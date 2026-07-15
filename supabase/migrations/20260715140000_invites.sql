@@ -3,11 +3,18 @@
 -- the guard: /join/[token] resolves an invite server-side (service role) and
 -- claims it for a client. Trainers manage invites for their own org.
 
+-- The invite token default uses gen_random_bytes(), which lives in the pgcrypto
+-- extension. The Supabase CLI pre-enables pgcrypto locally, but a fresh hosted
+-- project does not — enable it here so this migration is self-contained.
+-- Installed in the `extensions` schema (Supabase convention) and referenced
+-- schema-qualified below so it resolves regardless of the role's search_path.
+create extension if not exists pgcrypto with schema extensions;
+
 create table public.invites (
   id uuid primary key default gen_random_uuid(),
   org_id uuid not null references public.orgs (id) on delete cascade,
   client_id uuid not null references public.clients (id) on delete cascade,
-  token text not null unique default encode(gen_random_bytes(24), 'hex'),
+  token text not null unique default encode(extensions.gen_random_bytes(24), 'hex'),
   expires_at timestamptz not null default now() + interval '7 days',
   used_at timestamptz,
   created_at timestamptz not null default now(),
