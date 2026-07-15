@@ -1,0 +1,72 @@
+name: CI
+
+# Gate every PR into main, plus pushes on feature branches. main itself is
+# handled by deploy.yml. Branch protection (repo Settings → Branches) should
+# require the "Typecheck & lint" and "RLS + E2E" checks to pass before merge.
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches-ignore: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Typecheck & lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+
+  test:
+    name: RLS + E2E (local Supabase)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      # Brings up the local stack in Docker (present on ubuntu-latest) and
+      # applies every migration + seed — equivalent to `supabase db reset`.
+      - name: Start Supabase
+        run: supabase start
+
+      - name: RLS / pgTAP tests
+        run: supabase test db
+
+      # The Playwright suite seeds data through the service role, reading
+      # apps/web/.env.local. Generate it from the running local stack.
+      - name: Write apps/web/.env.local from local Supabase
+        run: |
+          supabase status -o env \
+            --override-name api.url=NEXT_PUBLIC_SUPABASE_URL \
+            --override-name auth.anon_key=NEXT_PUBLIC_SUPABASE_ANON_KEY \
+            --override-name auth.service_role_key=SUPABASE_SERVICE_ROLE_KEY \
+            > apps/web/.env.local
+          echo "NEXT_PUBLIC_APP_URL=http://localhost:3000" >> apps/web/.env.local
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+        working-directory: apps/web
+
+      # playwright.config.ts starts `npm run dev` itself and waits for :3000.
+      - name: Playwright smoke tests
+        run: npm run test
+        working-directory: apps/web

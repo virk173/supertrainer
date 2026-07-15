@@ -11,6 +11,7 @@
     "test": "playwright test"
   },
   "dependencies": {
+    "@sentry/nextjs": "^10.65.0",
     "@supabase/ssr": "^0.12.3",
     "@supabase/supabase-js": "^2.110.5",
     "@supertrainer/ai": "*",
@@ -18,6 +19,7 @@
     "@supertrainer/ui": "*",
     "lucide-react": "^1.24.0",
     "next": "15.5.20",
+    "posthog-node": "^5.44.0",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "server-only": "^0.0.1"

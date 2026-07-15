@@ -10,3 +10,10 @@ export {
   AiOutputValidationError,
   type ZodOutputParams,
 } from "./zodOutput";
+export {
+  flushTracing,
+  withAiTask,
+  currentAiTask,
+  recordGeneration,
+  type GenerationRecord,
+} from "./tracing";

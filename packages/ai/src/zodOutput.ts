@@ -3,6 +3,7 @@ import type { z } from "zod";
 
 import { getClaudeClient } from "./claude";
 import { modelRouter, type AiTask } from "./modelRouter";
+import { withAiTask } from "./tracing";
 
 export interface ZodOutputParams {
   task: AiTask;
@@ -33,14 +34,18 @@ export async function zodOutput<T>(
   const client = getClaudeClient();
   const model = modelRouter(params.task);
 
+  // Run inside the task context so the traced client (claude.ts) tags this
+  // generation with the AiTask in Langfuse.
   const attempt = () =>
-    client.messages.parse({
-      model,
-      max_tokens: params.maxTokens ?? 16000,
-      ...(params.system ? { system: params.system } : {}),
-      messages: [{ role: "user", content: params.prompt }],
-      output_config: { format: zodOutputFormat(schema) },
-    });
+    withAiTask(params.task, () =>
+      client.messages.parse({
+        model,
+        max_tokens: params.maxTokens ?? 16000,
+        ...(params.system ? { system: params.system } : {}),
+        messages: [{ role: "user", content: params.prompt }],
+        output_config: { format: zodOutputFormat(schema) },
+      }),
+    );
 
   // A schema-validation failure surfaces two ways depending on the SDK path:
   // messages.parse() THROWS a parse/validation error, or it resolves with a

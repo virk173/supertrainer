@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.111.0",
+    "langfuse": "^3.38.20",
     "zod": "^4.0.0"
   },
   "devDependencies": {
