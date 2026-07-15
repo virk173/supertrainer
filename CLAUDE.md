@@ -6,7 +6,7 @@ AI coaching platform for personal trainers. Full spec and phase plans: **docs/pl
 
 1. **All DB access goes through `packages/db`** — no raw Supabase clients constructed elsewhere.
 2. **All AI calls go through `packages/ai` `modelRouter(task)`** — never hardcode a model id at a call site.
-3. **Every new table ships with RLS policies + a policy test in the same PR.** No exceptions.
+3. **Every new table ships with RLS policies + a policy test in the same PR.** No exceptions. Supabase grants API roles NOTHING on new tables by default — every table migration must also include an explicit `grant` block (see `supabase/migrations/20260715130200_rls_policies.sql` for the pattern).
 4. **No LLM ever does arithmetic** — money and macros are computed in code; the LLM only selects/structures.
 5. **Zod-validate every AI output** — use `zodOutput()` from `packages/ai`; never consume unvalidated model output.
 
@@ -36,6 +36,10 @@ apps/web          Next.js app (App Router). Imports the three packages below.
 packages/db       Supabase client factories + generated types.
                   Import from "@supertrainer/db/server" | "/browser" | "/types".
                   Types regenerated via: npx supabase gen types typescript --local > packages/db/src/types.ts
+                  Migrations live in supabase/migrations (packages/db/migrations is a symlink);
+                  pgTAP RLS tests in supabase/tests (packages/db/tests is a symlink), run via `npx supabase test db`.
+                  JWT claims (org_id, user_role) come from public.custom_access_token_hook — RLS policies
+                  read them via public.jwt_org_id() / public.jwt_user_role() / public.is_org_staff().
 packages/ui       Design tokens (src/styles/globals.css) + shared shadcn components.
                   apps/web/app/globals.css imports "@supertrainer/ui/globals.css".
                   shadcn CLI installs shared components here (aliases in components.json).

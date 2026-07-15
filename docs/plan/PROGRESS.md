@@ -52,7 +52,7 @@ Sub-phase status for the actual build. Update after each sub-phase's Definition 
 
 ## Phase 0 — Foundations
 - [x] 0.1 Architecture lock-in + repo scaffold (2026-07-15, commit 5464db3) — monorepo boots, typecheck green, placeholder page verified in browser
-- [ ] 0.2 Supabase project, core schema, RLS (requires Docker)
+- [x] 0.2 Supabase project, core schema, RLS (2026-07-15) — 3 migrations apply cleanly, 26 pgTAP RLS tests green (cross-org, cross-client, audit_log isolation, privilege-escalation guards), org_id/user_role JWT claims via custom access token hook, types generated
 - [ ] 0.3 Auth flows + org bootstrap
 - [ ] 0.4 Design system baseline + app shells
 - [ ] 0.5 CI/CD + observability
