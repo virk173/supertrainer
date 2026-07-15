@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+import { isPathActive, roleHomePath } from "@/lib/routes";
 import { updateSession } from "@/lib/supabase/middleware";
 
 // Route guards (docs/plan/PHASE-0-foundations.md §0.3):
@@ -27,19 +28,20 @@ export async function middleware(request: NextRequest) {
     return response;
   };
 
-  if (path.startsWith("/trainer")) {
+  // Segment-aware matches so "/trainer-x" is not gated as "/trainer".
+  if (isPathActive(path, "/trainer")) {
     if (!isAuthed) return redirectTo("/login");
     if (role !== "owner" && role !== "staff") {
-      return redirectTo(role === "client" ? "/portal" : "/onboarding");
+      return redirectTo(roleHomePath(role));
     }
   }
 
-  if (path.startsWith("/portal")) {
+  if (isPathActive(path, "/portal")) {
     if (!isAuthed) return redirectTo("/login");
-    if (role !== "client") return redirectTo("/trainer");
+    if (role !== "client") return redirectTo(roleHomePath(role));
   }
 
-  if (path.startsWith("/onboarding") && !isAuthed) {
+  if (isPathActive(path, "/onboarding") && !isAuthed) {
     return redirectTo("/login");
   }
 

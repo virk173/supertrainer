@@ -9,7 +9,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(26);
+select plan(32);
 
 -- ── Fixtures (inserted as postgres — bypasses RLS) ───────────────────────────
 
@@ -18,6 +18,7 @@ insert into auth.users (id, email, aud, role) values
   ('a0000000-0000-0000-0000-000000000002', 'staff-a@test.local', 'authenticated', 'authenticated'),
   ('a0000000-0000-0000-0000-000000000003', 'client-a1@test.local', 'authenticated', 'authenticated'),
   ('a0000000-0000-0000-0000-000000000004', 'client-a2@test.local', 'authenticated', 'authenticated'),
+  ('a0000000-0000-0000-0000-000000000009', 'unclaimed-a@test.local', 'authenticated', 'authenticated'),
   ('b0000000-0000-0000-0000-000000000001', 'owner-b@test.local', 'authenticated', 'authenticated');
 
 insert into public.orgs (id, name, slug) values
@@ -127,6 +128,23 @@ select is_empty(
   'staff cannot read audit_log (owner-only)'
 );
 
+-- Privilege-escalation guards: profile lifecycle is service-role only, so even
+-- staff cannot mint a new profile (e.g. a second owner) or delete one.
+select throws_like(
+  $$ insert into public.profiles (id, org_id, role, display_name)
+     values ('a0000000-0000-0000-0000-000000000009',
+             '11111111-1111-1111-1111-111111111111', 'owner', 'Injected') $$,
+  '%permission denied%',
+  'staff cannot insert profiles (no INSERT grant)'
+);
+
+select throws_like(
+  $$ delete from public.profiles
+     where id = 'a0000000-0000-0000-0000-000000000001' $$,
+  '%permission denied%',
+  'staff cannot delete the owner''s profile (no DELETE grant)'
+);
+
 -- ── Persona: Client A1 ───────────────────────────────────────────────────────
 
 select set_config('request.jwt.claims',
@@ -169,6 +187,42 @@ select throws_ok(
        set status = 'paused'
      where id = 'c0000000-0000-0000-0000-0000000000a1' $$,
   'clients cannot modify restricted columns'
+);
+
+-- Consent timestamps pair with a server-set hash, and health flags are trainer
+-- annotations — a client must not forge either on their own record. (Distinct
+-- values so the trigger's is-distinct-from guard actually fires.)
+select throws_like(
+  $$ update public.clients
+       set consent_signed_at = now()
+     where id = 'c0000000-0000-0000-0000-0000000000a1' $$,
+  '%restricted columns%',
+  'clients cannot forge their consent timestamp'
+);
+
+select throws_like(
+  $$ update public.clients
+       set health_flags = '{"risk": "elevated"}'::jsonb
+     where id = 'c0000000-0000-0000-0000-0000000000a1' $$,
+  '%restricted columns%',
+  'clients cannot change trainer-set health flags'
+);
+
+-- audit_log is append-only and the actor cannot be spoofed (RLS 42501).
+select throws_ok(
+  $$ insert into public.audit_log (org_id, actor_profile_id, action)
+     values ('11111111-1111-1111-1111-111111111111',
+             'a0000000-0000-0000-0000-000000000001', 'org.deleted') $$,
+  '42501',
+  NULL,
+  'client cannot append an audit row attributed to another actor'
+);
+
+select lives_ok(
+  $$ insert into public.audit_log (org_id, actor_profile_id, action)
+     values ('11111111-1111-1111-1111-111111111111',
+             'a0000000-0000-0000-0000-000000000003', 'client.self_action') $$,
+  'client may append an audit row attributed to themselves'
 );
 
 select throws_like(

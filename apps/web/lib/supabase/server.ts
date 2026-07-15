@@ -1,3 +1,7 @@
+// Build-time guard: this module (and the RLS-bypassing service-role client it
+// re-exports) must never be pulled into a client bundle. Importing it from a
+// client component fails the build instead of leaking the service key.
+import "server-only";
 import { cookies } from "next/headers";
 
 import {

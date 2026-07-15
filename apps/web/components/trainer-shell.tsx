@@ -15,7 +15,9 @@ import {
 } from "lucide-react";
 
 import { Avatar } from "@supertrainer/ui/components/avatar";
-import { cn } from "@supertrainer/ui/lib/utils";
+import { cn, focusRing } from "@supertrainer/ui/lib/utils";
+
+import { isPathActive } from "@/lib/routes";
 
 const NAV_ITEMS = [
   { label: "Home", href: "/trainer", icon: Home },
@@ -68,7 +70,10 @@ export function TrainerShell({
         >
           <Link
             href="/trainer"
-            className="rounded-md text-sm font-semibold tracking-tight focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            className={cn(
+              "rounded-md text-sm font-semibold tracking-tight",
+              focusRing,
+            )}
           >
             <span className={cn(collapsed ? "" : "md:hidden")}>st</span>
             {!collapsed && (
@@ -79,10 +84,7 @@ export function TrainerShell({
 
         <nav aria-label="Primary" className="flex-1 space-y-1 p-2">
           {NAV_ITEMS.map(({ label, href, icon: Icon }) => {
-            const active =
-              href === "/trainer"
-                ? pathname === "/trainer"
-                : pathname.startsWith(href);
+            const active = isPathActive(pathname, href);
             return (
               <Link
                 key={href}
@@ -90,13 +92,13 @@ export function TrainerShell({
                 title={label}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+                  "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                  focusRing,
                   active
                     ? "bg-primary text-primary-foreground"
                     : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground",
-                  collapsed
-                    ? "justify-center px-2"
-                    : "justify-center px-2 md:justify-start md:px-3",
+                  "justify-center px-2",
+                  !collapsed && "md:justify-start md:px-3",
                 )}
               >
                 <Icon aria-hidden="true" className="size-4 shrink-0" />
@@ -115,10 +117,10 @@ export function TrainerShell({
             aria-expanded={!collapsed}
             aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
             className={cn(
-              "flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
-              collapsed
-                ? "justify-center px-2"
-                : "justify-center px-2 md:justify-start md:px-3",
+              "flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-foreground",
+              focusRing,
+              "justify-center px-2",
+              !collapsed && "md:justify-start md:px-3",
             )}
           >
             <PanelLeft aria-hidden="true" className="size-4 shrink-0" />
@@ -133,7 +135,10 @@ export function TrainerShell({
           <button
             type="button"
             title="Org switching arrives in a later phase"
-            className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium transition-colors hover:bg-foreground/5 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            className={cn(
+              "flex items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium transition-colors hover:bg-foreground/5",
+              focusRing,
+            )}
           >
             <span className="truncate">My coaching org</span>
             <ChevronsUpDown

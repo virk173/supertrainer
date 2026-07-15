@@ -12,10 +12,21 @@ export const metadata = { title: "Onboarding — supertrainer" };
 export default async function OnboardingPage() {
   const supabase = await createClient();
 
-  // RLS: users read their own profile; staff read org profiles.
+  const { data: claimsData } = await supabase.auth.getClaims();
+  const userId =
+    typeof claimsData?.claims?.sub === "string" ? claimsData.claims.sub : null;
+
+  if (!userId) {
+    redirect("/login?error=Please%20sign%20in%20again");
+  }
+
+  // Filter to the caller's own row: owners/staff can read every profile in
+  // their org (RLS), so an unfiltered maybeSingle() errors once the org has
+  // more than one member.
   const { data: profile } = await supabase
     .from("profiles")
     .select("display_name, role, org_id, orgs(name, slug)")
+    .eq("id", userId)
     .maybeSingle();
 
   if (!profile) {

@@ -12,7 +12,9 @@ import {
 } from "lucide-react";
 
 import { Avatar } from "@supertrainer/ui/components/avatar";
-import { cn } from "@supertrainer/ui/lib/utils";
+import { cn, focusRing } from "@supertrainer/ui/lib/utils";
+
+import { isPathActive } from "@/lib/routes";
 
 const TAB_ITEMS = [
   { label: "Today", href: "/portal", icon: Sun },
@@ -67,17 +69,16 @@ export function PortalShell({
       >
         <div className="mx-auto flex w-full max-w-lg">
           {TAB_ITEMS.map(({ label, href, icon: Icon }) => {
-            const active =
-              href === "/portal"
-                ? pathname === "/portal"
-                : pathname.startsWith(href);
+            const active = isPathActive(pathname, href);
             return (
               <Link
                 key={href}
                 href={href}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "flex flex-1 flex-col items-center gap-1 py-2 text-[11px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring",
+                  "flex flex-1 flex-col items-center gap-1 py-2 text-[11px] font-medium transition-colors",
+                  focusRing,
+                  "focus-visible:ring-inset",
                   active
                     ? "text-foreground"
                     : "text-muted-foreground hover:text-foreground",

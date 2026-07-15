@@ -1,8 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
-import { createClient } from "@supabase/supabase-js";
 
-import type { Database } from "@supertrainer/db/types";
+import { seedClient, uniqueEmail } from "./helpers";
 
 const DESKTOP = { width: 1280, height: 800 };
 const MOBILE = { width: 375, height: 812 };
@@ -107,46 +106,12 @@ test.describe("portal shell on the real route", () => {
   test("mobile + desktop, light + dark: overflow-free, axe AA clean", async ({
     page,
   }) => {
-    // Seed a client the same way auth.spec.ts does — service role only.
-    const service = createClient<Database>(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      { auth: { persistSession: false, autoRefreshToken: false } },
-    );
-    const email = `styleguide-client-${Date.now()}@test.local`;
-
-    const { data: created, error: createError } =
-      await service.auth.admin.createUser({ email, email_confirm: true });
-    expect(createError).toBeNull();
-    const userId = created!.user!.id;
-
-    const { data: org, error: orgError } = await service
-      .from("orgs")
-      .insert({ name: "Styleguide Org", slug: `styleguide-${Date.now()}` })
-      .select("id")
-      .single();
-    expect(orgError).toBeNull();
-
-    await service.from("profiles").insert({
-      id: userId,
-      org_id: org!.id,
-      role: "client",
-      display_name: "Styleguide Client",
-    });
-    await service.from("clients").insert({
-      org_id: org!.id,
-      profile_id: userId,
-      status: "active",
-      source: "invite",
-    });
-
-    const { data: linkData, error: linkError } =
-      await service.auth.admin.generateLink({ type: "magiclink", email });
-    expect(linkError).toBeNull();
+    // Seed a client (service role) and sign in through the real confirm route.
+    const { tokenHash } = await seedClient(uniqueEmail("styleguide-client"));
 
     await page.setViewportSize(MOBILE);
     await page.goto(
-      `/auth/confirm?token_hash=${linkData!.properties!.hashed_token}&type=email&next=/portal`,
+      `/auth/confirm?token_hash=${tokenHash}&type=email&next=/portal`,
     );
     await expect(page.getByTestId("portal-home")).toBeVisible();
 
@@ -160,9 +125,12 @@ test.describe("portal shell on the real route", () => {
     await expectAxeAAClean(page);
     await page.screenshot({ path: `${SHOTS}/portal-mobile-dark.png` });
 
+    // Reset BOTH the class and the emulated media, or the "light" desktop shot
+    // is captured while prefers-color-scheme:dark is still emulated.
     await page.evaluate(() =>
       document.documentElement.classList.remove("dark"),
     );
+    await page.emulateMedia({ colorScheme: "light" });
     await page.setViewportSize(DESKTOP);
     await expectNoHorizontalOverflow(page);
     await page.screenshot({ path: `${SHOTS}/portal-desktop-light.png` });

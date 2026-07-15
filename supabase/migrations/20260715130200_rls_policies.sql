@@ -25,9 +25,10 @@ grant select, insert, update, delete
   on table public.orgs, public.clients, public.events
   to authenticated;
 
--- Privilege-escalation guard: org_id/role are never writable through the API —
--- they change only via the service role. UPDATE is column-limited.
-grant select, insert, delete on table public.profiles to authenticated;
+-- Privilege-escalation guard: org_id/role are never writable through the API,
+-- and profile lifecycle (create/delete, role assignment) is service-role only.
+-- So API roles get SELECT + a column-limited UPDATE — never INSERT/DELETE.
+grant select on table public.profiles to authenticated;
 grant update (display_name, timezone, locale, avatar_url)
   on table public.profiles
   to authenticated;
@@ -59,8 +60,16 @@ create policy "auth admin can read profiles"
   to supabase_auth_admin
   using (true);
 
-create policy "staff full access to org profiles"
-  on public.profiles for all
+-- Staff read every profile in their org and update the column-limited set
+-- above — but INSERT/DELETE are not granted, so creating or removing profiles
+-- (and thus minting owners or deleting an owner) stays service-role only.
+create policy "staff can read org profiles"
+  on public.profiles for select
+  to authenticated
+  using ((select public.is_org_staff(org_id)));
+
+create policy "staff can update org profiles"
+  on public.profiles for update
   to authenticated
   using ((select public.is_org_staff(org_id)))
   with check ((select public.is_org_staff(org_id)));
@@ -95,8 +104,10 @@ create policy "clients can update own record"
   using (profile_id = (select auth.uid()))
   with check (profile_id = (select auth.uid()));
 
--- Structural columns stay server-controlled for client-role users (status
--- changes, org moves, and consent hashes go through staff or service role).
+-- Structural and trainer/system-controlled columns stay read-only for
+-- client-role users (status changes, org moves, consent hashes/timestamps, and
+-- trainer health flags go through staff or the service role). Clients may still
+-- edit their own intake questionnaire.
 create or replace function public.clients_block_restricted_updates()
 returns trigger
 language plpgsql
@@ -107,7 +118,9 @@ begin
       or new.profile_id is distinct from old.profile_id
       or new.status is distinct from old.status
       or new.source is distinct from old.source
-      or new.consent_doc_hash is distinct from old.consent_doc_hash then
+      or new.consent_doc_hash is distinct from old.consent_doc_hash
+      or new.consent_signed_at is distinct from old.consent_signed_at
+      or new.health_flags is distinct from old.health_flags then
       raise exception 'clients cannot modify restricted columns';
     end if;
   end if;
@@ -121,10 +134,19 @@ create trigger clients_guard_restricted_updates
 
 -- ── audit_log (append-only) ──────────────────────────────────────────────────
 
+-- Append-only, and the actor cannot be spoofed: an authenticated caller may
+-- only attribute a row to themselves (or leave it null for system events).
+-- Cross-actor/backfilled audit rows go through the service role.
 create policy "authenticated can append audit rows for own org"
   on public.audit_log for insert
   to authenticated
-  with check (org_id = (select public.jwt_org_id()));
+  with check (
+    org_id = (select public.jwt_org_id())
+    and (
+      actor_profile_id is null
+      or actor_profile_id = (select auth.uid())
+    )
+  );
 
 create policy "owners can read org audit log"
   on public.audit_log for select

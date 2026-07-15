@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { type NextRequest } from "next/server";
 
 import { bootstrapOrgIfNeeded } from "@/lib/auth/bootstrap";
+import { safeRelativePath } from "@/lib/routes";
 import { createClient } from "@/lib/supabase/server";
 
 // Email OTP / magic-link verification per current Supabase SSR docs. The email
@@ -11,7 +12,8 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const token_hash = searchParams.get("token_hash");
   const type = searchParams.get("type") as EmailOtpType | null;
-  const next = searchParams.get("next") ?? "/onboarding";
+  // Guard against open redirect: `next` must be a same-origin relative path.
+  const next = safeRelativePath(searchParams.get("next"));
 
   if (token_hash && type) {
     const supabase = await createClient();

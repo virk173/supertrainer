@@ -41,7 +41,9 @@ export async function bootstrapOrgIfNeeded(
   if (profileError) throw profileError;
 
   if (!profile) {
-    const emailLocal = user.email?.split("@")[0] ?? "trainer";
+    // `||` not `??`: an email like "@example.com" splits to "" (not null), and
+    // an empty org name/slug is worse than the generic fallback.
+    const emailLocal = user.email?.split("@")[0] || "trainer";
     const suffix = crypto.randomUUID().slice(0, 6);
 
     const { data: org, error: orgError } = await service
@@ -60,7 +62,18 @@ export async function bootstrapOrgIfNeeded(
       role: "owner",
       display_name: emailLocal,
     });
-    if (insertError) throw insertError;
+    if (insertError) {
+      // Concurrent first sign-in (e.g. a link prefetch racing the click): the
+      // other request already created this user's profile. The profiles PK is
+      // user.id, so a unique violation means we lost the race — the org we just
+      // created is now orphaned; delete it and defer to the winner's profile.
+      if (insertError.code === "23505") {
+        await service.from("orgs").delete().eq("id", org.id);
+        await supabase.auth.refreshSession();
+        return;
+      }
+      throw insertError;
+    }
 
     await service.from("audit_log").insert({
       org_id: org.id,
