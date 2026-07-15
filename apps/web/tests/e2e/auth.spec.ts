@@ -80,7 +80,7 @@ test("client role is blocked from /trainer routes", async ({ page }) => {
   const { data: created, error: createError } =
     await service.auth.admin.createUser({ email, email_confirm: true });
   expect(createError).toBeNull();
-  const userId = created!.user.id;
+  const userId = created!.user!.id;
 
   const { data: org, error: orgError } = await service
     .from("orgs")
@@ -108,7 +108,7 @@ test("client role is blocked from /trainer routes", async ({ page }) => {
   expect(linkError).toBeNull();
 
   await page.goto(
-    `/auth/confirm?token_hash=${linkData!.properties.hashed_token}&type=email&next=/portal`,
+    `/auth/confirm?token_hash=${linkData!.properties!.hashed_token}&type=email&next=/portal`,
   );
   await expect(page.getByTestId("portal-home")).toBeVisible();
 

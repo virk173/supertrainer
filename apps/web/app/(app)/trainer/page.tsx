@@ -1,15 +1,23 @@
-export const metadata = { title: "Dashboard — supertrainer" };
+import { Users } from "lucide-react";
 
-// Placeholder — Phase 0.4 builds the TrainerShell (sidebar nav, topbar).
+import { EmptyState } from "@supertrainer/ui/components/empty-state";
+
+export const metadata = { title: "Home — supertrainer" };
+
 export default function TrainerHomePage() {
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-2 p-8">
-      <h1 className="text-2xl font-semibold tracking-tight" data-testid="trainer-home">
-        Trainer dashboard
+    <div className="space-y-6">
+      <h1
+        className="text-2xl font-semibold tracking-tight"
+        data-testid="trainer-home"
+      >
+        Home
       </h1>
-      <p className="text-muted-foreground">
-        Empty shell — the real dashboard arrives in Phase 0.4 and Phase 7.
-      </p>
-    </main>
+      <EmptyState
+        icon={<Users />}
+        title="No clients yet"
+        description="Invite your first client to see their adherence, plans, and messages here."
+      />
+    </div>
   );
 }

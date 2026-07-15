@@ -1,15 +1,23 @@
+import { Sun } from "lucide-react";
+
+import { EmptyState } from "@supertrainer/ui/components/empty-state";
+
 export const metadata = { title: "Today — supertrainer" };
 
-// Placeholder — Phase 0.4 builds the PortalShell (mobile bottom tabs).
 export default function PortalHomePage() {
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-2 p-8">
-      <h1 className="text-2xl font-semibold tracking-tight" data-testid="portal-home">
-        Client portal
+    <div className="space-y-4">
+      <h1
+        className="text-xl font-semibold tracking-tight"
+        data-testid="portal-home"
+      >
+        Today
       </h1>
-      <p className="text-muted-foreground">
-        Empty shell — logging and plans arrive in Phase 2 and 3.
-      </p>
-    </main>
+      <EmptyState
+        icon={<Sun />}
+        title="Nothing to log yet"
+        description="Your trainer is setting things up. Your plan and daily check-ins will appear here."
+      />
+    </div>
   );
 }

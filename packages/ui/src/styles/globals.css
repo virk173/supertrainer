@@ -1,15 +1,19 @@
 /*
- * supertrainer design tokens — baseline (Phase 0.1).
- * Phase 0.4 builds the full design system (app shells, surface scale,
- * component states) on top of these variables. Semantic names only —
- * components never reference raw color values.
+ * supertrainer design tokens (Phase 0.4).
+ * Semantic names only — components never reference raw color values.
  *
  * Conventions:
  *  - Spacing: 4px grid (--spacing: 0.25rem — every Tailwind spacing step is a
  *    multiple of 4px).
  *  - Radii: 6px inputs/buttons (--radius-input), 10px cards (--radius-card).
- *  - Colors: shadcn/ui neutral base (oklch), light + dark, plus
- *    success/warning used by adherence scoring UI in later phases.
+ *  - Colors: shadcn/ui neutral base (oklch), light + dark. Chrome is
+ *    achromatic by design — color is reserved for state (success = adherence
+ *    hit, warning = drift, danger = missed/destructive) so a colored mark
+ *    always means something about a client, never decoration.
+ *  - Surfaces: three-step elevation scale — background (page) → surface
+ *    (sidebar, wells, tab bars) → surface-raised (cards, popovers).
+ *  - Metrics: every numeric display uses the `metric` utility (semibold,
+ *    tabular numerals) so digits align in tables and tiles.
  */
 
 @import "tailwindcss";
@@ -17,23 +21,39 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
+  color-scheme: light;
+}
+
+.dark {
+  color-scheme: dark;
+}
+
+:root {
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
+  --surface: oklch(0.975 0 0);
+  --surface-foreground: oklch(0.145 0 0);
+  --surface-raised: oklch(1 0 0);
+  --surface-raised-foreground: oklch(0.145 0 0);
+  --card: var(--surface-raised);
+  --card-foreground: var(--surface-raised-foreground);
+  --popover: var(--surface-raised);
+  --popover-foreground: var(--surface-raised-foreground);
   --primary: oklch(0.205 0 0);
   --primary-foreground: oklch(0.985 0 0);
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
   --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
+  /* Deep enough for 4.5:1 on --surface, not just on --background. */
+  --muted-foreground: oklch(0.52 0 0);
   --accent: oklch(0.97 0 0);
   --accent-foreground: oklch(0.205 0 0);
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(0.985 0 0);
-  --success: oklch(0.627 0.17 149.2);
+  --danger: var(--destructive);
+  --danger-foreground: var(--destructive-foreground);
+  /* Dark enough that white foreground text passes AA at body size. */
+  --success: oklch(0.527 0.154 150.069);
   --success-foreground: oklch(0.985 0 0);
   --warning: oklch(0.769 0.164 70.08);
   --warning-foreground: oklch(0.205 0 0);
@@ -48,10 +68,14 @@
 .dark {
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
+  --surface: oklch(0.185 0 0);
+  --surface-foreground: oklch(0.985 0 0);
+  --surface-raised: oklch(0.225 0 0);
+  --surface-raised-foreground: oklch(0.985 0 0);
+  --card: var(--surface-raised);
+  --card-foreground: var(--surface-raised-foreground);
+  --popover: var(--surface-raised);
+  --popover-foreground: var(--surface-raised-foreground);
   --primary: oklch(0.922 0 0);
   --primary-foreground: oklch(0.205 0 0);
   --secondary: oklch(0.269 0 0);
@@ -61,7 +85,10 @@
   --accent: oklch(0.269 0 0);
   --accent-foreground: oklch(0.985 0 0);
   --destructive: oklch(0.704 0.191 22.216);
-  --destructive-foreground: oklch(0.985 0 0);
+  /* Dark ink — white on the dark-mode red is ~3.4:1, under AA body-text. */
+  --destructive-foreground: oklch(0.145 0 0);
+  --danger: var(--destructive);
+  --danger-foreground: var(--destructive-foreground);
   --success: oklch(0.696 0.17 149.2);
   --success-foreground: oklch(0.205 0 0);
   --warning: oklch(0.795 0.184 86.05);
@@ -75,6 +102,10 @@
   --spacing: 0.25rem;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-foreground: var(--surface-foreground);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-raised-foreground: var(--surface-raised-foreground);
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);
   --color-popover: var(--popover);
@@ -89,6 +120,8 @@
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
+  --color-danger: var(--danger);
+  --color-danger-foreground: var(--danger-foreground);
   --color-success: var(--success);
   --color-success-foreground: var(--success-foreground);
   --color-warning: var(--warning);
@@ -111,4 +144,29 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* Motion is decorative here — honor the OS-level opt-out wholesale. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/*
+ * Metric display — the one treatment every numeric value wears (adherence %,
+ * macros, money, streaks). Tabular numerals keep digit columns aligned;
+ * money/macros are always computed in code before they reach the UI.
+ */
+@utility metric {
+  @apply font-semibold tabular-nums tracking-tight;
+}
+
+/* Micro-label above a metric ("PROTEIN", "ADHERENCE 7D"). */
+@utility metric-label {
+  @apply text-[11px] font-medium uppercase tracking-wider text-muted-foreground;
 }

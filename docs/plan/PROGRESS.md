@@ -54,5 +54,5 @@ Sub-phase status for the actual build. Update after each sub-phase's Definition 
 - [x] 0.1 Architecture lock-in + repo scaffold (2026-07-15, commit 5464db3) — monorepo boots, typecheck green, placeholder page verified in browser
 - [x] 0.2 Supabase project, core schema, RLS (2026-07-15) — 3 migrations apply cleanly, 26 pgTAP RLS tests green (cross-org, cross-client, audit_log isolation, privilege-escalation guards), org_id/user_role JWT claims via custom access token hook, types generated
 - [x] 0.3 Auth flows + org bootstrap (2026-07-15) — email OTP + Google OAuth (code path; creds pending), org bootstrap with claim refresh, invites table + RLS tests (33 total green), role-guard middleware, 2 Playwright smoke tests green
-- [ ] 0.4 Design system baseline + app shells
+- [x] 0.4 Design system baseline + app shells (2026-07-15) — semantic tokens (surface scale, status colors, metric utility) light+dark, TrainerShell (collapsible sidebar + topbar) and PortalShell (bottom tabs) wired as layouts, EmptyState/Skeleton/ErrorBoundary primitives, /styleguide QA route; 3 Playwright checks green (screenshots light+dark & mobile+desktop, zero horizontal overflow, axe-core WCAG AA clean incl. real /portal route), all 5 e2e green
 - [ ] 0.5 CI/CD + observability

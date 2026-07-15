@@ -14,11 +14,13 @@
     "@supertrainer/ai": "*",
     "@supertrainer/db": "*",
     "@supertrainer/ui": "*",
+    "lucide-react": "^1.24.0",
     "next": "15.5.20",
     "react": "19.1.0",
     "react-dom": "19.1.0"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.12.1",
     "@eslint/eslintrc": "^3",
     "@playwright/test": "^1.61.1",
     "@tailwindcss/postcss": "^4",

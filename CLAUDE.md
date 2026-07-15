@@ -65,4 +65,5 @@ docs/plan         The build plan — phase prompts reference these paths.
 - Server components + server actions by default; route handlers only for webhooks/streaming (no tRPC).
 - Service-role Supabase client (`createSupabaseServiceRoleClient`) is server-only — never import into client components.
 - `NEXT_PUBLIC_*` env vars are browser-exposed; secrets never get that prefix. Every env var is documented in `.env.example`.
-- Design tokens are semantic CSS variables — components never hardcode colors; 4px spacing grid; radii: 6px inputs, 10px cards.
+- Design tokens are semantic CSS variables — components never hardcode colors; 4px spacing grid; radii: 6px inputs, 10px cards. Chrome is achromatic; color is reserved for state (success/warning/danger). Surfaces: background → surface (sidebars, wells) → surface-raised (cards).
+- Numeric displays always use the `metric` utility (semibold tabular numerals) with a `metric-label` eyebrow; every screen renders EmptyState / Skeleton / ErrorBoundary (packages/ui) before its data exists.
