@@ -190,6 +190,54 @@ export type Database = {
           },
         ]
       }
+      invites: {
+        Row: {
+          client_id: string
+          created_at: string
+          expires_at: string
+          id: string
+          org_id: string
+          token: string
+          updated_at: string
+          used_at: string | null
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          org_id: string
+          token?: string
+          updated_at?: string
+          used_at?: string | null
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          org_id?: string
+          token?: string
+          updated_at?: string
+          used_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invites_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invites_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       orgs: {
         Row: {
           brand: Json

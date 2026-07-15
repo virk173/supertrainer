@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { Button } from "@supertrainer/ui/components/button";
 
 export default function Home() {
@@ -11,8 +13,12 @@ export default function Home() {
         </p>
       </div>
       <div className="flex gap-3">
-        <Button>Get started</Button>
-        <Button variant="outline">View plan</Button>
+        <Button asChild>
+          <Link href="/signup">Get started</Link>
+        </Button>
+        <Button variant="outline" asChild>
+          <Link href="/login">Log in</Link>
+        </Button>
       </div>
     </main>
   );
