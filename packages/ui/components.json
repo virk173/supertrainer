@@ -1,0 +1,21 @@
+{
+  "$schema": "https://ui.shadcn.com/schema.json",
+  "style": "new-york",
+  "rsc": true,
+  "tsx": true,
+  "tailwind": {
+    "config": "",
+    "css": "src/styles/globals.css",
+    "baseColor": "neutral",
+    "cssVariables": true,
+    "prefix": ""
+  },
+  "iconLibrary": "lucide",
+  "aliases": {
+    "components": "@supertrainer/ui/components",
+    "utils": "@supertrainer/ui/lib/utils",
+    "ui": "@supertrainer/ui/components",
+    "lib": "@supertrainer/ui/lib",
+    "hooks": "@supertrainer/ui/hooks"
+  }
+}

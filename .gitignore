@@ -1,0 +1,40 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+.next/
+out/
+dist/
+build/
+
+# Turborepo
+.turbo/
+
+# Environment — never commit real secrets; .env.example is the template
+.env
+.env.*
+!.env.example
+
+# Supabase local dev
+supabase/.temp/
+supabase/.branches/
+
+# Test artifacts
+coverage/
+playwright-report/
+test-results/
+
+# OS / editor
+.DS_Store
+*.pem
+
+# Logs
+npm-debug.log*
+*.log
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+
+# Vercel
+.vercel/

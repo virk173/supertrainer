@@ -1,0 +1,5 @@
+/* Design tokens + Tailwind live in packages/ui — single source of truth. */
+@import "@supertrainer/ui/globals.css";
+
+/* Tailwind's auto content detection doesn't scan workspace packages. */
+@source "../../../packages/ui/src";
