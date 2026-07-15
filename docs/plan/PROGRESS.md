@@ -43,3 +43,16 @@ Task: Optimize AI Coaching Platform spec → master plan + ordered phase files w
 
 ## FINAL STATE: verified complete (iteration 1)
 Two independent fresh-eyes reviews confirm: phases ordered, pipelines in sync (every table/function created before first use, stubs explicit), both onboarding funnels gap-free end-to-end (trainer signup→payout incl. payments checklist step; client teaser→first-log<24h→paying incl. 8.6 beta cutover), all prompts self-contained with resolvable docs/plan/ paths, research incorporated (repos per phase, plugin gaps, dashboard arsenal + design harness).
+
+---
+
+# Build progress (repo: supertrainer)
+
+Sub-phase status for the actual build. Update after each sub-phase's Definition of Done passes.
+
+## Phase 0 — Foundations
+- [x] 0.1 Architecture lock-in + repo scaffold (2026-07-15, commit 5464db3) — monorepo boots, typecheck green, placeholder page verified in browser
+- [ ] 0.2 Supabase project, core schema, RLS (requires Docker)
+- [ ] 0.3 Auth flows + org bootstrap
+- [ ] 0.4 Design system baseline + app shells
+- [ ] 0.5 CI/CD + observability
