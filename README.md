@@ -16,7 +16,7 @@ docs/plan      Product spec + phase build plans (source of truth for scope)
 
 ## Local dev quickstart
 
-Prereqs: Node ≥ 20, npm ≥ 10, Docker (for Supabase local, from Phase 0.2 on).
+Prereqs: Node ≥ 22 (Supabase JS needs a native WebSocket), npm ≥ 10, Docker (for Supabase local, from Phase 0.2 on).
 
 ```bash
 npm install                 # install all workspaces
