@@ -243,31 +243,40 @@ export type Database = {
       }
       invites: {
         Row: {
+          channel: Database["public"]["Enums"]["invite_channel"]
           client_id: string
           created_at: string
           expires_at: string
           id: string
+          opened_at: string | null
           org_id: string
+          personal_message: string | null
           token: string
           updated_at: string
           used_at: string | null
         }
         Insert: {
+          channel?: Database["public"]["Enums"]["invite_channel"]
           client_id: string
           created_at?: string
           expires_at?: string
           id?: string
+          opened_at?: string | null
           org_id: string
+          personal_message?: string | null
           token?: string
           updated_at?: string
           used_at?: string | null
         }
         Update: {
+          channel?: Database["public"]["Enums"]["invite_channel"]
           client_id?: string
           created_at?: string
           expires_at?: string
           id?: string
+          opened_at?: string | null
           org_id?: string
+          personal_message?: string | null
           token?: string
           updated_at?: string
           used_at?: string | null
@@ -608,6 +617,7 @@ export type Database = {
     Enums: {
       client_source: "teaser" | "invite" | "import"
       client_status: "lead" | "onboarding" | "active" | "paused" | "churned"
+      invite_channel: "copy_link" | "email"
       onboarding_step:
         | "brand"
         | "style"
@@ -755,6 +765,7 @@ export const Constants = {
     Enums: {
       client_source: ["teaser", "invite", "import"],
       client_status: ["lead", "onboarding", "active", "paused", "churned"],
+      invite_channel: ["copy_link", "email"],
       onboarding_step: ["brand", "style", "tiers", "import", "demo", "invite"],
       onboarding_step_status: ["todo", "done", "skipped"],
       org_role: ["owner", "staff", "client"],

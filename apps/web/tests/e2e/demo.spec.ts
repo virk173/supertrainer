@@ -44,7 +44,16 @@ test("demo client: create is idempotent, badged, completes the step", async ({
   // Teaser share renders the branded link.
   await expect(page.getByTestId("teaser-url")).toContainText("/c/");
 
-  // Step complete.
+  // Step complete, and the funnel event fired via completeStep.
+  const { data: events } = await service
+    .from("events")
+    .select("payload")
+    .eq("org_id", orgId)
+    .eq("type", "onboarding_step_completed");
+  expect(
+    events?.some((e) => (e.payload as { step?: string }).step === "demo"),
+  ).toBe(true);
+
   await page.goto("/onboarding");
   await expect(page.getByTestId("step-status-demo")).toHaveText("Done");
 });
