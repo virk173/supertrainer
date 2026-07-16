@@ -41,6 +41,13 @@ npx supabase db reset       # re-apply all migrations from scratch
 | `npm run lint`      | ESLint across every workspace                 |
 | `npm run test`      | Test suites across every workspace            |
 
+## CI / Deploy
+
+- **Production:** https://supertrainer-web.vercel.app (Vercel, auto-deploys on merge to `main`; preview deployment per PR).
+- **CI** (`.github/workflows/ci.yml`, on every PR): typecheck + lint, plus a local-Supabase job running the pgTAP RLS tests and Playwright smoke suite.
+- **Migrations** (`.github/workflows/migrate.yml`): manually triggered (`workflow_dispatch`) `supabase db push` to production.
+- One-time account/secret setup is documented in [docs/ci-cd-observability.md](docs/ci-cd-observability.md).
+
 ## Standing rules
 
 See [CLAUDE.md](CLAUDE.md) — architecture decisions and the non-negotiable build rules (RLS on every table, all AI through `packages/ai`, no LLM arithmetic, Zod-validate every AI output).
