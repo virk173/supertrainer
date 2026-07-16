@@ -65,6 +65,12 @@ jobs:
         working-directory: apps/web
 
       # playwright.config.ts starts `npm run dev` itself and waits for :3000.
+      # ANTHROPIC_API_KEY (repo secret) flows to both the test process (the
+      # live style-ingestion test's skip guard) and the dev-server subprocess
+      # Playwright spawns (server-side getClaudeClient + the import mapColumns
+      # agent). Absent → the AI-dependent tests skip and CI still passes.
       - name: Playwright smoke tests
         run: npm run test
         working-directory: apps/web
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
