@@ -20,25 +20,35 @@ git push -u origin main
 
 ## 2. Secrets (repo Settings → Secrets and variables → Actions)
 
-| Secret | Used by | Where to get it |
-|---|---|---|
-| `VERCEL_TOKEN` | deploy.yml | Vercel → Account Settings → Tokens |
-| `VERCEL_ORG_ID` | deploy.yml | `.vercel/project.json` after `vercel link`, or Vercel project settings |
-| `VERCEL_PROJECT_ID` | deploy.yml | same as above |
-| `SUPABASE_ACCESS_TOKEN` | deploy.yml | Supabase → Account → Access Tokens |
-| `SUPABASE_PROJECT_REF` | deploy.yml | Supabase project ref (dashboard URL / Project Settings) |
-| `SUPABASE_DB_PASSWORD` | deploy.yml | Supabase → Project Settings → Database |
+Only the migration workflow (`migrate.yml`) needs secrets — app deploys run
+through Vercel's Git integration, not Actions.
+
+| Secret | Where to get it |
+|---|---|
+| `SUPABASE_ACCESS_TOKEN` | Supabase → Account → Access Tokens |
+| `SUPABASE_PROJECT_REF` | Supabase project ref (dashboard URL / Settings → General) |
+| `SUPABASE_DB_PASSWORD` | the DB password set at project creation (Settings → Database to reset) |
 
 CI (`ci.yml`) needs **no secrets** — it spins up a throwaway local Supabase.
 
-## 3. Vercel project
+## 3. Vercel project (Git integration)
 
-`vercel link` (or import the repo in the Vercel dashboard) to create the project,
-then set the **runtime** env vars in Vercel (Project → Settings → Environment
-Variables) from `.env.example`: the `NEXT_PUBLIC_SUPABASE_*`,
-`SUPABASE_SERVICE_ROLE_KEY`, `ANTHROPIC_API_KEY`, and the observability keys
-below. Also set the **build-time** Sentry vars (`SENTRY_ORG`, `SENTRY_PROJECT`,
-`SENTRY_AUTH_TOKEN`) so source maps upload during the Vercel build.
+Import the repo in the Vercel dashboard (New Project → import
+`virk173/supertrainer`):
+- **Root Directory: `apps/web`** — critical; it's a Turborepo monorepo.
+- Framework preset: **Next.js** (auto-detected).
+- Add the **runtime** env vars from `.env.example`: `NEXT_PUBLIC_SUPABASE_URL`,
+  `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`,
+  `ANTHROPIC_API_KEY`, `NEXT_PUBLIC_APP_URL`, plus the observability keys when
+  set up. Add the **build-time** Sentry vars (`SENTRY_ORG`, `SENTRY_PROJECT`,
+  `SENTRY_AUTH_TOKEN`) so source maps upload during the Vercel build.
+
+Vercel then deploys production on every push to main and a preview on every PR.
+
+> Ordering note: production deploy and the gated migration run independently on
+> merge — fine for backward-compatible (expand-contract) migrations. For strict
+> migrate-before-serve ordering, disable Vercel's production auto-deploy and
+> trigger it via a Vercel Deploy Hook at the end of the migrate job.
 
 ## 4. Observability dashboards
 
@@ -80,8 +90,8 @@ below. Also set the **build-time** Sentry vars (`SENTRY_ORG`, `SENTRY_PROJECT`,
 ## 6. Verify (Phase 0.5 DoD)
 
 1. Open a trivial PR → both CI jobs go green (typecheck/lint, and RLS + E2E).
-2. Merge → the `migrations` job waits for approval → approve → `db push` runs →
-   Vercel production deploy completes.
+2. Merge → Vercel deploys production (its Git integration); the `migrations`
+   job pauses for approval → approve → `db push` runs.
 3. Hit `GET /api/debug/sentry` on the deployed URL → a **Sentry test event**
    appears (returns 501 until `SENTRY_DSN` is set).
 4. Load any page → a **$pageview** appears in PostHog (and the browser network

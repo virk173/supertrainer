@@ -1,0 +1,37 @@
+name: Migrate (production DB)
+
+# Runs on merge to main: apply DB migrations behind a manual approval gate.
+# App deploys are handled by Vercel's native Git integration (production on
+# main, preview deployments on PRs) — not this workflow.
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: migrate-main
+  cancel-in-progress: false
+
+jobs:
+  migrations:
+    name: Supabase migrations (db push)
+    runs-on: ubuntu-latest
+    # Manual approval gate: configure required reviewers on the "production"
+    # environment (repo Settings → Environments → production). The job pauses
+    # here until an approver signs off before any migration hits prod.
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Link project
+        run: supabase link --project-ref "$SUPABASE_PROJECT_REF"
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+      - name: Push migrations
+        run: supabase db push
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
