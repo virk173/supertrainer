@@ -55,24 +55,36 @@ test("activation checklist: out-of-order progress persists across reloads", asyn
 test("resume banner shows while steps remain, clears on completion", async ({
   page,
 }) => {
-  await signInAsTrainer(page);
+  const { orgId } = await signInAsTrainer(page);
 
   // Steps remain → the trainer shell shows the resume banner.
   await page.goto("/trainer");
   await expect(page.getByTestId("trainer-home")).toBeVisible();
   await expect(page.getByTestId("resume-onboarding-banner")).toBeVisible();
 
-  // Resolve every step: skip the skippables, complete the rest through stubs.
+  // Resolve every step. brand/style now have real flows (covered by their own
+  // specs); this test only cares about banner logic, so mark them done at the
+  // data layer and drive the remaining stub steps through the UI.
+  await serviceClient()
+    .from("org_onboarding_state")
+    .upsert(
+      [
+        { org_id: orgId, step: "brand", status: "done", completed_at: new Date().toISOString() },
+        { org_id: orgId, step: "style", status: "done", completed_at: new Date().toISOString() },
+      ],
+      { onConflict: "org_id,step" },
+    )
+    .throwOnError();
+
   await page.goto("/onboarding");
-  for (const step of ["brand", "import"]) {
-    await page
-      .getByTestId(`step-${step}`)
-      .locator('[data-slot="accordion-trigger"]')
-      .click();
-    await page.getByTestId(`skip-${step}`).click();
-    await expect(page.getByTestId(`step-status-${step}`)).toHaveText("Skipped");
-  }
-  for (const step of ["style", "tiers", "demo", "invite"]) {
+  await page
+    .getByTestId("step-import")
+    .locator('[data-slot="accordion-trigger"]')
+    .click();
+  await page.getByTestId("skip-import").click();
+  await expect(page.getByTestId("step-status-import")).toHaveText("Skipped");
+
+  for (const step of ["tiers", "demo", "invite"]) {
     await page.goto(`/onboarding/${step}`);
     await page.getByTestId(`complete-${step}`).click();
     await expect(page).toHaveURL(/\/onboarding$/);

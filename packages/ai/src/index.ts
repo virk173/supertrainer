@@ -23,6 +23,11 @@ export {
   voiceStyleExtractor,
   extractStyleProfile,
 } from "./style/extractors";
+export { visionExtractText, type VisionMediaType } from "./style/vision";
+export {
+  serializeStyleProfile,
+  STYLE_DOMAINS,
+} from "./style/serialize";
 export {
   StyleDomain,
   DietProfileSchema,
