@@ -350,6 +350,144 @@ export type Database = {
           },
         ]
       }
+      style_exemplars: {
+        Row: {
+          content: string
+          created_at: string
+          domain: Database["public"]["Enums"]["style_domain"]
+          embedding: string | null
+          id: string
+          org_id: string
+          quality_score: number | null
+          source: Database["public"]["Enums"]["style_exemplar_source"]
+          updated_at: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          domain: Database["public"]["Enums"]["style_domain"]
+          embedding?: string | null
+          id?: string
+          org_id: string
+          quality_score?: number | null
+          source: Database["public"]["Enums"]["style_exemplar_source"]
+          updated_at?: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          domain?: Database["public"]["Enums"]["style_domain"]
+          embedding?: string | null
+          id?: string
+          org_id?: string
+          quality_score?: number | null
+          source?: Database["public"]["Enums"]["style_exemplar_source"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "style_exemplars_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      style_profiles: {
+        Row: {
+          confidence: number | null
+          confirmed_at: string | null
+          created_at: string
+          created_from: string[]
+          domain: Database["public"]["Enums"]["style_domain"]
+          id: string
+          org_id: string
+          profile: Json
+          status: Database["public"]["Enums"]["style_profile_status"]
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          confidence?: number | null
+          confirmed_at?: string | null
+          created_at?: string
+          created_from?: string[]
+          domain: Database["public"]["Enums"]["style_domain"]
+          id?: string
+          org_id: string
+          profile?: Json
+          status?: Database["public"]["Enums"]["style_profile_status"]
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          confidence?: number | null
+          confirmed_at?: string | null
+          created_at?: string
+          created_from?: string[]
+          domain?: Database["public"]["Enums"]["style_domain"]
+          id?: string
+          org_id?: string
+          profile?: Json
+          status?: Database["public"]["Enums"]["style_profile_status"]
+          updated_at?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "style_profiles_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      uploads: {
+        Row: {
+          bucket_path: string
+          created_at: string
+          error: string | null
+          extracted_text: string | null
+          extraction_status: Database["public"]["Enums"]["upload_extraction_status"]
+          id: string
+          kind: Database["public"]["Enums"]["upload_kind"]
+          org_id: string
+          updated_at: string
+        }
+        Insert: {
+          bucket_path: string
+          created_at?: string
+          error?: string | null
+          extracted_text?: string | null
+          extraction_status?: Database["public"]["Enums"]["upload_extraction_status"]
+          id?: string
+          kind: Database["public"]["Enums"]["upload_kind"]
+          org_id: string
+          updated_at?: string
+        }
+        Update: {
+          bucket_path?: string
+          created_at?: string
+          error?: string | null
+          extracted_text?: string | null
+          extraction_status?: Database["public"]["Enums"]["upload_extraction_status"]
+          id?: string
+          kind?: Database["public"]["Enums"]["upload_kind"]
+          org_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "uploads_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -375,6 +513,11 @@ export type Database = {
         | "invite"
       onboarding_step_status: "todo" | "done" | "skipped"
       org_role: "owner" | "staff" | "client"
+      style_domain: "diet" | "training" | "voice"
+      style_exemplar_source: "upload" | "edit_capture"
+      style_profile_status: "draft" | "confirmed"
+      upload_extraction_status: "pending" | "processing" | "done" | "failed"
+      upload_kind: "plan_pdf" | "checkin_screenshot" | "doc"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -510,6 +653,11 @@ export const Constants = {
       onboarding_step: ["brand", "style", "tiers", "import", "demo", "invite"],
       onboarding_step_status: ["todo", "done", "skipped"],
       org_role: ["owner", "staff", "client"],
+      style_domain: ["diet", "training", "voice"],
+      style_exemplar_source: ["upload", "edit_capture"],
+      style_profile_status: ["draft", "confirmed"],
+      upload_extraction_status: ["pending", "processing", "done", "failed"],
+      upload_kind: ["plan_pdf", "checkin_screenshot", "doc"],
     },
   },
 } as const
