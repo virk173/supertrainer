@@ -298,6 +298,63 @@ export type Database = {
           },
         ]
       }
+      leads: {
+        Row: {
+          allergens: string[]
+          answers: Json
+          converted_client_id: string | null
+          created_at: string
+          email: string
+          id: string
+          org_id: string
+          phone: string | null
+          status: Database["public"]["Enums"]["lead_status"]
+          turnstile_verified: boolean
+          updated_at: string
+        }
+        Insert: {
+          allergens?: string[]
+          answers?: Json
+          converted_client_id?: string | null
+          created_at?: string
+          email: string
+          id?: string
+          org_id: string
+          phone?: string | null
+          status?: Database["public"]["Enums"]["lead_status"]
+          turnstile_verified?: boolean
+          updated_at?: string
+        }
+        Update: {
+          allergens?: string[]
+          answers?: Json
+          converted_client_id?: string | null
+          created_at?: string
+          email?: string
+          id?: string
+          org_id?: string
+          phone?: string | null
+          status?: Database["public"]["Enums"]["lead_status"]
+          turnstile_verified?: boolean
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "leads_converted_client_id_fkey"
+            columns: ["converted_client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leads_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       org_onboarding_state: {
         Row: {
           completed_at: string | null
@@ -618,6 +675,7 @@ export type Database = {
       client_source: "teaser" | "invite" | "import"
       client_status: "lead" | "onboarding" | "active" | "paused" | "churned"
       invite_channel: "copy_link" | "email"
+      lead_status: "started" | "preview_shown" | "converted" | "expired"
       onboarding_step:
         | "brand"
         | "style"
@@ -766,6 +824,7 @@ export const Constants = {
       client_source: ["teaser", "invite", "import"],
       client_status: ["lead", "onboarding", "active", "paused", "churned"],
       invite_channel: ["copy_link", "email"],
+      lead_status: ["started", "preview_shown", "converted", "expired"],
       onboarding_step: ["brand", "style", "tiers", "import", "demo", "invite"],
       onboarding_step_status: ["todo", "done", "skipped"],
       org_role: ["owner", "staff", "client"],

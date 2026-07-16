@@ -1,0 +1,165 @@
+import { randomUUID } from "node:crypto";
+
+import { expect, test, type Page } from "@playwright/test";
+
+import { serviceClient } from "./helpers";
+
+// Seeds a branded org (no auth needed — the teaser is public) and returns its
+// slug for /c/{slug}/start.
+async function seedTeaserOrg(): Promise<{ orgId: string; slug: string }> {
+  const service = serviceClient();
+  const slug = `teaser-${randomUUID().slice(0, 8)}`;
+  const { data, error } = await service
+    .from("orgs")
+    .insert({ name: "Teaser Coach", slug, brand: { primaryColor: "#2563eb" } })
+    .select("id")
+    .single();
+  if (error || !data) throw error ?? new Error("seed org failed");
+  return { orgId: data.id, slug };
+}
+
+// Drives the one-question-per-screen flow to the final (allergen) step. Leaves
+// the allergen choice to the caller so the explicit-none rule can be exercised.
+async function fillToAllergenStep(
+  page: Page,
+  slug: string,
+  email: string,
+): Promise<void> {
+  await page.goto(`/c/${slug}/start`);
+  await expect(page.getByTestId("stage-a-form")).toBeVisible();
+
+  await page.getByTestId("field-name").fill("Sam Prospect");
+  await page.getByTestId("next").click();
+  await page.getByTestId("field-email").fill(email);
+  await page.getByTestId("next").click();
+  // phone (optional) — skip
+  await page.getByTestId("next").click();
+  await page.getByTestId("field-age").fill("29");
+  await page.getByTestId("next").click();
+  await page.getByTestId("choice-sex-male").click();
+  await page.getByTestId("next").click();
+  await page.getByTestId("field-heightCm").fill("178");
+  await page.getByTestId("next").click();
+  await page.getByTestId("field-weightKg").fill("82");
+  await page.getByTestId("next").click();
+  await page.getByTestId("choice-goal-build_muscle").click();
+  await page.getByTestId("next").click();
+  await page.getByTestId("choice-activity-moderate").click();
+  await page.getByTestId("next").click();
+  await page.getByTestId("field-trainingDaysPerWeek").fill("4");
+  await page.getByTestId("next").click();
+  await page.getByTestId("choice-experience-intermediate").click();
+  await page.getByTestId("next").click();
+  await page.getByTestId("choice-diet-non_veg").click();
+  await page.getByTestId("next").click();
+  // Now on the allergen step.
+  await expect(page.getByTestId("allergies-none")).toBeVisible();
+}
+
+test("teaser: full Stage A flow persists a lead with promoted columns + answers", async ({
+  page,
+}) => {
+  const { orgId, slug } = await seedTeaserOrg();
+  const email = `prospect-${randomUUID().slice(0, 8)}@test.local`;
+
+  await fillToAllergenStep(page, slug, email);
+  await page.getByTestId("allergen-Peanuts").click();
+  await page.getByTestId("next").click();
+
+  await expect(page.getByTestId("stage-a-done")).toBeVisible();
+
+  const service = serviceClient();
+  const { data: lead } = await service
+    .from("leads")
+    .select("email, allergens, answers, status")
+    .eq("org_id", orgId)
+    .eq("email", email)
+    .single();
+
+  expect(lead?.email).toBe(email);
+  expect(lead?.allergens).toEqual(["Peanuts"]);
+  expect(lead?.status).toBe("started");
+  const answers = lead?.answers as Record<string, unknown>;
+  expect(answers.name).toBe("Sam Prospect");
+  expect(answers.goal).toBe("build_muscle");
+  expect(answers.trainingDaysPerWeek).toBe(4);
+  // Promoted columns must NOT be duplicated into answers.
+  expect(answers.email).toBeUndefined();
+  expect(answers.allergens).toBeUndefined();
+
+  // The funnel event fired.
+  const { data: events } = await service
+    .from("events")
+    .select("type")
+    .eq("org_id", orgId)
+    .eq("type", "lead_created");
+  expect((events ?? []).length).toBe(1);
+});
+
+test("teaser: allergies require an explicit choice — empty is blocked, 'none' proceeds", async ({
+  page,
+}) => {
+  const { orgId, slug } = await seedTeaserOrg();
+  const email = `none-${randomUUID().slice(0, 8)}@test.local`;
+
+  await fillToAllergenStep(page, slug, email);
+
+  // Advancing with neither allergens nor "none" is blocked.
+  await page.getByTestId("next").click();
+  await expect(page.getByTestId("step-error")).toBeVisible();
+  await expect(page.getByTestId("allergies-none")).toBeVisible(); // still here
+
+  // Explicit "none" unblocks submission.
+  await page.getByTestId("allergies-none").click();
+  await page.getByTestId("next").click();
+  await expect(page.getByTestId("stage-a-done")).toBeVisible();
+
+  const service = serviceClient();
+  const { data: lead } = await service
+    .from("leads")
+    .select("allergens")
+    .eq("org_id", orgId)
+    .eq("email", email)
+    .single();
+  expect(lead?.allergens).toEqual([]);
+});
+
+test("teaser: per-org daily limit rejects further submissions", async ({ page }) => {
+  const { orgId, slug } = await seedTeaserOrg();
+  const service = serviceClient();
+
+  // Seed the daily cap (50) directly so we don't drive the form 50 times.
+  const rows = Array.from({ length: 50 }, (_, i) => ({
+    org_id: orgId,
+    email: `seed-${i}@test.local`,
+    allergens: [],
+  }));
+  await service.from("leads").insert(rows);
+
+  await fillToAllergenStep(page, slug, `over-${randomUUID().slice(0, 8)}@test.local`);
+  await page.getByTestId("allergies-none").click();
+  await page.getByTestId("next").click();
+
+  await expect(page.getByTestId("step-error")).toContainText("try again tomorrow");
+  await expect(page.getByTestId("stage-a-done")).toHaveCount(0);
+});
+
+test("teaser: per-email weekly limit rejects a 4th preview for the same email", async ({
+  page,
+}) => {
+  const { orgId, slug } = await seedTeaserOrg();
+  const service = serviceClient();
+  const email = `repeat-${randomUUID().slice(0, 8)}@test.local`;
+
+  // Seed the weekly per-email cap (3).
+  await service.from("leads").insert(
+    Array.from({ length: 3 }, () => ({ org_id: orgId, email, allergens: [] })),
+  );
+
+  await fillToAllergenStep(page, slug, email);
+  await page.getByTestId("allergies-none").click();
+  await page.getByTestId("next").click();
+
+  await expect(page.getByTestId("step-error")).toContainText("this week");
+  await expect(page.getByTestId("stage-a-done")).toHaveCount(0);
+});

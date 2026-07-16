@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Camera, Globe, Music, Video } from "lucide-react";
 
@@ -77,16 +78,17 @@ export default async function BrandedLandingPage({
         </div>
       </div>
 
-      <button
-        type="button"
+      <Link
+        href={`/c/${slug}/start`}
         className="rounded-md px-5 py-2.5 text-sm font-medium"
         style={{
           background: "var(--brand-primary, var(--color-primary))",
           color: "var(--brand-on-primary, var(--color-primary-foreground))",
         }}
+        data-testid="start-cta"
       >
         Start your journey
-      </button>
+      </Link>
 
       {socials.length > 0 && (
         <footer className="flex items-center gap-4 pt-4 text-muted-foreground">
