@@ -16,6 +16,39 @@ export function isPathActive(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
+// Subdomains that are NOT trainer brands — they belong to the platform itself.
+const PLATFORM_SUBDOMAINS = new Set(["www", "app", "api"]);
+
+// Given a request host and the platform apex (e.g. "supertrainer.app"), returns
+// the trainer brand slug when the host is a branded subdomain
+// (coach.supertrainer.app → "coach"), or null for the apex, platform
+// subdomains, or any host that isn't under the platform domain (localhost).
+export function brandedSlugFromHost(
+  host: string | null | undefined,
+  platformDomain: string | null | undefined,
+): string | null {
+  if (!host || !platformDomain) return null;
+  const hostname = host.split(":")[0].toLowerCase();
+  const suffix = `.${platformDomain.toLowerCase()}`;
+  if (!hostname.endsWith(suffix)) return null;
+  const sub = hostname.slice(0, -suffix.length);
+  // Only a single-label subdomain maps to a brand; skip empty, platform, and
+  // any deeper host (a.b.supertrainer.app).
+  if (!sub || sub.includes(".") || PLATFORM_SUBDOMAINS.has(sub)) return null;
+  return sub;
+}
+
+// On a branded subdomain, app/auth plumbing paths still resolve to the real
+// routes; everything else is rewritten into that org's /c/{slug} space.
+export function isBrandedPassthroughPath(pathname: string): boolean {
+  return (
+    pathname.startsWith("/c/") ||
+    pathname.startsWith("/auth") ||
+    pathname.startsWith("/api") ||
+    pathname.startsWith("/join")
+  );
+}
+
 // A `next`/redirect target is safe only if it is a same-origin relative path.
 // Rejects absolute URLs and protocol-relative "//host" (open-redirect vectors).
 export function safeRelativePath(

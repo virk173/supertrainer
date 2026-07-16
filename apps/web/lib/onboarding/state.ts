@@ -11,14 +11,32 @@ import {
   type OnboardingStepStatus,
 } from "./steps";
 
-// The signed-in trainer's org, read from the JWT custom claim (injected by
-// custom_access_token_hook) — no extra query. null when unauthenticated or the
-// claim is missing (e.g. a session minted before bootstrap ran).
-export async function getSessionOrgId(): Promise<string | null> {
+export interface SessionClaims {
+  userId: string | null;
+  orgId: string | null;
+  role: string | null;
+}
+
+// The signed-in user's org/role, read from the JWT custom claims (injected by
+// custom_access_token_hook) — no extra query. Fields are null when
+// unauthenticated or a claim is missing (e.g. a session minted before bootstrap
+// ran).
+export async function getSessionClaims(): Promise<SessionClaims> {
   const supabase = await createClient();
   const { data } = await supabase.auth.getClaims();
-  const orgId = data?.claims?.org_id;
-  return typeof orgId === "string" ? orgId : null;
+  const claims = data?.claims;
+  const str = (v: unknown) => (typeof v === "string" ? v : null);
+  return {
+    userId: str(claims?.sub),
+    orgId: str(claims?.org_id),
+    role: str(claims?.user_role),
+  };
+}
+
+// The signed-in trainer's org, read from the JWT custom claim. null when
+// unauthenticated or the claim is missing.
+export async function getSessionOrgId(): Promise<string | null> {
+  return (await getSessionClaims()).orgId;
 }
 
 // The full checklist state for an org: every step, defaulting to 'todo' when no
