@@ -10,8 +10,10 @@ import {
   Inbox,
   ListChecks,
   PanelLeft,
+  Rocket,
   Settings,
   Users,
+  X,
 } from "lucide-react";
 
 import { Avatar } from "@supertrainer/ui/components/avatar";
@@ -37,11 +39,14 @@ export function TrainerShell({
   children,
   className,
   embedded = false,
+  resumeOnboarding = false,
 }: {
   children: React.ReactNode;
   className?: string;
   /** Styleguide preview mode — renders a div instead of a main landmark. */
   embedded?: boolean;
+  /** Show the "finish setup" banner — true while onboarding steps remain. */
+  resumeOnboarding?: boolean;
 }) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = React.useState(false);
@@ -149,10 +154,69 @@ export function TrainerShell({
           <Avatar name="Trainer" />
         </header>
 
+        {resumeOnboarding && <ResumeBanner />}
+
         <Content className="flex-1 overflow-y-auto">
           <div className="mx-auto w-full max-w-5xl p-6">{children}</div>
         </Content>
       </div>
+    </div>
+  );
+}
+
+const RESUME_DISMISS_KEY = "st.onboarding.resume-dismissed";
+
+/*
+ * Resume-setup nudge, shown while onboarding steps remain. Dismissible: the
+ * choice is remembered in localStorage so it stays closed across reloads, but
+ * the server stops passing resumeOnboarding once every step is resolved, so a
+ * completed checklist never renders this at all.
+ */
+function ResumeBanner() {
+  const [dismissed, setDismissed] = React.useState(true);
+
+  React.useEffect(() => {
+    setDismissed(
+      window.localStorage.getItem(RESUME_DISMISS_KEY) === "true",
+    );
+  }, []);
+
+  if (dismissed) return null;
+
+  return (
+    <div
+      data-testid="resume-onboarding-banner"
+      className="flex items-center gap-3 border-b bg-surface px-4 py-2.5 text-sm"
+    >
+      <Rocket aria-hidden="true" className="size-4 shrink-0 text-success" />
+      <p className="min-w-0 flex-1 truncate text-muted-foreground">
+        <span className="font-medium text-foreground">Finish setting up.</span>{" "}
+        A few steps remain before your workspace is fully activated.
+      </p>
+      <Link
+        href="/onboarding"
+        className={cn(
+          "shrink-0 rounded-md px-2.5 py-1 text-sm font-medium text-primary hover:underline",
+          focusRing,
+        )}
+      >
+        Resume
+      </Link>
+      <button
+        type="button"
+        onClick={() => {
+          window.localStorage.setItem(RESUME_DISMISS_KEY, "true");
+          setDismissed(true);
+        }}
+        aria-label="Dismiss setup reminder"
+        className={cn(
+          "shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-foreground",
+          focusRing,
+        )}
+        data-testid="dismiss-resume-banner"
+      >
+        <X aria-hidden="true" className="size-4" />
+      </button>
     </div>
   );
 }

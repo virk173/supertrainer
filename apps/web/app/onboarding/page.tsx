@@ -3,12 +3,14 @@ import { redirect } from "next/navigation";
 import { Button } from "@supertrainer/ui/components/button";
 
 import { signOut } from "@/app/(auth)/actions";
+import { OnboardingChecklist } from "@/components/onboarding-checklist";
+import { getOnboardingState } from "@/lib/onboarding/state";
 import { createClient } from "@/lib/supabase/server";
 
-export const metadata = { title: "Onboarding — supertrainer" };
+export const metadata = { title: "Get set up — supertrainer" };
 
-// Placeholder — Phase 1 replaces this with the trainer activation flow
-// (style-profile ingestion, tiers, brand, first client invite).
+// Trainer activation checklist (Phase 1.1). Each step deep-links into its own
+// flow (built across 1.2–1.7) and reports completion back here.
 export default async function OnboardingPage() {
   const supabase = await createClient();
 
@@ -25,13 +27,11 @@ export default async function OnboardingPage() {
   // more than one member.
   const { data: profile } = await supabase
     .from("profiles")
-    .select("display_name, role, org_id, orgs(name, slug)")
+    .select("display_name, role, org_id, orgs(name)")
     .eq("id", userId)
     .maybeSingle();
 
   if (!profile) {
-    // No profile means bootstrap hasn't run (e.g. stale session) — sign the
-    // user back in through the confirm flow.
     redirect("/login?error=Please%20sign%20in%20again");
   }
 
@@ -39,33 +39,31 @@ export default async function OnboardingPage() {
     redirect("/portal");
   }
 
+  const state = await getOnboardingState(profile.org_id);
+
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-6 p-8">
-      <div className="flex flex-col items-center gap-2 text-center">
-        <p className="text-sm font-medium text-success" data-testid="org-ready">
-          Your org is ready
-        </p>
-        <h1 className="text-3xl font-semibold tracking-tight">
-          Welcome, {profile.display_name ?? "coach"}
-        </h1>
-        <p className="max-w-md text-muted-foreground">
-          <span className="font-medium text-foreground">
-            {profile.orgs?.name}
-          </span>{" "}
-          is set up. Trainer onboarding (style profile, tiers, branding) lands
-          in Phase 1 — for now, head to your dashboard.
-        </p>
-      </div>
-      <div className="flex gap-3">
-        <Button asChild>
-          <a href="/trainer">Go to dashboard</a>
-        </Button>
+    <main className="mx-auto min-h-screen w-full max-w-2xl px-6 py-10 sm:py-16">
+      <div className="mb-8 flex items-start justify-between gap-4">
+        <div className="space-y-1">
+          <p className="text-sm font-medium text-success" data-testid="org-ready">
+            {profile.orgs?.name ?? "Your org"} is ready
+          </p>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            Let&apos;s get you activated
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Work through these steps in any order. Style ingestion is the one
+            that makes every AI draft sound like you.
+          </p>
+        </div>
         <form action={signOut}>
-          <Button variant="outline" type="submit">
+          <Button variant="ghost" size="sm" type="submit">
             Sign out
           </Button>
         </form>
       </div>
+
+      <OnboardingChecklist state={state} />
     </main>
   );
 }

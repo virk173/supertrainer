@@ -238,6 +238,44 @@ export type Database = {
           },
         ]
       }
+      org_onboarding_state: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          id: string
+          org_id: string
+          status: Database["public"]["Enums"]["onboarding_step_status"]
+          step: Database["public"]["Enums"]["onboarding_step"]
+          updated_at: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          org_id: string
+          status?: Database["public"]["Enums"]["onboarding_step_status"]
+          step: Database["public"]["Enums"]["onboarding_step"]
+          updated_at?: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          org_id?: string
+          status?: Database["public"]["Enums"]["onboarding_step_status"]
+          step?: Database["public"]["Enums"]["onboarding_step"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "org_onboarding_state_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       orgs: {
         Row: {
           brand: Json
@@ -328,6 +366,14 @@ export type Database = {
     Enums: {
       client_source: "teaser" | "invite" | "import"
       client_status: "lead" | "onboarding" | "active" | "paused" | "churned"
+      onboarding_step:
+        | "brand"
+        | "style"
+        | "tiers"
+        | "import"
+        | "demo"
+        | "invite"
+      onboarding_step_status: "todo" | "done" | "skipped"
       org_role: "owner" | "staff" | "client"
     }
     CompositeTypes: {
@@ -461,6 +507,8 @@ export const Constants = {
     Enums: {
       client_source: ["teaser", "invite", "import"],
       client_status: ["lead", "onboarding", "active", "paused", "churned"],
+      onboarding_step: ["brand", "style", "tiers", "import", "demo", "invite"],
+      onboarding_step_status: ["todo", "done", "skipped"],
       org_role: ["owner", "staff", "client"],
     },
   },
