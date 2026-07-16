@@ -33,11 +33,11 @@ async function expectAxeAAClean(page: Page) {
   ).toEqual([]);
 }
 
-async function toggleDark(page: Page) {
-  await page.getByTestId("theme-toggle").click();
-  await expect(page.locator("html")).toHaveClass(/dark/);
-  // Let style recalc + paint settle before axe reads computed colors —
-  // scanning in the same frame as the class flip reads stale values.
+// Let style recalc + paint settle before axe reads computed colors — scanning
+// in the same frame as a theme-class flip reads stale values (a dark surface
+// with a not-yet-updated light foreground → false contrast failures, seen only
+// on slower CI runners).
+async function settlePaint(page: Page) {
   await page.evaluate(
     () =>
       new Promise((resolve) =>
@@ -45,6 +45,12 @@ async function toggleDark(page: Page) {
       ),
   );
   await page.waitForTimeout(100);
+}
+
+async function toggleDark(page: Page) {
+  await page.getByTestId("theme-toggle").click();
+  await expect(page.locator("html")).toHaveClass(/dark/);
+  await settlePaint(page);
 }
 
 // Color transitions run ~150ms after a theme flip; axe must not scan
@@ -121,6 +127,7 @@ test.describe("portal shell on the real route", () => {
 
     await page.emulateMedia({ colorScheme: "dark" });
     await page.evaluate(() => document.documentElement.classList.add("dark"));
+    await settlePaint(page);
     await expectNoHorizontalOverflow(page);
     await expectAxeAAClean(page);
     await page.screenshot({ path: `${SHOTS}/portal-mobile-dark.png` });

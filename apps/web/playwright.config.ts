@@ -9,7 +9,12 @@ const envFile = path.join(__dirname, ".env.local");
 if (fs.existsSync(envFile)) {
   for (const line of fs.readFileSync(envFile, "utf8").split("\n")) {
     const match = line.match(/^([A-Z0-9_]+)=(.*)$/);
-    if (match && !process.env[match[1]]) process.env[match[1]] = match[2];
+    if (match && !process.env[match[1]]) {
+      // Strip surrounding quotes — `supabase status -o env` emits KEY="value",
+      // and the raw quotes would otherwise poison the value we set (and, since
+      // process.env wins over Next's own .env loading, break the dev server).
+      process.env[match[1]] = match[2].replace(/^(['"])(.*)\1$/, "$2");
+    }
   }
 }
 

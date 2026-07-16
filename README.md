@@ -16,7 +16,7 @@ docs/plan      Product spec + phase build plans (source of truth for scope)
 
 ## Local dev quickstart
 
-Prereqs: Node ≥ 20, npm ≥ 10, Docker (for Supabase local, from Phase 0.2 on).
+Prereqs: Node ≥ 22 (Supabase JS needs a native WebSocket), npm ≥ 10, Docker (for Supabase local, from Phase 0.2 on).
 
 ```bash
 npm install                 # install all workspaces
@@ -40,6 +40,13 @@ npx supabase db reset       # re-apply all migrations from scratch
 | `npm run typecheck` | `tsc --noEmit` across every workspace         |
 | `npm run lint`      | ESLint across every workspace                 |
 | `npm run test`      | Test suites across every workspace            |
+
+## CI / Deploy
+
+- **Production:** https://supertrainer-web.vercel.app (Vercel, auto-deploys on merge to `main`; preview deployment per PR).
+- **CI** (`.github/workflows/ci.yml`, on every PR): typecheck + lint, plus a local-Supabase job running the pgTAP RLS tests and Playwright smoke suite.
+- **Migrations** (`.github/workflows/migrate.yml`): manually triggered (`workflow_dispatch`) `supabase db push` to production.
+- One-time account/secret setup is documented in [docs/ci-cd-observability.md](docs/ci-cd-observability.md).
 
 ## Standing rules
 
