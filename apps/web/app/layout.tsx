@@ -1,5 +1,3 @@
-import { Suspense } from "react";
-
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 
@@ -34,10 +32,14 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <PostHogProvider>
-          <Suspense fallback={null}>
-            <PostHogPageview />
-          </Suspense>
           {children}
+          {/*
+           * Analytics-only, renders null. No Suspense needed: PostHogPageview
+           * no longer calls useSearchParams (which would force a client-bailout
+           * boundary and offset React's useId counter, breaking hydration of
+           * useId-based components elsewhere on the page).
+           */}
+          <PostHogPageview />
         </PostHogProvider>
       </body>
     </html>

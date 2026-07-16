@@ -7,7 +7,8 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "eval:style": "tsx evals/style-ingestion/run.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.111.0",
@@ -15,6 +16,7 @@
     "zod": "^4.0.0"
   },
   "devDependencies": {
+    "tsx": "^4.19.0",
     "typescript": "^5"
   }
 }

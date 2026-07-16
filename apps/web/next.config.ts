@@ -5,6 +5,8 @@ import { withSentryConfig } from "@sentry/nextjs";
 const nextConfig: NextConfig = {
   // Workspace packages ship raw TypeScript — Next transpiles them.
   transpilePackages: ["@supertrainer/ai", "@supertrainer/db", "@supertrainer/ui"],
+  // Node-only extraction libs (style ingestion) — keep them out of the bundle.
+  serverExternalPackages: ["pdf-parse", "mammoth"],
   // Monorepo root — stops Next inferring it from stray lockfiles outside the repo.
   turbopack: {
     root: path.join(__dirname, "../.."),

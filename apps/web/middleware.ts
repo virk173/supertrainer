@@ -1,6 +1,11 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import { isPathActive, roleHomePath } from "@/lib/routes";
+import {
+  brandedSlugFromHost,
+  isBrandedPassthroughPath,
+  isPathActive,
+  roleHomePath,
+} from "@/lib/routes";
 import { updateSession } from "@/lib/supabase/middleware";
 
 // Route guards (docs/plan/PHASE-0-foundations.md §0.3):
@@ -8,6 +13,7 @@ import { updateSession } from "@/lib/supabase/middleware";
 //   /portal/*   → role client
 //   /onboarding → any authenticated user
 //   everything else (marketing, /login, /signup, /join, /auth) is public.
+// Branded subdomains ({slug}.<platform>) are rewritten into /c/{slug} (P1.2).
 export async function middleware(request: NextRequest) {
   const { supabaseResponse, claims } = await updateSession(request);
   const path = request.nextUrl.pathname;
@@ -16,17 +22,32 @@ export async function middleware(request: NextRequest) {
     typeof claims?.user_role === "string" ? claims.user_role : null;
   const isAuthed = claims !== null;
 
-  // Any redirect must carry the refreshed session cookies.
-  const redirectTo = (pathname: string) => {
-    const url = request.nextUrl.clone();
-    url.pathname = pathname;
-    url.search = "";
-    const response = NextResponse.redirect(url);
+  // Carry the refreshed session cookies onto any response we swap in.
+  const withCookies = (response: NextResponse) => {
     supabaseResponse.cookies
       .getAll()
       .forEach((cookie) => response.cookies.set(cookie));
     return response;
   };
+
+  const redirectTo = (pathname: string) => {
+    const url = request.nextUrl.clone();
+    url.pathname = pathname;
+    url.search = "";
+    return withCookies(NextResponse.redirect(url));
+  };
+
+  // Branded subdomain → serve that org's client-facing pages from /c/{slug}.
+  // The apex and app/www/api subdomains fall through to normal routing.
+  const brandSlug = brandedSlugFromHost(
+    request.headers.get("host"),
+    process.env.NEXT_PUBLIC_PLATFORM_DOMAIN,
+  );
+  if (brandSlug && !isBrandedPassthroughPath(path)) {
+    const url = request.nextUrl.clone();
+    url.pathname = `/c/${brandSlug}${path === "/" ? "" : path}`;
+    return withCookies(NextResponse.rewrite(url));
+  }
 
   // Segment-aware matches so "/trainer-x" is not gated as "/trainer".
   if (isPathActive(path, "/trainer")) {

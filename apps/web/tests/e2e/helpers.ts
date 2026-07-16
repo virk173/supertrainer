@@ -61,6 +61,44 @@ export async function seedClient(
   };
 }
 
+// Seeds an owner (trainer) + org through the service role and returns a
+// magic-link token so the caller can sign in via /auth/confirm — the fast path
+// for tests that need an activated trainer session without the full OTP dance.
+export async function seedTrainer(
+  email: string,
+): Promise<{ userId: string; orgId: string; tokenHash: string }> {
+  const service = serviceClient();
+
+  const { data: created, error: createError } =
+    await service.auth.admin.createUser({ email, email_confirm: true });
+  if (createError) throw createError;
+  const userId = created!.user!.id;
+
+  const { data: org, error: orgError } = await service
+    .from("orgs")
+    .insert({ name: "E2E Trainer Org", slug: `e2e-${randomUUID().slice(0, 8)}` })
+    .select("id")
+    .single();
+  if (orgError) throw orgError;
+
+  await service.from("profiles").insert({
+    id: userId,
+    org_id: org!.id,
+    role: "owner",
+    display_name: email.split("@")[0],
+  });
+
+  const { data: linkData, error: linkError } =
+    await service.auth.admin.generateLink({ type: "magiclink", email });
+  if (linkError) throw linkError;
+
+  return {
+    userId,
+    orgId: org!.id,
+    tokenHash: linkData!.properties!.hashed_token,
+  };
+}
+
 // Poll Mailpit (Supabase local email sink) for the confirm link sent to `email`.
 export async function confirmLinkFromEmail(email: string): Promise<string> {
   for (let attempt = 0; attempt < 20; attempt++) {

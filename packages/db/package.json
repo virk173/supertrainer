@@ -6,7 +6,9 @@
   "exports": {
     "./server": "./src/server.ts",
     "./browser": "./src/browser.ts",
-    "./types": "./src/types.ts"
+    "./types": "./src/types.ts",
+    "./seed": "./src/seed/demo-client.ts",
+    "./queries": "./src/queries.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"

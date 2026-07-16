@@ -4,17 +4,33 @@ import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  Camera,
   ClipboardList,
+  Globe,
   MessageCircle,
+  Music,
   NotebookPen,
   Sun,
   User,
+  Video,
 } from "lucide-react";
 
 import { Avatar } from "@supertrainer/ui/components/avatar";
+import type { SocialPlatform } from "@supertrainer/ui/lib/brand";
 import { cn, focusRing } from "@supertrainer/ui/lib/utils";
 
 import { isPathActive } from "@/lib/routes";
+
+// This lucide build ships no brand marks — map socials to generic glyphs.
+const SOCIAL_ICON: Record<
+  SocialPlatform,
+  React.ComponentType<{ className?: string }>
+> = {
+  instagram: Camera,
+  youtube: Video,
+  tiktok: Music,
+  website: Globe,
+};
 
 const TAB_ITEMS = [
   { label: "Today", href: "/portal", icon: Sun },
@@ -33,11 +49,17 @@ export function PortalShell({
   children,
   className,
   embedded = false,
+  brandName,
+  socials = [],
 }: {
   children: React.ReactNode;
   className?: string;
   /** Styleguide preview mode — renders a div instead of a main landmark. */
   embedded?: boolean;
+  /** Trainer/org display name for the footer (spec §11: socials on portal). */
+  brandName?: string;
+  /** Trainer social links rendered in the footer. */
+  socials?: { platform: SocialPlatform; href: string }[];
 }) {
   const pathname = usePathname();
   const Content = embedded ? "div" : "main";
@@ -61,6 +83,41 @@ export function PortalShell({
 
       <Content className="flex-1 overflow-y-auto">
         <div className="mx-auto w-full max-w-lg p-4">{children}</div>
+        {(brandName || socials.length > 0) && (
+          <footer
+            data-testid="portal-brand-footer"
+            className="mx-auto flex w-full max-w-lg flex-col items-center gap-2 px-4 pb-6 pt-4 text-center"
+          >
+            {socials.length > 0 && (
+              <div className="flex items-center gap-4 text-muted-foreground">
+                {socials.map(({ platform, href }) => {
+                  const Icon = SOCIAL_ICON[platform];
+                  return (
+                    <a
+                      key={platform}
+                      href={href}
+                      target="_blank"
+                      rel="noopener noreferrer nofollow"
+                      aria-label={`${brandName ?? "Coach"} on ${platform}`}
+                      className={cn(
+                        "rounded-md transition-colors hover:text-foreground",
+                        focusRing,
+                      )}
+                    >
+                      <Icon className="size-4" />
+                    </a>
+                  );
+                })}
+              </div>
+            )}
+            {brandName && (
+              <p className="text-[11px] text-muted-foreground">
+                Coached by{" "}
+                <span className="font-medium text-foreground">{brandName}</span>
+              </p>
+            )}
+          </footer>
+        )}
       </Content>
 
       <nav
