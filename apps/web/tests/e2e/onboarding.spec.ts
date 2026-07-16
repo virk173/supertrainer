@@ -24,13 +24,13 @@ test("activation checklist: out-of-order progress persists across reloads", asyn
   await expect(page.getByTestId("step-status-brand")).toHaveText("To do");
 
   // Complete a LATER step first (out of order) via its deep-link + stub flow.
-  // 'demo' is still a generic stub (its real flow lands in 1.6).
-  await page.getByTestId("step-demo").locator('[data-slot="accordion-trigger"]').click();
-  await page.getByTestId("open-demo").click();
-  await expect(page).toHaveURL(/\/onboarding\/demo/);
-  await page.getByTestId("complete-demo").click();
+  // 'invite' is still a generic stub (its real flow lands in 1.7).
+  await page.getByTestId("step-invite").locator('[data-slot="accordion-trigger"]').click();
+  await page.getByTestId("open-invite").click();
+  await expect(page).toHaveURL(/\/onboarding\/invite/);
+  await page.getByTestId("complete-invite").click();
   await expect(page).toHaveURL(/\/onboarding$/);
-  await expect(page.getByTestId("step-status-demo")).toHaveText("Done");
+  await expect(page.getByTestId("step-status-invite")).toHaveText("Done");
 
   // Skip an earlier, skippable step (brand is open by default).
   await page.getByTestId("skip-brand").click();
@@ -39,7 +39,7 @@ test("activation checklist: out-of-order progress persists across reloads", asyn
   // Reload mid-flow: both the completion and the skip survive.
   await page.reload();
   await expect(page.getByTestId("onboarding-progress-count")).toHaveText("2 / 6");
-  await expect(page.getByTestId("step-status-demo")).toHaveText("Done");
+  await expect(page.getByTestId("step-status-invite")).toHaveText("Done");
   await expect(page.getByTestId("step-status-brand")).toHaveText("Skipped");
 
   // The funnel event fired for the completed step (not the skipped one).
@@ -50,7 +50,7 @@ test("activation checklist: out-of-order progress persists across reloads", asyn
     .eq("org_id", orgId)
     .eq("type", "onboarding_step_completed");
   expect(events?.length).toBe(1);
-  expect(events?.[0]?.payload).toMatchObject({ step: "demo" });
+  expect(events?.[0]?.payload).toMatchObject({ step: "invite" });
 });
 
 test("resume banner shows while steps remain, clears on completion", async ({
@@ -69,17 +69,17 @@ test("resume banner shows while steps remain, clears on completion", async ({
   await serviceClient()
     .from("org_onboarding_state")
     .upsert(
-      ["brand", "style", "tiers", "import"].map((step) => ({
+      (["brand", "style", "tiers", "import", "demo"] as const).map((step) => ({
         org_id: orgId,
         step,
-        status: "done",
+        status: "done" as const,
         completed_at: new Date().toISOString(),
       })),
       { onConflict: "org_id,step" },
     )
     .throwOnError();
 
-  for (const step of ["demo", "invite"]) {
+  for (const step of ["invite"]) {
     await page.goto(`/onboarding/${step}`);
     await page.getByTestId(`complete-${step}`).click();
     await expect(page).toHaveURL(/\/onboarding$/);

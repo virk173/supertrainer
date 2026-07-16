@@ -94,6 +94,7 @@ export type Database = {
           id: string
           import_batch_id: string | null
           intake: Json
+          is_demo: boolean
           org_id: string
           profile_id: string | null
           source: Database["public"]["Enums"]["client_source"]
@@ -108,6 +109,7 @@ export type Database = {
           id?: string
           import_batch_id?: string | null
           intake?: Json
+          is_demo?: boolean
           org_id: string
           profile_id?: string | null
           source: Database["public"]["Enums"]["client_source"]
@@ -122,6 +124,7 @@ export type Database = {
           id?: string
           import_batch_id?: string | null
           intake?: Json
+          is_demo?: boolean
           org_id?: string
           profile_id?: string | null
           source?: Database["public"]["Enums"]["client_source"]
