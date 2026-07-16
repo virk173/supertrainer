@@ -444,6 +444,59 @@ export type Database = {
           },
         ]
       }
+      tiers: {
+        Row: {
+          cadence: Database["public"]["Enums"]["tier_cadence"]
+          created_at: string
+          currency: string
+          features: Json
+          id: string
+          is_active: boolean
+          name: string
+          org_id: string
+          position: number
+          price_cents: number
+          stripe_product_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          cadence?: Database["public"]["Enums"]["tier_cadence"]
+          created_at?: string
+          currency?: string
+          features?: Json
+          id?: string
+          is_active?: boolean
+          name: string
+          org_id: string
+          position?: number
+          price_cents?: number
+          stripe_product_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          cadence?: Database["public"]["Enums"]["tier_cadence"]
+          created_at?: string
+          currency?: string
+          features?: Json
+          id?: string
+          is_active?: boolean
+          name?: string
+          org_id?: string
+          position?: number
+          price_cents?: number
+          stripe_product_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tiers_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       uploads: {
         Row: {
           bucket_path: string
@@ -516,6 +569,7 @@ export type Database = {
       style_domain: "diet" | "training" | "voice"
       style_exemplar_source: "upload" | "edit_capture"
       style_profile_status: "draft" | "confirmed"
+      tier_cadence: "monthly"
       upload_extraction_status: "pending" | "processing" | "done" | "failed"
       upload_kind: "plan_pdf" | "checkin_screenshot" | "doc"
     }
@@ -656,6 +710,7 @@ export const Constants = {
       style_domain: ["diet", "training", "voice"],
       style_exemplar_source: ["upload", "edit_capture"],
       style_profile_status: ["draft", "confirmed"],
+      tier_cadence: ["monthly"],
       upload_extraction_status: ["pending", "processing", "done", "failed"],
       upload_kind: ["plan_pdf", "checkin_screenshot", "doc"],
     },
