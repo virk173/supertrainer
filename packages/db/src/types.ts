@@ -92,6 +92,7 @@ export type Database = {
           created_at: string
           health_flags: Json
           id: string
+          import_batch_id: string | null
           intake: Json
           org_id: string
           profile_id: string | null
@@ -105,6 +106,7 @@ export type Database = {
           created_at?: string
           health_flags?: Json
           id?: string
+          import_batch_id?: string | null
           intake?: Json
           org_id: string
           profile_id?: string | null
@@ -118,6 +120,7 @@ export type Database = {
           created_at?: string
           health_flags?: Json
           id?: string
+          import_batch_id?: string | null
           intake?: Json
           org_id?: string
           profile_id?: string | null
@@ -126,6 +129,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "clients_import_batch_id_fkey"
+            columns: ["import_batch_id"]
+            isOneToOne: false
+            referencedRelation: "import_batches"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "clients_org_id_fkey"
             columns: ["org_id"]
@@ -183,6 +193,44 @@ export type Database = {
           },
           {
             foreignKeyName: "events_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      import_batches: {
+        Row: {
+          created_at: string
+          id: string
+          org_id: string
+          row_count: number
+          source: string
+          undone_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          org_id: string
+          row_count?: number
+          source?: string
+          undone_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          org_id?: string
+          row_count?: number
+          source?: string
+          undone_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "import_batches_org_id_fkey"
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "orgs"

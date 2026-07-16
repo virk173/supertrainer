@@ -29,6 +29,13 @@ export {
   STYLE_DOMAINS,
 } from "./style/serialize";
 export {
+  mapColumns,
+  IMPORT_FIELDS,
+  ColumnMappingSchema,
+  type ImportField,
+  type ColumnMapping,
+} from "./import/mapColumns";
+export {
   StyleDomain,
   DietProfileSchema,
   TrainingProfileSchema,
