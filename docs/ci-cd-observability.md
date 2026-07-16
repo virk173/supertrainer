@@ -66,26 +66,27 @@ Vercel then deploys production on every push to main and a preview on every PR.
   for `claude-haiku-4-5`, `claude-sonnet-5`, and `claude-opus-4-8` (Langfuse
   computes cost from model + token usage).
 
-## 5. Branch protection + approval gate
+## 5. Branch protection + migration gate
 
-- **Branch protection** (Settings → Branches → add rule for `main`): require PRs,
-  and require the CI checks **"Typecheck & lint"** and **"RLS + E2E"** to pass.
+- **Migration gate** — `migrate.yml` is **manual only** (`workflow_dispatch`):
+  nothing hits prod until you run it from Actions → *Migrate (production DB)* →
+  *Run workflow*. This is the free-tier gate and works on any plan.
+
+- **Branch protection** — enforcing "CI must pass before merge" via GitHub
+  **requires a public repo or GitHub Pro** (classic protection, rulesets, and
+  environment required-reviewers are all Pro-gated on private repos). On a free
+  private repo, CI still *runs* on every PR and reports pass/fail — you just
+  self-enforce (don't merge a red PR). To turn on real enforcement later:
 
   ```bash
-  gh api -X PUT repos/:owner/supertrainer/branches/main/protection \
-    -H "Accept: application/vnd.github+json" \
-    -f 'required_status_checks[strict]=true' \
-    -f 'required_status_checks[contexts][]=Typecheck & lint' \
-    -f 'required_status_checks[contexts][]=RLS + E2E (local Supabase)' \
-    -F 'enforce_admins=true' \
-    -F 'required_pull_request_reviews[required_approving_review_count]=1' \
-    -F 'restrictions=null'
+  # after making the repo public OR upgrading to GitHub Pro:
+  gh api -X PUT repos/virk173/supertrainer/branches/main/protection --input - <<'JSON'
+  {"required_status_checks":{"strict":true,"contexts":["Typecheck & lint","RLS + E2E (local Supabase)"]},
+   "enforce_admins":false,"required_pull_request_reviews":{"required_approving_review_count":0},"restrictions":null}
+  JSON
   ```
-
-- **Migration approval gate** (Settings → Environments → new environment
-  `production`): add yourself as a **required reviewer**. `deploy.yml`'s
-  `migrations` job targets this environment, so every `supabase db push` to prod
-  pauses for a click before running; the Vercel deploy waits on it.
+  Then optionally add required reviewers on the `production` environment and
+  switch `migrate.yml` back to a `push`-triggered gate.
 
 ## 6. Verify (Phase 0.5 DoD)
 

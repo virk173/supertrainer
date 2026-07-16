@@ -1,11 +1,15 @@
 name: Migrate (production DB)
 
-# Runs on merge to main: apply DB migrations behind a manual approval gate.
-# App deploys are handled by Vercel's native Git integration (production on
-# main, preview deployments on PRs) — not this workflow.
+# Manual gate: production migrations run ONLY when you trigger this workflow
+# from the Actions tab (Run workflow) — nothing hits prod automatically. This
+# works on any GitHub plan (unlike environment required-reviewers, which need
+# Pro on a private repo). App deploys are handled by Vercel's Git integration.
+#
+# If you later make the repo public or upgrade to Pro, you can add
+# `push: { branches: [main] }` back and enforce an approval via required
+# reviewers on the `production` environment.
 on:
-  push:
-    branches: [main]
+  workflow_dispatch:
 
 concurrency:
   group: migrate-main
@@ -15,9 +19,8 @@ jobs:
   migrations:
     name: Supabase migrations (db push)
     runs-on: ubuntu-latest
-    # Manual approval gate: configure required reviewers on the "production"
-    # environment (repo Settings → Environments → production). The job pauses
-    # here until an approver signs off before any migration hits prod.
+    # Scopes the run to the `production` environment (add required reviewers
+    # here once your plan supports it, for an extra approval pause).
     environment: production
     steps:
       - uses: actions/checkout@v4
