@@ -17,3 +17,20 @@ export {
   recordGeneration,
   type GenerationRecord,
 } from "./tracing";
+export {
+  dietStyleExtractor,
+  trainingStyleExtractor,
+  voiceStyleExtractor,
+  extractStyleProfile,
+} from "./style/extractors";
+export {
+  StyleDomain,
+  DietProfileSchema,
+  TrainingProfileSchema,
+  VoiceProfileSchema,
+  PROFILE_SCHEMAS,
+  type DietProfile,
+  type TrainingProfile,
+  type VoiceProfile,
+  type StyleProfileByDomain,
+} from "./style/schemas";

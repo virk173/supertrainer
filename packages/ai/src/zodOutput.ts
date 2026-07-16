@@ -10,6 +10,12 @@ export interface ZodOutputParams {
   prompt: string;
   system?: string;
   maxTokens?: number;
+  /**
+   * Cache the system prompt (prompt caching). Set for stable, reused system
+   * prompts — e.g. the style-extraction instructions injected on every upload.
+   * The variable content must live in `prompt`, never `system`.
+   */
+  cacheSystem?: boolean;
 }
 
 export class AiOutputValidationError extends Error {
@@ -34,6 +40,20 @@ export async function zodOutput<T>(
   const client = getClaudeClient();
   const model = modelRouter(params.task);
 
+  // A cached system prompt is sent as a text block with cache_control so the
+  // stable prefix is reused across calls (e.g. every upload extraction).
+  const system = params.system
+    ? params.cacheSystem
+      ? [
+          {
+            type: "text" as const,
+            text: params.system,
+            cache_control: { type: "ephemeral" as const },
+          },
+        ]
+      : params.system
+    : undefined;
+
   // Run inside the task context so the traced client (claude.ts) tags this
   // generation with the AiTask in Langfuse.
   const attempt = () =>
@@ -41,7 +61,7 @@ export async function zodOutput<T>(
       client.messages.parse({
         model,
         max_tokens: params.maxTokens ?? 16000,
-        ...(params.system ? { system: params.system } : {}),
+        ...(system ? { system } : {}),
         messages: [{ role: "user", content: params.prompt }],
         output_config: { format: zodOutputFormat(schema) },
       }),
