@@ -50,12 +50,16 @@ export function isBrandedPassthroughPath(pathname: string): boolean {
 }
 
 // A `next`/redirect target is safe only if it is a same-origin relative path.
-// Rejects absolute URLs and protocol-relative "//host" (open-redirect vectors).
+// Rejects absolute URLs and any value that opens an authority. Note that a
+// leading "/\" is NOT safe: browsers normalize backslashes to slashes, so
+// `Location: /\host` resolves to `//host` (an off-origin redirect) — the second
+// character must not start an authority ("/" or "\").
 export function safeRelativePath(
   next: string | null | undefined,
   fallback = "/onboarding",
 ): string {
   if (!next) return fallback;
-  if (!next.startsWith("/") || next.startsWith("//")) return fallback;
+  if (!next.startsWith("/")) return fallback;
+  if (next.length > 1 && (next[1] === "/" || next[1] === "\\")) return fallback;
   return next;
 }

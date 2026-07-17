@@ -16,7 +16,6 @@ import { Button } from "@supertrainer/ui/components/button";
 import { Input } from "@supertrainer/ui/components/input";
 import { Label } from "@supertrainer/ui/components/label";
 import { TierCard } from "@supertrainer/ui/components/tier-card";
-import { cn } from "@supertrainer/ui/lib/utils";
 
 import { saveTiers } from "@/app/onboarding/tiers/actions";
 import {
