@@ -87,6 +87,7 @@ export type Database = {
       }
       clients: {
         Row: {
+          approved_manually: boolean
           consent_doc_hash: string | null
           consent_signed_at: string | null
           created_at: string
@@ -102,6 +103,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          approved_manually?: boolean
           consent_doc_hash?: string | null
           consent_signed_at?: string | null
           created_at?: string
@@ -117,6 +119,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          approved_manually?: boolean
           consent_doc_hash?: string | null
           consent_signed_at?: string | null
           created_at?: string
@@ -196,6 +199,74 @@ export type Database = {
           },
           {
             foreignKeyName: "events_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      foods: {
+        Row: {
+          allergen_tags: string[]
+          carbs_per_100g: number
+          created_at: string
+          cuisine_tags: string[]
+          fat_per_100g: number
+          fiber_per_100g: number
+          id: string
+          kcal_per_100g: number
+          name: string
+          name_normalized: string
+          org_id: string | null
+          protein_per_100g: number
+          serving_units: Json
+          source: Database["public"]["Enums"]["food_source"]
+          source_ref: string | null
+          updated_at: string
+          verified: boolean
+        }
+        Insert: {
+          allergen_tags?: string[]
+          carbs_per_100g?: number
+          created_at?: string
+          cuisine_tags?: string[]
+          fat_per_100g?: number
+          fiber_per_100g?: number
+          id?: string
+          kcal_per_100g: number
+          name: string
+          name_normalized: string
+          org_id?: string | null
+          protein_per_100g?: number
+          serving_units?: Json
+          source: Database["public"]["Enums"]["food_source"]
+          source_ref?: string | null
+          updated_at?: string
+          verified?: boolean
+        }
+        Update: {
+          allergen_tags?: string[]
+          carbs_per_100g?: number
+          created_at?: string
+          cuisine_tags?: string[]
+          fat_per_100g?: number
+          fiber_per_100g?: number
+          id?: string
+          kcal_per_100g?: number
+          name?: string
+          name_normalized?: string
+          org_id?: string | null
+          protein_per_100g?: number
+          serving_units?: Json
+          source?: Database["public"]["Enums"]["food_source"]
+          source_ref?: string | null
+          updated_at?: string
+          verified?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "foods_org_id_fkey"
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "orgs"
@@ -308,6 +379,8 @@ export type Database = {
           id: string
           org_id: string
           phone: string | null
+          preview: Json | null
+          preview_generated_at: string | null
           status: Database["public"]["Enums"]["lead_status"]
           turnstile_verified: boolean
           updated_at: string
@@ -321,6 +394,8 @@ export type Database = {
           id?: string
           org_id: string
           phone?: string | null
+          preview?: Json | null
+          preview_generated_at?: string | null
           status?: Database["public"]["Enums"]["lead_status"]
           turnstile_verified?: boolean
           updated_at?: string
@@ -334,6 +409,8 @@ export type Database = {
           id?: string
           org_id?: string
           phone?: string | null
+          preview?: Json | null
+          preview_generated_at?: string | null
           status?: Database["public"]["Enums"]["lead_status"]
           turnstile_verified?: boolean
           updated_at?: string
@@ -674,6 +751,7 @@ export type Database = {
     Enums: {
       client_source: "teaser" | "invite" | "import"
       client_status: "lead" | "onboarding" | "active" | "paused" | "churned"
+      food_source: "usda" | "off" | "ifct" | "org_custom" | "seed"
       invite_channel: "copy_link" | "email"
       lead_status: "started" | "preview_shown" | "converted" | "expired"
       onboarding_step:
@@ -823,6 +901,7 @@ export const Constants = {
     Enums: {
       client_source: ["teaser", "invite", "import"],
       client_status: ["lead", "onboarding", "active", "paused", "churned"],
+      food_source: ["usda", "off", "ifct", "org_custom", "seed"],
       invite_channel: ["copy_link", "email"],
       lead_status: ["started", "preview_shown", "converted", "expired"],
       onboarding_step: ["brand", "style", "tiers", "import", "demo", "invite"],

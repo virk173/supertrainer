@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
 
 import { Button } from "@supertrainer/ui/components/button";
 import { Input } from "@supertrainer/ui/components/input";
@@ -86,6 +87,7 @@ function stepError(step: StageAStep, d: Draft): string | null {
 }
 
 export function StageAForm({ slug }: { slug: string }) {
+  const router = useRouter();
   const [draft, setDraft] = React.useState<Draft>(EMPTY);
   const [index, setIndex] = React.useState(0);
   const [error, setError] = React.useState<string | null>(null);
@@ -142,8 +144,8 @@ export function StageAForm({ slug }: { slug: string }) {
       },
       token ?? undefined,
     );
-    setSubmitting(false);
     if (!result.ok) {
+      setSubmitting(false);
       setError(result.message ?? "Something went wrong.");
       // Jump back to the offending field if the server pinned one.
       if (result.field) {
@@ -152,6 +154,12 @@ export function StageAForm({ slug }: { slug: string }) {
       }
       return;
     }
+    // Hand off to the blurred preview (keeps the "Sending…" state through nav).
+    if (result.leadId) {
+      router.push(`/c/${slug}/preview/${result.leadId}`);
+      return;
+    }
+    setSubmitting(false);
     setDone(true);
   }
 
