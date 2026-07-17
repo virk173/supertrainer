@@ -53,6 +53,26 @@ export {
   PREVIEW_MODEL,
 } from "./preview";
 export {
+  type HealthFlagCategory,
+  HEALTH_FLAG_CATEGORIES,
+  type HealthFlagResult,
+  keywordHealthFlags,
+  detectHealthFlags,
+} from "./escalation";
+export {
+  INTERVIEW_SECTIONS,
+  SECTION_DAY,
+  SECTION_SCHEMAS,
+  type InterviewSection,
+  type SectionAnswers,
+  type InterviewTurnInput,
+  type InterviewTurnOutput,
+  interviewTurn,
+  isSectionComplete,
+  nextSection,
+  isInterviewComplete,
+} from "./interview";
+export {
   StyleDomain,
   DietProfileSchema,
   TrainingProfileSchema,

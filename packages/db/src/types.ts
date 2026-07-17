@@ -369,6 +369,60 @@ export type Database = {
           },
         ]
       }
+      interview_state: {
+        Row: {
+          answers: Json
+          client_id: string
+          created_at: string
+          last_prompt_at: string | null
+          nudges_sent: number
+          org_id: string
+          section: Database["public"]["Enums"]["interview_section"]
+          started_at: string
+          status: Database["public"]["Enums"]["interview_status"]
+          updated_at: string
+        }
+        Insert: {
+          answers?: Json
+          client_id: string
+          created_at?: string
+          last_prompt_at?: string | null
+          nudges_sent?: number
+          org_id: string
+          section?: Database["public"]["Enums"]["interview_section"]
+          started_at?: string
+          status?: Database["public"]["Enums"]["interview_status"]
+          updated_at?: string
+        }
+        Update: {
+          answers?: Json
+          client_id?: string
+          created_at?: string
+          last_prompt_at?: string | null
+          nudges_sent?: number
+          org_id?: string
+          section?: Database["public"]["Enums"]["interview_section"]
+          started_at?: string
+          status?: Database["public"]["Enums"]["interview_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "interview_state_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "interview_state_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invites: {
         Row: {
           channel: Database["public"]["Enums"]["invite_channel"]
@@ -489,6 +543,54 @@ export type Database = {
           },
         ]
       }
+      messages: {
+        Row: {
+          body: string | null
+          client_id: string
+          created_at: string
+          id: string
+          kind: string
+          org_id: string
+          payload: Json
+          sender: Database["public"]["Enums"]["message_sender"]
+        }
+        Insert: {
+          body?: string | null
+          client_id: string
+          created_at?: string
+          id?: string
+          kind?: string
+          org_id: string
+          payload?: Json
+          sender: Database["public"]["Enums"]["message_sender"]
+        }
+        Update: {
+          body?: string | null
+          client_id?: string
+          created_at?: string
+          id?: string
+          kind?: string
+          org_id?: string
+          payload?: Json
+          sender?: Database["public"]["Enums"]["message_sender"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messages_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       org_onboarding_state: {
         Row: {
           completed_at: string | null
@@ -556,6 +658,54 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      plan_requests: {
+        Row: {
+          client_id: string
+          created_at: string
+          id: string
+          kind: Database["public"]["Enums"]["plan_kind"]
+          org_id: string
+          status: Database["public"]["Enums"]["plan_request_status"]
+          trigger: Database["public"]["Enums"]["plan_trigger"]
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          id?: string
+          kind: Database["public"]["Enums"]["plan_kind"]
+          org_id: string
+          status?: Database["public"]["Enums"]["plan_request_status"]
+          trigger: Database["public"]["Enums"]["plan_trigger"]
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          id?: string
+          kind?: Database["public"]["Enums"]["plan_kind"]
+          org_id?: string
+          status?: Database["public"]["Enums"]["plan_request_status"]
+          trigger?: Database["public"]["Enums"]["plan_trigger"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plan_requests_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plan_requests_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
@@ -860,8 +1010,17 @@ export type Database = {
       client_source: "teaser" | "invite" | "import"
       client_status: "lead" | "onboarding" | "active" | "paused" | "churned"
       food_source: "usda" | "off" | "ifct" | "org_custom" | "seed"
+      interview_section:
+        | "logistics"
+        | "goals"
+        | "nutrition"
+        | "training"
+        | "lifestyle"
+        | "health"
+      interview_status: "in_progress" | "paused_health" | "complete"
       invite_channel: "copy_link" | "email"
       lead_status: "started" | "preview_shown" | "converted" | "expired"
+      message_sender: "client" | "coach" | "system" | "assistant"
       notification_channel: "push" | "email_only"
       onboarding_step:
         | "brand"
@@ -872,6 +1031,9 @@ export type Database = {
         | "invite"
       onboarding_step_status: "todo" | "done" | "skipped"
       org_role: "owner" | "staff" | "client"
+      plan_kind: "diet" | "split"
+      plan_request_status: "queued" | "running" | "drafted" | "failed"
+      plan_trigger: "onboarding" | "monthly" | "manual"
       style_domain: "diet" | "training" | "voice"
       style_exemplar_source: "upload" | "edit_capture"
       style_profile_status: "draft" | "confirmed"
@@ -1011,12 +1173,25 @@ export const Constants = {
       client_source: ["teaser", "invite", "import"],
       client_status: ["lead", "onboarding", "active", "paused", "churned"],
       food_source: ["usda", "off", "ifct", "org_custom", "seed"],
+      interview_section: [
+        "logistics",
+        "goals",
+        "nutrition",
+        "training",
+        "lifestyle",
+        "health",
+      ],
+      interview_status: ["in_progress", "paused_health", "complete"],
       invite_channel: ["copy_link", "email"],
       lead_status: ["started", "preview_shown", "converted", "expired"],
+      message_sender: ["client", "coach", "system", "assistant"],
       notification_channel: ["push", "email_only"],
       onboarding_step: ["brand", "style", "tiers", "import", "demo", "invite"],
       onboarding_step_status: ["todo", "done", "skipped"],
       org_role: ["owner", "staff", "client"],
+      plan_kind: ["diet", "split"],
+      plan_request_status: ["queued", "running", "drafted", "failed"],
+      plan_trigger: ["onboarding", "monthly", "manual"],
       style_domain: ["diet", "training", "voice"],
       style_exemplar_source: ["upload", "edit_capture"],
       style_profile_status: ["draft", "confirmed"],
