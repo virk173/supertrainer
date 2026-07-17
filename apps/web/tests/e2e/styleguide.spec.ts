@@ -1,7 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 
-import { seedClient, uniqueEmail } from "./helpers";
+import { consentClient, seedClient, uniqueEmail } from "./helpers";
 
 const DESKTOP = { width: 1280, height: 800 };
 const MOBILE = { width: 375, height: 812 };
@@ -113,7 +113,9 @@ test.describe("portal shell on the real route", () => {
     page,
   }) => {
     // Seed a client (service role) and sign in through the real confirm route.
-    const { tokenHash } = await seedClient(uniqueEmail("styleguide-client"));
+    const { userId, tokenHash } = await seedClient(uniqueEmail("styleguide-client"));
+    // Past the consent gate so the portal shell renders for this QA pass.
+    await consentClient(userId);
 
     await page.setViewportSize(MOBILE);
     await page.goto(

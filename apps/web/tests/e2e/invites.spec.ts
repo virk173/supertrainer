@@ -51,9 +51,10 @@ test("invite loop: issue → join creates the client account → lands on portal
   await expect(clientPage.getByTestId("join-valid")).toBeVisible();
   await clientPage.getByTestId("accept-invite").click();
 
-  // Accepting creates the account, logs them in, and lands on the portal.
-  await expect(clientPage.getByTestId("portal-home")).toBeVisible();
-  await expect(clientPage).toHaveURL(/\/portal/);
+  // Accepting creates the account and logs them in; the portal's consent gate
+  // (Phase 2.3) then routes the new client to sign before anything else.
+  await expect(clientPage).toHaveURL(/\/consent/);
+  await expect(clientPage.getByTestId("consent-doc")).toBeVisible();
 
   // The lead is now a claimed client with a linked profile.
   const { data: claimed } = await service

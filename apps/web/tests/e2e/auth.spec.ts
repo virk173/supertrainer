@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 
 import {
   confirmLinkFromEmail,
+  consentClient,
   serviceClient,
   seedClient,
   uniqueEmail,
@@ -40,7 +41,9 @@ test("signup → org created → lands on /onboarding → owner reaches /trainer
 });
 
 test("client role is blocked from /trainer routes", async ({ page }) => {
-  const { tokenHash } = await seedClient(uniqueEmail("client"));
+  const { userId, tokenHash } = await seedClient(uniqueEmail("client"));
+  // Past the consent gate so this test exercises role-guarding, not consent.
+  await consentClient(userId);
 
   // Sign in through the real confirm route using an admin-generated token.
   await page.goto(

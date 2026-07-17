@@ -158,6 +158,60 @@ export type Database = {
           },
         ]
       }
+      consents: {
+        Row: {
+          client_id: string
+          created_at: string
+          doc_sha256: string
+          doc_version: string
+          id: string
+          ip: string | null
+          org_id: string
+          signed_at: string
+          signed_name: string
+          user_agent: string | null
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          doc_sha256: string
+          doc_version: string
+          id?: string
+          ip?: string | null
+          org_id: string
+          signed_at?: string
+          signed_name: string
+          user_agent?: string | null
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          doc_sha256?: string
+          doc_version?: string
+          id?: string
+          ip?: string | null
+          org_id?: string
+          signed_at?: string
+          signed_name?: string
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "consents_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "consents_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       events: {
         Row: {
           client_id: string | null

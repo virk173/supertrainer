@@ -66,6 +66,12 @@ export async function middleware(request: NextRequest) {
     return redirectTo("/login");
   }
 
+  // The consent gate (Phase 2.3) requires a signed-in client; the page itself
+  // routes non-clients and already-consented clients onward.
+  if (isPathActive(path, "/consent") && !isAuthed) {
+    return redirectTo("/login");
+  }
+
   return supabaseResponse;
 }
 
