@@ -7,6 +7,7 @@ import {
 } from "@supertrainer/ai";
 import type { Json } from "@supertrainer/db/types";
 
+import { trackServer } from "@/lib/analytics/server";
 import { createServiceClient } from "@/lib/supabase/server";
 import {
   filterByDiet,
@@ -53,11 +54,15 @@ function buildMeal(
 ): PreviewMeal {
   // Fail-closed: keep ONLY items whose foodId is in the allergen/diet-filtered
   // pool. A hallucinated or unsafe id is dropped here, so nothing outside the
-  // safe pool can ever reach the rendered preview.
+  // safe pool can ever reach the rendered preview. Dedupe repeated ids too — the
+  // model occasionally lists a food twice, which would double-count macros and
+  // collide React keys.
   const items: PreviewMealItem[] = [];
+  const usedIds = new Set<string>();
   for (const it of rawItems) {
     const food = pool.get(it.foodId);
-    if (!food) continue;
+    if (!food || usedIds.has(food.id)) continue;
+    usedIds.add(food.id);
     const grams = Math.max(1, Math.min(1000, Math.round(it.grams)));
     items.push({
       foodId: food.id,
@@ -181,16 +186,30 @@ export async function getOrCreatePreview(
     generatedAt: new Date().toISOString(),
   };
 
-  // Cache on the lead (never regenerate) and advance the funnel status.
+  // Cache on the lead UNCONDITIONALLY (this is the never-regenerate guarantee —
+  // a paid Sonnet call must be cached even if the lead already converted).
   await service
     .from("leads")
     .update({
       preview: content as unknown as Json,
       preview_generated_at: content.generatedAt,
-      status: "preview_shown",
     })
+    .eq("id", leadId);
+
+  // Advance the funnel status only from 'started' — never downgrade a lead that
+  // has already moved to preview_shown/converted.
+  await service
+    .from("leads")
+    .update({ status: "preview_shown" })
     .eq("id", leadId)
-    .neq("status", "converted");
+    .eq("status", "started");
+
+  // Funnel event: the preview is the phase's central conversion mechanic.
+  await trackServer({
+    orgId: lead.org_id,
+    event: "preview_shown",
+    properties: { lead_id: leadId },
+  });
 
   return content;
 }

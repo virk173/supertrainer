@@ -4,6 +4,9 @@ import { expect, test } from "@playwright/test";
 
 import { serviceClient } from "./helpers";
 
+// DoD: the client funnel is verified on a phone viewport (mobile-first).
+test.use({ viewport: { width: 390, height: 844 } });
+
 async function seedOrgWithTier(): Promise<{ orgId: string; slug: string; tierId: string }> {
   const service = serviceClient();
   const slug = `preview-${randomUUID().slice(0, 8)}`;
@@ -148,7 +151,8 @@ test("conversion: choosing a tier creates the correct client + links the lead", 
   expect(client?.profile_id).toBeTruthy();
   expect((client?.intake as { email?: string })?.email).toBe(email);
   expect((client?.intake as { selected_tier_id?: string })?.selected_tier_id).toBe(tierId);
-  expect((client?.health_flags as { allergens?: string[] })?.allergens).toEqual(["peanuts"]);
+  // convert writes health_flags.allergies (matching the Phase 1 import/demo key).
+  expect((client?.health_flags as { allergies?: string[] })?.allergies).toEqual(["peanuts"]);
 
   const service = serviceClient();
   const { data: lead } = await service

@@ -40,12 +40,16 @@ function dayNumber(startedAt: string): number {
   return Math.max(1, days + 1);
 }
 
+// Interview turns only. Bounded so a long thread can't unbounded-scan or ship
+// the whole history to the browser (the real, paginated thread arrives in P6.1).
 async function loadMessages(service: ReturnType<typeof createServiceClient>, clientId: string) {
   const { data } = await service
     .from("messages")
     .select("id, sender, body")
     .eq("client_id", clientId)
-    .order("created_at", { ascending: true });
+    .eq("kind", "interview")
+    .order("created_at", { ascending: true })
+    .limit(200);
   return (data ?? []).map((m) => ({
     id: m.id,
     sender: m.sender as string,
@@ -118,9 +122,16 @@ export async function ensureInterview(
   if (!state) throw new Error("interview state missing");
 
   const answers = (state.answers ?? {}) as AnswersBySection;
-  const status = state.status as InterviewStatus;
+  let status = state.status as InterviewStatus;
   const day = dayNumber(state.started_at);
   const section = nextSection(answers, day);
+
+  // Self-heal: a complete intake whose finalize didn't land (status still
+  // in_progress) gets finalized on the next visit. completeIntake is idempotent.
+  if (status === "in_progress" && isInterviewComplete(answers)) {
+    await completeIntake(orgId, clientId, answers);
+    status = "complete";
+  }
 
   let messages = await loadMessages(service, clientId);
 
@@ -175,11 +186,14 @@ export async function runTurn(
     return view(await loadMessages(service, clientId), status, nextSection(answers, day), false);
   }
 
-  await say(service, orgId, clientId, "client", text);
+  const answers = (state.answers ?? {}) as AnswersBySection;
+  const day = dayNumber(state.started_at);
 
   // ── HARD RULE: health disclosure pauses everything ────────────────────────
   const flags = await detectHealthFlags(text);
   if (flags.flagged) {
+    await say(service, orgId, clientId, "client", text);
+
     const { data: client } = await service
       .from("clients")
       .select("health_flags")
@@ -220,13 +234,21 @@ export async function runTurn(
     return view(await loadMessages(service, clientId), "paused_health", null, false);
   }
 
-  const answers = (state.answers ?? {}) as AnswersBySection;
-  const day = dayNumber(state.started_at);
   const section = nextSection(answers, day);
   if (!section) {
+    // Nothing open. If the intake is actually complete, finalize (self-heals a
+    // prior completeIntake that didn't land); otherwise it's the between-days wait.
+    if (isInterviewComplete(answers)) {
+      await completeIntake(orgId, clientId, answers);
+      return view(await loadMessages(service, clientId), "complete", null, false);
+    }
     return view(await loadMessages(service, clientId), status, null, true);
   }
 
+  // Load history BEFORE recording this message so the model doesn't see the
+  // client's newest line twice (it's passed separately as clientMessage). And if
+  // interviewTurn throws, NOTHING is recorded — the client's retry is clean, not
+  // an orphaned message duplicated on every attempt.
   const history = (await loadMessages(service, clientId)).map((m) => ({
     sender: m.sender === "client" ? ("client" as const) : ("assistant" as const),
     body: m.body,
@@ -246,17 +268,20 @@ export async function runTurn(
     ...answers,
     [section]: { ...(answers[section] ?? {}), ...turn.parsed },
   };
-  await say(service, orgId, clientId, "assistant", turn.reply);
-
   const done = isInterviewComplete(merged);
   const next = nextSection(merged, day);
 
+  await say(service, orgId, clientId, "client", text);
+  await say(service, orgId, clientId, "assistant", turn.reply);
+
+  // Save progress. status='complete' is set only by completeIntake, and only
+  // AFTER the intake is assembled and plan_requests are queued — so a failure
+  // there can never leave a 'complete' interview with no intake.
   await service
     .from("interview_state")
     .update({
       answers: merged as Json,
       section: next ?? section,
-      status: done ? "complete" : "in_progress",
       last_prompt_at: new Date().toISOString(),
     })
     .eq("client_id", clientId);
@@ -271,7 +296,11 @@ export async function runTurn(
   );
 }
 
-// Assembles the intake, propagates timezone/language, and queues the P4/P5 work.
+// Assembles the intake, propagates timezone/language, queues the P4/P5 work, and
+// ONLY THEN marks the interview complete — so a mid-way failure never leaves a
+// 'complete' interview with no intake or plan_requests. Idempotent, so the
+// self-heal retry (runTurn / ensureInterview) can't double-queue plan_requests
+// or double-fire the event.
 async function completeIntake(
   orgId: string,
   clientId: string,
@@ -305,12 +334,24 @@ async function completeIntake(
       .eq("id", client.profile_id);
   }
 
-  // Queue one diet + one split draft. They sit 'queued' until the P4/P5
-  // pipelines exist to pick them up.
-  await service.from("plan_requests").insert([
-    { org_id: orgId, client_id: clientId, kind: "diet", trigger: "onboarding" },
-    { org_id: orgId, client_id: clientId, kind: "split", trigger: "onboarding" },
-  ]);
+  // Queue one diet + one split draft (idempotent — skip if already queued from a
+  // prior finalize attempt). They sit 'queued' until the P4/P5 pipelines exist.
+  const { count: existing } = await service
+    .from("plan_requests")
+    .select("id", { count: "exact", head: true })
+    .eq("client_id", clientId)
+    .eq("trigger", "onboarding");
+  if ((existing ?? 0) === 0) {
+    await service.from("plan_requests").insert([
+      { org_id: orgId, client_id: clientId, kind: "diet", trigger: "onboarding" },
+      { org_id: orgId, client_id: clientId, kind: "split", trigger: "onboarding" },
+    ]);
+    await trackServer({ orgId, event: "intake_complete", clientId });
+  }
 
-  await trackServer({ orgId, event: "intake_complete", clientId });
+  // Mark complete LAST — every downstream artifact now exists.
+  await service
+    .from("interview_state")
+    .update({ status: "complete" })
+    .eq("client_id", clientId);
 }

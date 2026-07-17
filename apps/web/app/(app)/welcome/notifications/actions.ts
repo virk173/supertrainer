@@ -32,6 +32,29 @@ export interface PushSubscriptionInput {
   platform: string;
 }
 
+// The endpoint is a client-supplied URL that Phase 6's delivery worker will POST
+// to, so validate it here: HTTPS and a recognized push-service host only. Fail
+// closed — an unrecognized or non-HTTPS endpoint is dropped (not stored as an
+// SSRF target), and delivery falls back to the email digest.
+const PUSH_HOSTS = [
+  "fcm.googleapis.com",
+  "android.googleapis.com",
+  "push.services.mozilla.com",
+  "push.apple.com",
+  "notify.windows.com",
+  "push.microsoft.com",
+  "web.push.apple.com",
+];
+function isValidPushEndpoint(endpoint: string): boolean {
+  try {
+    const url = new URL(endpoint);
+    if (url.protocol !== "https:") return false;
+    return PUSH_HOSTS.some((h) => url.hostname === h || url.hostname.endsWith(`.${h}`));
+  } catch {
+    return false;
+  }
+}
+
 // Permission granted → move the client up the fallback ladder to 'push' and
 // register this device. Without VAPID configured (dev/preview) there's no
 // subscription to store — the channel still records the client's choice, and
@@ -44,7 +67,7 @@ export async function enablePush(
   if (!own) return { ok: false, message: "Please sign in as a client." };
   const { clientId, orgId, supabase } = own;
 
-  if (sub?.endpoint) {
+  if (sub?.endpoint && isValidPushEndpoint(sub.endpoint)) {
     const { error } = await supabase.from("push_subscriptions").upsert(
       {
         org_id: orgId,

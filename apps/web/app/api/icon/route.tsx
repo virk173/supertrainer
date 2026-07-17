@@ -26,10 +26,19 @@ export async function GET(request: NextRequest) {
   const rgb = parseHex(color);
   const onColor = rgb ? readableTextOn(rgb).onColor : "#ffffff";
 
-  // Only render a remote logo from an http(s) URL (the org's public brand asset).
+  // Only ever fetch the org's own brand asset from our Supabase Storage public
+  // bucket — NOT an arbitrary attacker-supplied URL. This endpoint is public and
+  // unauthenticated, so an unrestricted server-side fetch would be an SSRF
+  // primitive (cloud metadata, internal services). Anything outside the storage
+  // prefix falls back to the letter avatar.
+  const storagePrefix = process.env.NEXT_PUBLIC_SUPABASE_URL
+    ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/`
+    : null;
   const logoParam = searchParams.get("logo");
   const logo =
-    logoParam && /^https?:\/\//i.test(logoParam) ? logoParam : null;
+    logoParam && storagePrefix && logoParam.startsWith(storagePrefix)
+      ? logoParam
+      : null;
 
   return new ImageResponse(
     (

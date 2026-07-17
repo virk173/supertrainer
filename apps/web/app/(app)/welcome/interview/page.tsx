@@ -1,38 +1,20 @@
-import { redirect } from "next/navigation";
-
 import { getOrgTheme } from "@/lib/brand/theme";
 import { ensureInterview } from "@/lib/interview/engine";
-import { getSessionClaims } from "@/lib/onboarding/state";
-import { roleHomePath } from "@/lib/routes";
-import { createServiceClient } from "@/lib/supabase/server";
+import { requireConsentedClient } from "@/lib/onboarding/require-consent";
 import { InterviewThread } from "@/components/interview-thread";
 
 export const metadata = { title: "Your intake" };
 
 // Stage B conversational interview (Phase 2.5). Resumable: the client can leave
 // and come back, and sections unlock across days 1–3 — so this is a thread they
-// return to, not a wizard that must be finished in one sitting.
+// return to, not a wizard that must be finished in one sitting. Consent-gated:
+// the interview is coaching content and collects health disclosures.
 export default async function InterviewPage() {
-  const { orgId, userId, role } = await getSessionClaims();
-  if (!orgId || !userId) redirect("/login");
-  if (role !== "client") redirect(roleHomePath(role));
-
-  const service = createServiceClient();
-  const { data: client } = await service
-    .from("clients")
-    .select("id, intake")
-    .eq("profile_id", userId)
-    .eq("org_id", orgId)
-    .maybeSingle();
-  if (!client) redirect("/login");
+  const { orgId, clientId, clientName } = await requireConsentedClient();
 
   const theme = await getOrgTheme(orgId);
   const trainerName = theme?.name ?? "Your coach";
-  const view = await ensureInterview(
-    orgId,
-    client.id,
-    (client.intake as { name?: string })?.name,
-  );
+  const view = await ensureInterview(orgId, clientId, clientName);
 
   return (
     <main

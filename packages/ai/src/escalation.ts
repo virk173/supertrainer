@@ -85,7 +85,10 @@ export function keywordHealthFlags(text: string): {
   categories: HealthFlagCategory[];
   matched: string[];
 } {
-  const s = (text || "").toLowerCase();
+  // Normalize separators to spaces so hyphenated/slashed spellings match the
+  // space-separated multiword keywords ("self-harm" → "self harm",
+  // "beta-blocker" → "beta blocker"). Fail-closed: over-matching is fine.
+  const s = (text || "").toLowerCase().replace(/[-_/]+/g, " ").replace(/\s+/g, " ");
   const categories: HealthFlagCategory[] = [];
   const matched: string[] = [];
   for (const category of HEALTH_FLAG_CATEGORIES) {

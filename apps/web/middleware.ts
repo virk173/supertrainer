@@ -2,7 +2,6 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import {
   brandedSlugFromHost,
-  isBrandedPassthroughPath,
   isPathActive,
   roleHomePath,
 } from "@/lib/routes";
@@ -37,15 +36,18 @@ export async function middleware(request: NextRequest) {
     return withCookies(NextResponse.redirect(url));
   };
 
-  // Branded subdomain → serve that org's client-facing pages from /c/{slug}.
-  // The apex and app/www/api subdomains fall through to normal routing.
+  // Branded subdomain → serve that org's landing at the ROOT only. Everything
+  // else ({slug}.<platform>/portal, /consent, /welcome, /c/{slug}/start, /auth,
+  // /offline, the PWA plumbing…) is a real app route and must pass through to
+  // normal routing — rewriting those into /c/{slug}/… would 404 the whole funnel
+  // and break service-worker install on branded subdomains.
   const brandSlug = brandedSlugFromHost(
     request.headers.get("host"),
     process.env.NEXT_PUBLIC_PLATFORM_DOMAIN,
   );
-  if (brandSlug && !isBrandedPassthroughPath(path)) {
+  if (brandSlug && path === "/") {
     const url = request.nextUrl.clone();
-    url.pathname = `/c/${brandSlug}${path === "/" ? "" : path}`;
+    url.pathname = `/c/${brandSlug}`;
     return withCookies(NextResponse.rewrite(url));
   }
 

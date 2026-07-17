@@ -38,20 +38,6 @@ export function brandedSlugFromHost(
   return sub;
 }
 
-// On a branded subdomain, app/auth plumbing paths still resolve to the real
-// routes; everything else is rewritten into that org's /c/{slug} space.
-export function isBrandedPassthroughPath(pathname: string): boolean {
-  return (
-    pathname.startsWith("/c/") ||
-    pathname.startsWith("/auth") ||
-    pathname.startsWith("/api") ||
-    pathname.startsWith("/join") ||
-    // PWA plumbing (Phase 2.4) must resolve to the real routes, not /c/{slug}/…
-    pathname === "/manifest.webmanifest" ||
-    pathname === "/sw.js"
-  );
-}
-
 // A `next`/redirect target is safe only if it is a same-origin relative path.
 // Rejects absolute URLs and any value that opens an authority. Note that a
 // leading "/\" is NOT safe: browsers normalize backslashes to slashes, so

@@ -4,6 +4,9 @@ import { expect, test, type Page } from "@playwright/test";
 
 import { serviceClient } from "./helpers";
 
+// DoD: the client funnel is verified on a phone viewport (mobile-first).
+test.use({ viewport: { width: 390, height: 844 } });
+
 // Seeds a branded org (no auth needed — the teaser is public) and returns its
 // slug for /c/{slug}/start.
 async function seedTeaserOrg(): Promise<{ orgId: string; slug: string }> {

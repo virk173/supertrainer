@@ -65,7 +65,13 @@ export const StageASubmissionSchema = z
     weightKg: z.coerce.number().min(25, "Check your weight").max(400),
     goal: z.enum(values(GOAL_OPTIONS)),
     activity: z.enum(values(ACTIVITY_OPTIONS)),
-    trainingDaysPerWeek: z.coerce.number().int().min(0).max(7),
+    // z.coerce.number() would turn an empty string into 0 and silently accept
+    // it (min is 0), so reject empty explicitly — an unanswered question is not
+    // "0 days".
+    trainingDaysPerWeek: z.preprocess(
+      (v) => (v === "" || v === null || v === undefined ? undefined : v),
+      z.coerce.number().int().min(0).max(7),
+    ),
     experience: z.enum(values(EXPERIENCE_OPTIONS)),
     diet: z.enum(values(DIET_OPTIONS)),
     allergens: z.array(z.string().trim().min(1).max(60)).max(30).default([]),

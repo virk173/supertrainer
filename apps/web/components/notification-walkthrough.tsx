@@ -43,8 +43,12 @@ export function NotificationWalkthrough({ trainerName }: { trainerName: string }
     setPlatform(p);
     setStandalone(s);
     setMounted(true);
-    // Returning here already installed is the iOS "did it work?" signal.
-    if (s) void markInstalled(p);
+    // Returning here already installed is the iOS "did it work?" signal — fire
+    // pwa_installed once per device, not on every standalone load of this page.
+    if (s && localStorage.getItem("st_pwa_installed") !== "1") {
+      localStorage.setItem("st_pwa_installed", "1");
+      void markInstalled(p);
+    }
   }, []);
 
   React.useEffect(() => {

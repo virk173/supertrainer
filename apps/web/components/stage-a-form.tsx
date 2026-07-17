@@ -70,8 +70,11 @@ function stepError(step: StageAStep, d: Draft): string | null {
       return n >= 25 && n <= 400 ? null : "Enter your weight in kg";
     }
     case "trainingDaysPerWeek": {
-      const n = Number(d.trainingDaysPerWeek);
-      return Number.isInteger(n) && n >= 0 && n <= 7 ? null : "Pick 0–7 days";
+      const raw = d.trainingDaysPerWeek.trim();
+      const n = Number(raw);
+      return raw !== "" && Number.isInteger(n) && n >= 0 && n <= 7
+        ? null
+        : "Pick 0–7 days";
     }
     case "sex":
     case "goal":

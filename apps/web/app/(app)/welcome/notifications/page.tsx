@@ -1,19 +1,15 @@
-import { redirect } from "next/navigation";
-
 import { getOrgTheme } from "@/lib/brand/theme";
-import { getSessionClaims } from "@/lib/onboarding/state";
-import { roleHomePath } from "@/lib/routes";
+import { requireConsentedClient } from "@/lib/onboarding/require-consent";
 import { NotificationWalkthrough } from "@/components/notification-walkthrough";
 
 export const metadata = { title: "Stay in touch" };
 
 // Install + notification permission walkthrough (Phase 2.4). Reached right after
-// the consent gate. Unlike consent this step is SKIPPABLE — skipping records the
-// email_only rung of the fallback ladder rather than blocking the portal.
+// the consent gate (and itself consent-gated). Unlike consent this step is
+// SKIPPABLE — skipping records the email_only rung of the fallback ladder rather
+// than blocking the portal.
 export default async function NotificationsWelcomePage() {
-  const { orgId, role } = await getSessionClaims();
-  if (!orgId) redirect("/login");
-  if (role !== "client") redirect(roleHomePath(role));
+  const { orgId } = await requireConsentedClient();
 
   const theme = await getOrgTheme(orgId);
   const trainerName = theme?.name ?? "Your coach";

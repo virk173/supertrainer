@@ -3,6 +3,9 @@ import { expect, test } from "@playwright/test";
 import { renderConsentDoc, consentDocHash, CONSENT_DOC_VERSION } from "../../lib/consent/doc";
 import { seedClient, serviceClient, uniqueEmail } from "./helpers";
 
+// DoD: the client funnel is verified on a phone viewport (mobile-first).
+test.use({ viewport: { width: 390, height: 844 } });
+
 // ── Hash stability (node-level, no browser) ──────────────────────────────────
 
 test("consent doc hash is stable and context-sensitive", () => {

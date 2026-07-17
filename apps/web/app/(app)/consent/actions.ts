@@ -31,7 +31,7 @@ export async function recordConsent(
     return { ok: false, message: "Please sign in as a client to continue." };
   }
 
-  const name = signedName.trim();
+  const name = signedName.trim().slice(0, 120);
   if (name.length < 2) return { ok: false, message: "Type your full name to sign." };
 
   const theme = await getOrgTheme(orgId);

@@ -11,6 +11,9 @@ import {
 import { isNudgeDue } from "../../lib/interview/nudge";
 import { consentClient, seedClient, serviceClient, uniqueEmail } from "./helpers";
 
+// DoD: the client funnel is verified on a phone viewport (mobile-first).
+test.use({ viewport: { width: 390, height: 844 } });
+
 // ── Pure logic (node-level, no browser, no AI) ───────────────────────────────
 
 test("health keyword gate flags disclosures and ignores ordinary training talk", () => {
@@ -22,6 +25,9 @@ test("health keyword gate flags disclosures and ignores ordinary training talk",
   expect(keywordHealthFlags("I've been bingeing and using laxatives").categories).toContain(
     "eating_disorder",
   );
+  // Hyphenated spellings must still fire on the keyword floor.
+  expect(keywordHealthFlags("thoughts of self-harm").categories).toContain("eating_disorder");
+  expect(keywordHealthFlags("I take a beta-blocker daily").categories).toContain("medication");
   // Must NOT flag ordinary soreness/goals — a gate that cries wolf gets ignored.
   expect(keywordHealthFlags("my legs are sore after squats").categories).toEqual([]);
   expect(keywordHealthFlags("I want to lose 5kg and get stronger").categories).toEqual([]);
@@ -107,10 +113,11 @@ async function seedInterviewClient(
     kind: "interview",
     body: "Hey! Quick one to start — what timezone are you in?",
   });
-  // Allergens from the teaser must survive a later health-flag merge.
+  // Allergens from the teaser must survive a later health-flag merge (the
+  // canonical key is `allergies`, matching import/convert/demo).
   await service
     .from("clients")
-    .update({ health_flags: { allergens: ["Peanuts"] } })
+    .update({ health_flags: { allergies: ["Peanuts"] } })
     .eq("id", clientId);
 
   await page.goto(`/auth/confirm?token_hash=${tokenHash}&type=email&next=/welcome/interview`);
@@ -146,15 +153,15 @@ test("a health disclosure pauses the interview and flags it for the trainer", as
     .eq("id", clientId)
     .single();
   const flags = client?.health_flags as {
-    allergens?: string[];
+    allergies?: string[];
     interview?: { categories?: string[]; excerpt?: string };
   };
   expect(flags.interview?.categories).toEqual(
     expect.arrayContaining(["condition", "medication"]),
   );
   expect(flags.interview?.excerpt).toContain("metformin");
-  // The teaser's allergens must not be clobbered by the flag merge.
-  expect(flags.allergens).toEqual(["Peanuts"]);
+  // The teaser's allergies must not be clobbered by the flag merge.
+  expect(flags.allergies).toEqual(["Peanuts"]);
 
   const { data: events } = await service
     .from("events")
