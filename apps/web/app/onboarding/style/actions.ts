@@ -104,8 +104,10 @@ export async function ingestUploads(
     };
   }
 
-  // Confidence scales with how much material we had; <3 files is flagged low.
-  const confidence = Math.min(1, files.length / 3);
+  // Confidence scales with how much material actually extracted; files that
+  // failed to download or parse don't count (using the submitted files.length
+  // would overstate confidence when some uploads yield no text). <3 → low.
+  const confidence = Math.min(1, texts.length / 3);
 
   // Extract all three domains from the combined material in parallel.
   let drafts: StyleDraft[];

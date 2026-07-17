@@ -31,10 +31,14 @@ export async function claimInvite(token: string): Promise<ClaimResult> {
 
   const { data: client } = await service
     .from("clients")
-    .select("id, profile_id, intake")
+    .select("id, org_id, profile_id, intake")
     .eq("id", invite.client_id)
     .maybeSingle();
-  if (!client) {
+  // The invite's client must belong to the invite's org. Reads here use the
+  // service role (RLS-bypassing), so verify tenancy in code: a mismatch means
+  // the invite was forged to point at another org's client. Legitimate issuance
+  // always links a same-org client, so this never trips in normal flows.
+  if (!client || client.org_id !== invite.org_id) {
     return { ok: false, redirectTo: "/login?error=Invite%20is%20invalid%20or%20expired", reason: "no_client" };
   }
 
