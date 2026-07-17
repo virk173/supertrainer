@@ -66,9 +66,12 @@ export async function middleware(request: NextRequest) {
     return redirectTo("/login");
   }
 
-  // The consent gate (Phase 2.3) requires a signed-in client; the page itself
-  // routes non-clients and already-consented clients onward.
-  if (isPathActive(path, "/consent") && !isAuthed) {
+  // The consent gate (Phase 2.3) and the install/notification walkthrough
+  // (Phase 2.4) require a signed-in client; each page routes non-clients onward.
+  if (
+    (isPathActive(path, "/consent") || isPathActive(path, "/welcome")) &&
+    !isAuthed
+  ) {
     return redirectTo("/login");
   }
 

@@ -45,7 +45,10 @@ export function isBrandedPassthroughPath(pathname: string): boolean {
     pathname.startsWith("/c/") ||
     pathname.startsWith("/auth") ||
     pathname.startsWith("/api") ||
-    pathname.startsWith("/join")
+    pathname.startsWith("/join") ||
+    // PWA plumbing (Phase 2.4) must resolve to the real routes, not /c/{slug}/…
+    pathname === "/manifest.webmanifest" ||
+    pathname === "/sw.js"
   );
 }
 

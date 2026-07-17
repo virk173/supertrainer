@@ -48,9 +48,9 @@ test("consent gate blocks the portal, then signing unlocks it with an evidence t
 
   await page.getByTestId("consent-sign").click();
 
-  // Signed → into the portal.
-  await expect(page.getByTestId("portal-home")).toBeVisible();
-  await expect(page).toHaveURL(/\/portal/);
+  // Signed → handed off to the install/notification step (Phase 2.4), which is
+  // skippable; the portal is no longer blocked.
+  await expect(page).toHaveURL(/\/welcome\/notifications/);
 
   // Evidence trail: an immutable consent row with the hash, name, and UA.
   const service = serviceClient();

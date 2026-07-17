@@ -77,7 +77,9 @@ export function ConsentForm({
       setError(result.message ?? "Couldn't record your consent.");
       return;
     }
-    router.push("/portal");
+    // Next funnel step: install + notification permission (Phase 2.4). Skippable
+    // there, so the portal is reachable either way.
+    router.push("/welcome/notifications");
   }
 
   return (

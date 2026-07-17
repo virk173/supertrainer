@@ -96,6 +96,7 @@ export type Database = {
           import_batch_id: string | null
           intake: Json
           is_demo: boolean
+          notification_channel: Database["public"]["Enums"]["notification_channel"]
           org_id: string
           profile_id: string | null
           source: Database["public"]["Enums"]["client_source"]
@@ -112,6 +113,7 @@ export type Database = {
           import_batch_id?: string | null
           intake?: Json
           is_demo?: boolean
+          notification_channel?: Database["public"]["Enums"]["notification_channel"]
           org_id: string
           profile_id?: string | null
           source: Database["public"]["Enums"]["client_source"]
@@ -128,6 +130,7 @@ export type Database = {
           import_batch_id?: string | null
           intake?: Json
           is_demo?: boolean
+          notification_channel?: Database["public"]["Enums"]["notification_channel"]
           org_id?: string
           profile_id?: string | null
           source?: Database["public"]["Enums"]["client_source"]
@@ -598,6 +601,57 @@ export type Database = {
           },
         ]
       }
+      push_subscriptions: {
+        Row: {
+          client_id: string
+          created_at: string
+          endpoint: string
+          id: string
+          keys: Json
+          org_id: string
+          platform: string | null
+          revoked_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          endpoint: string
+          id?: string
+          keys?: Json
+          org_id: string
+          platform?: string | null
+          revoked_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          endpoint?: string
+          id?: string
+          keys?: Json
+          org_id?: string
+          platform?: string | null
+          revoked_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "push_subscriptions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "push_subscriptions_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       style_exemplars: {
         Row: {
           content: string
@@ -808,6 +862,7 @@ export type Database = {
       food_source: "usda" | "off" | "ifct" | "org_custom" | "seed"
       invite_channel: "copy_link" | "email"
       lead_status: "started" | "preview_shown" | "converted" | "expired"
+      notification_channel: "push" | "email_only"
       onboarding_step:
         | "brand"
         | "style"
@@ -958,6 +1013,7 @@ export const Constants = {
       food_source: ["usda", "off", "ifct", "org_custom", "seed"],
       invite_channel: ["copy_link", "email"],
       lead_status: ["started", "preview_shown", "converted", "expired"],
+      notification_channel: ["push", "email_only"],
       onboarding_step: ["brand", "style", "tiers", "import", "demo", "invite"],
       onboarding_step_status: ["todo", "done", "skipped"],
       org_role: ["owner", "staff", "client"],
