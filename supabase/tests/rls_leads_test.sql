@@ -8,7 +8,11 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(7);
+select plan(9);
+
+-- Phase 2 backstop columns (rate-limit hardening).
+select has_column('public', 'leads', 'email_normalized', 'leads has email_normalized');
+select has_column('public', 'leads', 'ip_hash', 'leads has ip_hash');
 
 insert into auth.users (id, email, aud, role) values
   ('a0000000-0000-0000-0000-000000000001', 'owner-a@test.local', 'authenticated', 'authenticated'),
