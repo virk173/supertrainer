@@ -26,7 +26,7 @@ All three are safety/abuse backstops on already-shipped surfaces. This spec cove
 **Problem.** `apps/web/app/c/[slug]/start/actions.ts` caps 3/email/week and 50/day/org, but (a) the weekly check matches the raw email string, so `u.s.e.r+1@gmail.com` / `+tags` / mixed case each read as a new person, and (b) the 50/day/org cap is a DoS weapon — one actor can fill it and block every real prospect. The client IP is computed for Turnstile but never stored, so a per-source sublimit has nothing to key on.
 
 **Migration** (`supabase/migrations/<ts>_leads_ratelimit_hardening.sql`):
-- Add `email_normalized text` to `leads`. Backfill existing rows with the same normalization the code uses. Add index `leads_org_id_email_normalized_created_at_idx (org_id, email_normalized, created_at)`; drop the now-unused `leads_org_id_email_created_at_idx`.
+- Add `email_normalized text` to `leads`. Backfill existing rows **best-effort with `lower(btrim(email))`** — the table is effectively empty pre-launch, and going-forward correctness comes from the code path; we deliberately do **not** re-implement the Gmail dot/`+tag` algorithm in SQL (it would drift from the TS `normalizeEmail`). Add index `leads_org_id_email_normalized_created_at_idx (org_id, email_normalized, created_at)`; drop the now-unused `leads_org_id_email_created_at_idx`. (`email` stays the raw contact field for the magic link; `email_normalized` is a count-only key.)
 - Add `ip_hash text` to `leads`. Add partial index `leads_org_id_ip_hash_created_at_idx (org_id, ip_hash, created_at) WHERE ip_hash IS NOT NULL`.
 - RLS unchanged (staff still read their org; both columns are abuse-prevention metadata, and `ip_hash` is a non-reversible keyed digest, so no column restriction is required).
 
@@ -38,7 +38,7 @@ All three are safety/abuse backstops on already-shipped surfaces. This spec cove
 `submitLead` changes:
 - Compute `emailNormalized = normalizeEmail(email)` and `ipHash = hashIp(ip, process.env.LEAD_IP_HASH_SECRET)`.
 - Weekly check now filters `.eq("email_normalized", emailNormalized)`.
-- **New per-IP/day sublimit** (`PER_IP_DAILY_LIMIT = 5`): only when `ipHash` is non-null, count same-`ip_hash` leads for the org in the last day; over the limit → friendly rejection.
+- **New per-IP/day sublimit** (`PER_IP_DAILY_LIMIT = 5`): only when `ipHash` is non-null, count same-`ip_hash` leads for the org in the last day; over the limit → friendly rejection. **Caveat:** shared IPs (gym wifi, corporate NAT, mobile CGNAT) can put several genuine prospects behind one `ip_hash`; 5 caps one source at ≤10% of the org's 50/day while keeping the false-positive risk low for a single coach's link. It is a clearly-named tunable so a coach running an in-person promo can be raised.
 - Keep the 50/day/org cap (cost ceiling), now backstopped by the sublimit.
 - Persist `email_normalized` and `ip_hash` on insert.
 
@@ -52,8 +52,8 @@ All three are safety/abuse backstops on already-shipped surfaces. This spec cove
 
 **New module** `apps/web/lib/interview/stall.ts` (server-only):
 - `runInterviewNudges(now = Date.now()): Promise<{ nudged: number }>`:
-  1. Select `interview_state` rows with `status = 'in_progress'`, bounded (`limit 200`), ordered by `last_prompt_at` ascending.
-  2. Filter in code with `isNudgeDue(last_prompt_at, nudges_sent, now)`.
+  1. Select `interview_state` rows with `status = 'in_progress'`, bounded (`limit 200`), ordered by `last_prompt_at` ascending. Read `client_id, org_id, answers, started_at, last_prompt_at, nudges_sent`.
+  2. Filter in code, nudging a row **only when both hold**: (a) `isNudgeDue(last_prompt_at, nudges_sent, now)` **and** (b) a section is actually **open for the client** — `nextSection(answers, dayNumber(started_at)) !== null`. Guard (b) is essential: the interview is day-paced (sections unlock across days 1–3), so a client who finished today's sections is *correctly* idle while waiting for the next day to unlock (`waitingForNextDay`). Nudging then would poke someone the **system** is gating, not someone who is stalling. Only nudge when the ball is in the client's court. (`dayNumber` is lifted out of `engine.ts` into a shared `stage-b` helper so both use one definition.)
   3. For each due row, do a **lease update** — `update interview_state set nudges_sent = nudges_sent + 1, last_prompt_at = now where client_id = ? and status = 'in_progress' and last_prompt_at = <value read>`. If it affects 0 rows, another tick already claimed it → skip. This is the race guard against overlapping ticks and is done **before** posting so a double-fire can't double-nudge.
   4. On a claimed row, insert an in-thread `assistant` `kind='interview'` nudge message, fire `interview_nudge_sent`, and call `notifyClient(...)`.
 - `notifyClient(...)` — the **Phase 6 seam**. Today: no-op that logs. Phase 6 attaches Web Push / email digest here. Documented as such inline.
@@ -83,7 +83,7 @@ All three are safety/abuse backstops on already-shipped surfaces. This spec cove
 - **Testing** (no new runner — Node-level Playwright specs that import pure helpers, per the existing `turnstile.spec.ts` pattern, plus DB/HTTP e2e):
   - Unit: `normalizeEmail` (gmail dots/+tags/case, googlemail, non-gmail +tag, idempotence), `hashIp` (stable, differs by IP, null when secret/ip absent), `rateLimitDecision` (precedence + limits).
   - pgTAP: the partial unique index rejects a 2nd `(client, diet, onboarding)` (`throws_ok`, expecting the unique-violation) and **allows** a `(client, diet, monthly)`.
-  - e2e: email-normalization path (two gmail-dot variants consume the same weekly quota → third blocked); cron route (seeded 25h-stalled `in_progress` interview → `nudged: 1` + a new nudge message + `nudges_sent` bumped; immediate re-run → not due; 401 without the secret).
+  - e2e: email-normalization path (submit `WEEKLY_EMAIL_LIMIT` = 3 same-normalizing Gmail variants — dots/`+tags` — all succeed, then the next variant is blocked, proving they share one quota); cron route (seeded 25h-stalled `in_progress` interview **with an open section** → `nudged: 1` + a new nudge message + `nudges_sent` bumped; a between-days `waitingForNextDay` interview idle >24h → **not** nudged; immediate re-run → not due; 401 without the secret).
 - **Verification gates (must stay green):** `npm run typecheck` (4/4), `npm run lint`, `npx supabase test db` (pgTAP), `npm run test` (Playwright). Update `docs/plan/PROGRESS.md` when done.
 
 ## Explicitly still deferred (captured, not built here)
