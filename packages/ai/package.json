@@ -8,7 +8,8 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "eval:style": "tsx evals/style-ingestion/run.ts"
+    "eval:style": "tsx evals/style-ingestion/run.ts",
+    "eval:interview": "tsx evals/interview/run.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.111.0",

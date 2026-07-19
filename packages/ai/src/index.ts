@@ -36,6 +36,43 @@ export {
   type ColumnMapping,
 } from "./import/mapColumns";
 export {
+  type AllergenTag,
+  ALLERGEN_TAGS,
+  type FoodLike,
+  excludedAllergenTags,
+  isFoodSafe,
+  filterSafeFoods,
+  allergenLabels,
+} from "./allergens";
+export {
+  PreviewDraftSchema,
+  type PreviewDraft,
+  type PreviewCandidate,
+  type PreviewAgentInput,
+  generatePreviewDraft,
+  PREVIEW_MODEL,
+} from "./preview";
+export {
+  type HealthFlagCategory,
+  HEALTH_FLAG_CATEGORIES,
+  type HealthFlagResult,
+  keywordHealthFlags,
+  detectHealthFlags,
+} from "./escalation";
+export {
+  INTERVIEW_SECTIONS,
+  SECTION_DAY,
+  SECTION_SCHEMAS,
+  type InterviewSection,
+  type SectionAnswers,
+  type InterviewTurnInput,
+  type InterviewTurnOutput,
+  interviewTurn,
+  isSectionComplete,
+  nextSection,
+  isInterviewComplete,
+} from "./interview";
+export {
   StyleDomain,
   DietProfileSchema,
   TrainingProfileSchema,

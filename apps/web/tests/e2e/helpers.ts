@@ -99,6 +99,16 @@ export async function seedTrainer(
   };
 }
 
+// Marks a seeded client as having signed consent (Phase 2.3), so tests that
+// exercise the portal itself skip past the blocking consent gate.
+export async function consentClient(profileId: string): Promise<void> {
+  const service = serviceClient();
+  await service
+    .from("clients")
+    .update({ consent_signed_at: new Date().toISOString(), consent_doc_hash: "test-hash" })
+    .eq("profile_id", profileId);
+}
+
 // Poll Mailpit (Supabase local email sink) for the confirm link sent to `email`.
 export async function confirmLinkFromEmail(email: string): Promise<string> {
   for (let attempt = 0; attempt < 20; attempt++) {

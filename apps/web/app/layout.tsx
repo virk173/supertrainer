@@ -4,6 +4,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { PostHogProvider } from "@supertrainer/ui/analytics";
 
 import { PostHogPageview } from "@/components/posthog-pageview";
+import { ServiceWorkerRegister } from "@/components/service-worker-register";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -31,6 +32,18 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
+        {/*
+         * PWA manifest (Phase 2.4). React 19 hoists this <link> into <head>.
+         * crossOrigin="use-credentials" is required: the manifest route is
+         * per-client (org-branded), so it must be fetched WITH cookies —
+         * without this the browser gets the generic platform manifest.
+         */}
+        <link
+          rel="manifest"
+          href="/manifest.webmanifest"
+          crossOrigin="use-credentials"
+        />
+        <ServiceWorkerRegister />
         <PostHogProvider>
           {children}
           {/*
