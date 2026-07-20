@@ -2,7 +2,7 @@
 
 - **Date:** 2026-07-18
 - **Branch:** `phase-2-backstops`
-- **Status:** approved (design), pre-implementation
+- **Status:** implemented (2026-07-18) — typecheck 4/4, lint clean, pgTAP 118, Playwright 57/57 non-AI green (3 live-AI tests credit-blocked only)
 - **Source:** the deferred items recorded in `docs/plan/PROGRESS.md` line 95 after the Phase 2 multi-agent review.
 
 ## Context
