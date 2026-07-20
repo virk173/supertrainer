@@ -48,7 +48,14 @@ export async function submitLead(
 
   // Bot gate BEFORE any persistence/AI. Best-effort client IP for Turnstile.
   const hdrs = await headers();
-  const ip = hdrs.get("x-forwarded-for")?.split(",")[0]?.trim() || null;
+  // Trusted client IP for Turnstile + the per-IP DoS sublimit. Prefer Vercel's
+  // single-value x-real-ip (set at the edge, not client-overridable); the leftmost
+  // X-Forwarded-For entry is client-supplied and spoofable, so fall back to its
+  // RIGHTMOST hop (closest trusted proxy), never the leftmost.
+  const ip =
+    hdrs.get("x-real-ip")?.trim() ||
+    hdrs.get("x-forwarded-for")?.split(",").pop()?.trim() ||
+    null;
   const turnstile = await verifyTurnstile(turnstileToken, ip);
   if (!turnstile.ok) {
     return { ok: false, message: "Verification failed — please try again." };
