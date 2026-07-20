@@ -160,12 +160,46 @@ test("teaser: per-email weekly limit rejects a 4th preview for the same email", 
   const service = serviceClient();
   const email = `repeat-${randomUUID().slice(0, 8)}@test.local`;
 
-  // Seed the weekly per-email cap (3).
+  // Seed the weekly per-email cap (3). The limiter counts on email_normalized.
   await service.from("leads").insert(
-    Array.from({ length: 3 }, () => ({ org_id: orgId, email, allergens: [] })),
+    Array.from({ length: 3 }, () => ({
+      org_id: orgId,
+      email,
+      email_normalized: email,
+      allergens: [],
+    })),
   );
 
   await fillToAllergenStep(page, slug, email);
+  await page.getByTestId("allergies-none").click();
+  await page.getByTestId("next").click();
+
+  await expect(page.getByTestId("step-error")).toContainText("this week");
+  await expect(page.getByTestId("stage-a-done")).toHaveCount(0);
+});
+
+test("teaser: Gmail dot/+tag variants share one weekly quota (normalization)", async ({
+  page,
+}) => {
+  const { orgId, slug } = await seedTeaserOrg();
+  const service = serviceClient();
+  const handle = `norm.user.${randomUUID().slice(0, 8)}`;
+
+  // Three prior previews under the SAME normalized identity, seeded as dotted
+  // Gmail variants (all normalize to handle-without-dots @gmail.com).
+  const normalized = `${handle.replace(/\./g, "")}@gmail.com`;
+  await service.from("leads").insert(
+    Array.from({ length: 3 }, (_, i) => ({
+      org_id: orgId,
+      email: `${handle}+v${i}@gmail.com`,
+      email_normalized: normalized,
+      allergens: [],
+    })),
+  );
+
+  // A fourth, spelled differently again, must still be recognized as the same
+  // person and blocked.
+  await fillToAllergenStep(page, slug, `${handle.toUpperCase()}@gmail.com`);
   await page.getByTestId("allergies-none").click();
   await page.getByTestId("next").click();
 

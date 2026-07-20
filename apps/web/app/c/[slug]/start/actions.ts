@@ -6,17 +6,26 @@ import type { Json } from "@supertrainer/db/types";
 
 import { trackServer } from "@/lib/analytics/server";
 import { getOrgThemeBySlug } from "@/lib/brand/theme";
+import { hashIp, normalizeEmail, rateLimitDecision, type RateLimitReason } from "@/lib/onboarding/rate-limit";
 import { StageASubmissionSchema, splitSubmission } from "@/lib/onboarding/stage-a";
 import { verifyTurnstile } from "@/lib/onboarding/turnstile";
 import { createServiceClient } from "@/lib/supabase/server";
 
-// Sliding-window teaser quotas (P2.1). Per-email/week caps a single prospect
-// hammering one link; per-org/day caps a link being scraped. Both slide on
-// leads.created_at — no separate counter table.
+// Sliding-window teaser quotas (P2.1 + P2 backstop). Weekly-per-email caps a
+// single prospect (on a normalized key so +tag/dot variants can't dodge it);
+// per-IP/day is a DoS sublimit so one source can't eat the org's quota;
+// per-org/day is the overall cost ceiling. All slide on leads.created_at.
 const WEEKLY_EMAIL_LIMIT = 3;
 const DAILY_ORG_LIMIT = 50;
+const PER_IP_DAILY_LIMIT = 5;
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+const LIMIT_MESSAGES: Record<RateLimitReason, string> = {
+  email: "You've already started a few previews this week — check your email or come back later.",
+  ip: "There've been a lot of sign-ups from your connection today — please try again tomorrow.",
+  org: "This coach is getting a lot of interest today — please try again tomorrow.",
+};
 
 export interface SubmitLeadResult {
   ok: boolean;
@@ -59,7 +68,9 @@ export async function submitLead(
   const { email, phone, allergens, answers } = splitSubmission(parsed.data);
   const service = createServiceClient();
 
-  // Sliding-window rate limits (Postgres count on created_at).
+  // Sliding-window rate limits (Postgres counts on created_at).
+  const emailNormalized = normalizeEmail(email);
+  const ipHash = hashIp(ip, process.env.LEAD_IP_HASH_SECRET);
   const weekAgo = new Date(Date.now() - WEEK_MS).toISOString();
   const dayAgo = new Date(Date.now() - DAY_MS).toISOString();
 
@@ -67,25 +78,32 @@ export async function submitLead(
     .from("leads")
     .select("id", { count: "exact", head: true })
     .eq("org_id", theme.orgId)
-    .eq("email", email)
+    .eq("email_normalized", emailNormalized)
     .gte("created_at", weekAgo);
-  if ((emailCount ?? 0) >= WEEKLY_EMAIL_LIMIT) {
-    return {
-      ok: false,
-      message: "You've already started a few previews this week — check your email or come back later.",
-    };
-  }
 
   const { count: orgCount } = await service
     .from("leads")
     .select("id", { count: "exact", head: true })
     .eq("org_id", theme.orgId)
     .gte("created_at", dayAgo);
-  if ((orgCount ?? 0) >= DAILY_ORG_LIMIT) {
-    return {
-      ok: false,
-      message: "This coach is getting a lot of interest today — please try again tomorrow.",
-    };
+
+  let ipCount: number | null = null;
+  if (ipHash) {
+    const { count } = await service
+      .from("leads")
+      .select("id", { count: "exact", head: true })
+      .eq("org_id", theme.orgId)
+      .eq("ip_hash", ipHash)
+      .gte("created_at", dayAgo);
+    ipCount = count ?? 0;
+  }
+
+  const decision = rateLimitDecision(
+    { emailCount: emailCount ?? 0, orgCount: orgCount ?? 0, ipCount },
+    { weeklyEmail: WEEKLY_EMAIL_LIMIT, dailyOrg: DAILY_ORG_LIMIT, dailyIp: PER_IP_DAILY_LIMIT },
+  );
+  if (!decision.ok && decision.reason) {
+    return { ok: false, message: LIMIT_MESSAGES[decision.reason] };
   }
 
   const { data: lead, error } = await service
@@ -93,6 +111,8 @@ export async function submitLead(
     .insert({
       org_id: theme.orgId,
       email,
+      email_normalized: emailNormalized,
+      ip_hash: ipHash,
       phone,
       allergens,
       answers: answers as Json,
