@@ -11,6 +11,7 @@ import {
 import type { Json } from "@supertrainer/db/types";
 
 import { trackServer } from "@/lib/analytics/server";
+import { dayNumber } from "@/lib/interview/pacing";
 import { createServiceClient } from "@/lib/supabase/server";
 
 // Stage B interview engine (Phase 2.5). Every turn is written server-side with
@@ -31,14 +32,6 @@ type AnswersBySection = Record<string, SectionAnswers>;
 
 const PAUSE_REPLY =
   "Thanks for telling me that — that's important. I'm going to have your coach look at this personally before we go any further, rather than guess. They'll pick this up with you shortly.";
-
-// Day 1 on the day they start; sections unlock across days 1–3.
-function dayNumber(startedAt: string): number {
-  const days = Math.floor(
-    (Date.now() - new Date(startedAt).getTime()) / (24 * 60 * 60 * 1000),
-  );
-  return Math.max(1, days + 1);
-}
 
 // Interview turns only. Bounded so a long thread can't unbounded-scan or ship
 // the whole history to the browser (the real, paginated thread arrives in P6.1).

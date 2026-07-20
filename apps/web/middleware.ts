@@ -14,8 +14,13 @@ import { updateSession } from "@/lib/supabase/middleware";
 //   everything else (marketing, /login, /signup, /join, /auth) is public.
 // Branded subdomains ({slug}.<platform>) are rewritten into /c/{slug} (P1.2).
 export async function middleware(request: NextRequest) {
-  const { supabaseResponse, claims } = await updateSession(request);
   const path = request.nextUrl.pathname;
+
+  // Service-role cron endpoints authenticate via CRON_SECRET, not a user
+  // session — skip session refresh and role gating entirely.
+  if (path.startsWith("/api/cron/")) return NextResponse.next();
+
+  const { supabaseResponse, claims } = await updateSession(request);
 
   const role =
     typeof claims?.user_role === "string" ? claims.user_role : null;
