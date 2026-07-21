@@ -44,10 +44,30 @@ test("consent gate blocks the portal, then signing unlocks it with an evidence t
 
   // Can't sign without scrolling to the end + name + checkbox.
   await expect(page.getByTestId("consent-sign")).toBeDisabled();
-  await page.getByTestId("consent-doc").evaluate((el) => el.scrollTo(0, el.scrollHeight));
+  await expect(page.getByTestId("scroll-hint")).toBeVisible();
+
+  // Naming + checking the box alone must NOT unlock signing — the read-to-end
+  // gate is independent of (and must be satisfied before) the other two
+  // requirements. This is the regression check for the bug where the gate's
+  // scrolledEnd flag flipped true on mount before the client had scrolled at
+  // all (SF-2): if that bug were reintroduced, the button would already be
+  // enabled here, before any scrolling has happened.
   await page.getByTestId("consent-agree").check();
   await page.getByTestId("consent-name").fill("Alex Client");
+  await expect(page.getByTestId("consent-sign")).toBeDisabled();
+  await expect(page.getByTestId("scroll-hint")).toBeVisible();
+
+  // The scrollable region is keyboard-operable (WCAG 2.1.1): tab to it and
+  // page-down instead of only exercising the programmatic scrollTo below.
+  await page.getByTestId("consent-doc").focus();
+  await expect(page.getByTestId("consent-doc")).toBeFocused();
+
+  // Scrolling to the end-of-document sentinel is what flips the gate — this is
+  // detected via IntersectionObserver so it's correct whether the inner doc
+  // div or the page itself is what physically scrolls.
+  await page.getByTestId("consent-doc").evaluate((el) => el.scrollTo(0, el.scrollHeight));
   await expect(page.getByTestId("consent-sign")).toBeEnabled();
+  await expect(page.getByTestId("scroll-hint")).toBeHidden();
 
   await page.getByTestId("consent-sign").click();
 
