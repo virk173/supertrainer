@@ -368,7 +368,7 @@ test("an un-consented client's sendAnswer write is rejected even called directly
       (req) => req.method() === "POST" && req.headers()["next-action"] !== undefined,
     ),
     (async () => {
-      await page.getByTestId("interview-input").fill("hello from a consented client");
+      await page.getByTestId("interview-input").fill("I'm type 2 diabetic and take metformin");
       await page.getByTestId("interview-send").click();
     })(),
   ]);
@@ -415,8 +415,11 @@ test("an un-consented client's sendAnswer write is rejected even called directly
   expect(bMessageCount ?? 0).toBe(0);
 
   // Sanity: the SAME replay mechanics actually work end-to-end (proves this
-  // isn't passing because the replay itself is broken) — client A, whose
-  // request we captured, really did get a turn recorded.
+  // isn't passing because the replay itself is broken) — client A, whose request
+  // we captured, really did get a message recorded. A's input is a KEYWORD
+  // health disclosure so it records via the deterministic keyword-flag path
+  // (which pauses without the paid coaching call), keeping this assertion valid
+  // in CI where no ANTHROPIC_API_KEY is present and interviewTurn would throw.
   const { count: aMessageCount } = await service
     .from("messages")
     .select("id", { count: "exact", head: true })
