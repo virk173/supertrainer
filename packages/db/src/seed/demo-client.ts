@@ -71,8 +71,26 @@ export async function seedDemoClient(supabase: Db, orgId: string): Promise<strin
       })
       .select("id")
       .single();
-    if (error) throw error;
-    clientId = data.id;
+    if (error) {
+      // A racing invocation (double-click, or seedDemo racing resetDemo)
+      // beat us here: the partial-unique index on clients(org_id) where
+      // is_demo (20260721120000_demo_client_unique.sql, mirroring the
+      // plan_requests_onboarding_unique.sql backstop) rejects our insert
+      // with 23505 once the winner's row already exists. Treat that as
+      // "already seeded" and adopt the winner's row instead of throwing, so
+      // a racing double-invoke is a no-op rather than a 500.
+      if (error.code !== "23505") throw error;
+      const { data: winner, error: refetchError } = await supabase
+        .from("clients")
+        .select("id")
+        .eq("org_id", orgId)
+        .eq("is_demo", true)
+        .single();
+      if (refetchError) throw refetchError;
+      clientId = winner.id;
+    } else {
+      clientId = data.id;
+    }
   } else {
     await supabase
       .from("clients")
