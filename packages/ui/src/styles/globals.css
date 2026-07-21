@@ -57,6 +57,12 @@
   --success-foreground: oklch(0.985 0 0);
   --warning: oklch(0.769 0.164 70.08);
   --warning-foreground: oklch(0.205 0 0);
+  /* --warning is tuned so its DARK foreground (above) passes on a warning
+   * FILL, not for use as amber text on light surfaces (~2:1 there). This is
+   * the dedicated text ink for that case: clears 4.5:1 AA on both
+   * --background (5.66:1) and --surface (5.27:1). Never use --warning
+   * itself as text on a light surface. */
+  --warning-text: oklch(0.52 0.16 70.08);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
   --ring: oklch(0.708 0 0);
@@ -93,6 +99,10 @@
   --success-foreground: oklch(0.205 0 0);
   --warning: oklch(0.795 0.184 86.05);
   --warning-foreground: oklch(0.205 0 0);
+  /* In dark mode --warning is already a light amber, so it doubles as
+   * light-on-dark text (10.34:1 on --background, 9.74:1 on --surface) —
+   * kept as its own token so the light/dark pair stays symmetric. */
+  --warning-text: oklch(0.795 0.184 86.05);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.556 0 0);
@@ -126,6 +136,7 @@
   --color-success-foreground: var(--success-foreground);
   --color-warning: var(--warning);
   --color-warning-foreground: var(--warning-foreground);
+  --color-warning-text: var(--warning-text);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);

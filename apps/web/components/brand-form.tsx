@@ -216,7 +216,7 @@ export function BrandForm({
           </div>
           {colorValid && !colorPassesAA && (
             <p
-              className="flex items-center gap-1.5 text-xs text-warning"
+              className="flex items-center gap-1.5 text-xs text-warning-text"
               data-testid="contrast-warning"
             >
               <AlertTriangle aria-hidden="true" className="size-3.5" />

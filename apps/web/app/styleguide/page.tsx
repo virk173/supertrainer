@@ -41,6 +41,13 @@ const COLOR_PAIRS = [
   { name: "success", chip: "bg-success text-success-foreground" },
   { name: "warning", chip: "bg-warning text-warning-foreground" },
   { name: "danger", chip: "bg-danger text-danger-foreground" },
+  // Warning as TEXT on a light surface (not the warning fill) — this is the
+  // combination SF-1 found rendering allergen text near-illegible (~2:1) when
+  // components used --warning itself as ink. --warning-text is the dedicated
+  // dark-amber ink for this case; keep both pairings QA'd so a future misuse
+  // of --warning as text on --background/--surface fails this axe scan.
+  { name: "warning-text/background", chip: "bg-background text-warning-text border" },
+  { name: "warning-text/surface", chip: "bg-surface text-warning-text border" },
 ] as const;
 
 const METRICS = [
