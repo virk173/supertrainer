@@ -84,10 +84,38 @@ async function styleFor(
 async function stateFor(service: ReturnType<typeof createServiceClient>, clientId: string) {
   const { data } = await service
     .from("interview_state")
-    .select("client_id, org_id, section, answers, status, started_at")
+    .select("client_id, org_id, section, answers, status, started_at, last_prompt_at")
     .eq("client_id", clientId)
     .maybeSingle();
   return data;
+}
+
+// Lease the opener slot with optimistic concurrency on last_prompt_at — the same
+// CAS pattern runInterviewNudges uses (stall.ts:41-52). Only the caller that
+// flips last_prompt_at from its previously-read value (NULL for a brand-new row,
+// or the last-known timestamp for a day-boundary reopen) wins the row; everyone
+// else backs off. That means concurrent loads — two tabs, a hover-prefetch
+// racing a click, or two overlapping day-2+ reopens — post the opener and pay
+// for the Sonnet call AT MOST ONCE.
+//
+// `section` is deliberately NOT written here: it's only advanced after the
+// opener message is actually saved (see below). If the AI call after a
+// successful lease throws, the DB's `section` marker stays put, so a later
+// reload is still detected as "not yet opened" and re-leases cleanly instead of
+// getting silently stuck.
+async function leaseOpenerSlot(
+  service: ReturnType<typeof createServiceClient>,
+  clientId: string,
+  lastPromptAt: string | null,
+): Promise<boolean> {
+  const query = service
+    .from("interview_state")
+    .update({ last_prompt_at: new Date().toISOString() })
+    .eq("client_id", clientId)
+    .eq("status", "in_progress");
+  const guarded = lastPromptAt === null ? query.is("last_prompt_at", null) : query.eq("last_prompt_at", lastPromptAt);
+  const { data: leased } = await guarded.select("client_id");
+  return !!leased && leased.length > 0;
 }
 
 function view(
@@ -128,27 +156,41 @@ export async function ensureInterview(
 
   let messages = await loadMessages(service, clientId);
 
-  // Opening turn: no history yet and there's a section to run. Tolerant of an
-  // agent failure (no API key in dev/CI) — the thread just opens empty rather
-  // than 500-ing the page.
-  if (messages.length === 0 && status === "in_progress" && section) {
-    try {
-      const turn = await interviewTurn({
-        section,
-        styleText: await styleFor(service, orgId),
-        history: [],
-        answersSoFar: answers[section] ?? {},
-        clientMessage: "",
-        clientName,
-      });
-      await say(service, orgId, clientId, "assistant", turn.reply);
-      await service
-        .from("interview_state")
-        .update({ section, last_prompt_at: new Date().toISOString() })
-        .eq("client_id", clientId);
-      messages = await loadMessages(service, clientId);
-    } catch (err) {
-      console.error("[interview] opening turn failed:", err);
+  // Opening turn: post the section opener when either (a) there's no history at
+  // all (brand-new interview), or (b) the currently-open section has moved past
+  // the section this row last posted for — e.g. a day-2+ reopen where a new
+  // section just unlocked (`interview_state.section` tracks the last section a
+  // turn actually ran for; `runTurn` keeps it in sync with `nextSection` on every
+  // within-day advance, so a mismatch here can only mean a fresh day unlocked a
+  // section nobody has been prompted for yet). Leased (see leaseOpenerSlot above)
+  // so concurrent loads never double-post or double-charge. Tolerant of an agent
+  // failure (no API key in dev/CI) — the thread just opens empty rather than
+  // 500-ing the page, and a later reload retries cleanly.
+  if (
+    status === "in_progress" &&
+    section &&
+    (messages.length === 0 || section !== state.section)
+  ) {
+    const leased = await leaseOpenerSlot(service, clientId, state.last_prompt_at);
+    if (leased) {
+      try {
+        const turn = await interviewTurn({
+          section,
+          styleText: await styleFor(service, orgId),
+          history: [],
+          answersSoFar: answers[section] ?? {},
+          clientMessage: "",
+          clientName,
+        });
+        await say(service, orgId, clientId, "assistant", turn.reply);
+        await service
+          .from("interview_state")
+          .update({ section, last_prompt_at: new Date().toISOString() })
+          .eq("client_id", clientId);
+        messages = await loadMessages(service, clientId);
+      } catch (err) {
+        console.error("[interview] opening turn failed:", err);
+      }
     }
   }
 

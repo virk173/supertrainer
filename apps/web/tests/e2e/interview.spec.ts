@@ -7,7 +7,10 @@ import {
   isInterviewComplete,
   isSectionComplete,
   nextSection,
+  type InterviewSection,
+  type SectionAnswers,
 } from "../../../../packages/ai/src/interview";
+import { dayNumber } from "../../lib/interview/pacing";
 import { isNudgeDue } from "../../lib/interview/nudge";
 import { consentClient, seedClient, serviceClient, uniqueEmail } from "./helpers";
 
@@ -84,7 +87,19 @@ test("idle nudge is due after 24h and capped at 2", () => {
 async function seedInterviewClient(
   page: Page,
   prefix: string,
-  opts: { answers?: Record<string, unknown>; backdateDays?: number } = {},
+  opts: {
+    answers?: Record<string, unknown>;
+    backdateDays?: number;
+    /**
+     * The section `interview_state.section` should hold, i.e. the last section a
+     * turn actually ran (and posted an opener) for. Defaults to whatever's
+     * currently open for `answers`/`backdateDays` — correct for tests that don't
+     * care about the day-boundary opener gap. Pass this explicitly to simulate a
+     * PRIOR day's state (e.g. `section: "goals"` with day-1-only answers) so a
+     * later reload can exercise ensureInterview's day-2+ opener detection.
+     */
+    section?: InterviewSection;
+  } = {},
 ) {
   const { userId, orgId, tokenHash } = await seedClient(uniqueEmail(prefix));
   await consentClient(userId);
@@ -100,10 +115,13 @@ async function seedInterviewClient(
   const startedAt = new Date(
     Date.now() - (opts.backdateDays ?? 0) * 24 * 60 * 60 * 1000,
   ).toISOString();
+  const answers = (opts.answers ?? {}) as Record<string, SectionAnswers>;
+  const section = opts.section ?? nextSection(answers, dayNumber(startedAt)) ?? "logistics";
   await service.from("interview_state").insert({
     client_id: clientId,
     org_id: orgId,
-    answers: (opts.answers ?? {}) as Json,
+    answers: answers as Json,
+    section,
     started_at: startedAt,
   });
   await service.from("messages").insert({
@@ -169,6 +187,59 @@ test("a health disclosure pauses the interview and flags it for the trainer", as
     .eq("org_id", orgId)
     .eq("type", "health_flag_raised");
   expect((events ?? []).length).toBe(1);
+});
+
+// LIVE: MF-2/MF-3 — a day-2+ reopen must post exactly one opener for the newly
+// unlocked section (MF-3), not zero (the old messages.length===0-only gate) and
+// not two (MF-2's missing lease). Day 1's logistics+goals are seeded complete
+// with interview_state.section left at "goals" — the true post-day-1 value a
+// real flow would leave it at — and started_at backdated a day so `dayNumber`
+// reads 2. seedInterviewClient's own initial page load is the "day-2 reopen":
+// ensureInterview must see section("nutrition") !== state.section("goals") and
+// post nutrition's opener.
+test("live: a day-2 reopen posts the newly-unlocked section's opener exactly once", async ({
+  page,
+}) => {
+  test.skip(!process.env.ANTHROPIC_API_KEY, "needs ANTHROPIC_API_KEY for the opener's live turn");
+  test.setTimeout(60_000);
+
+  const { clientId } = await seedInterviewClient(page, "interview-day2", {
+    backdateDays: 1,
+    answers: {
+      logistics: {
+        timezone: "Asia/Kolkata",
+        preferredLanguage: "English",
+        weighInDays: ["Monday"],
+      },
+      goals: { primaryGoal: "lose fat" },
+    },
+    section: "goals",
+  });
+
+  const service = serviceClient();
+
+  // Exactly 2 messages: day 1's seeded opener + day 2's new nutrition opener.
+  const { data: messages } = await service
+    .from("messages")
+    .select("sender, created_at")
+    .eq("client_id", clientId)
+    .eq("kind", "interview")
+    .order("created_at", { ascending: true });
+  expect(messages).toHaveLength(2);
+  expect(messages?.every((m) => m.sender === "assistant")).toBe(true);
+
+  // The lease must have advanced the row to the section it just opened for.
+  const { data: state } = await service
+    .from("interview_state")
+    .select("section, last_prompt_at")
+    .eq("client_id", clientId)
+    .single();
+  expect(state?.section).toBe("nutrition");
+  expect(state?.last_prompt_at).toBeTruthy();
+
+  // The client sees the fresh nutrition prompt, not a stale day-1 bubble with an
+  // open input the client's first reply would misread as an unprompted answer.
+  await expect(page.getByTestId("interview-input")).toBeVisible();
 });
 
 // LIVE: the completion path — one real turn finishes the last section and must
