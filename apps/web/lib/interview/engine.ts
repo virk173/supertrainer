@@ -5,6 +5,8 @@ import {
   interviewTurn,
   isInterviewComplete,
   nextSection,
+  serializeConfirmedStyles,
+  type HealthFlagResult,
   type InterviewSection,
   type SectionAnswers,
 } from "@supertrainer/ai";
@@ -32,6 +34,29 @@ type AnswersBySection = Record<string, SectionAnswers>;
 
 const PAUSE_REPLY =
   "Thanks for telling me that — that's important. I'm going to have your coach look at this personally before we go any further, rather than guess. They'll pick this up with you shortly.";
+
+// Per-client AI-call budget for the write path (MF-6 security audit finding).
+// Every runTurn call can make up to two paid Claude calls — detectHealthFlags's
+// cheap classify pass (unconditional — the health gate ALWAYS runs, even when
+// throttled) and interviewTurn's expensive draft pass. The budget below gates
+// the draft pass ONLY; nothing else bounds how often a client can invoke
+// sendAnswer (a stable POST endpoint). A real interview is
+// short: 6 sections (INTERVIEW_SECTIONS), each usually answered in a handful of
+// messages, spread across up to 3 days. This rolling window is sized generously
+// above any normal-cadence conversation, so it only ever engages a caller
+// hammering the action in a loop. Exported so the regression test doesn't
+// hardcode a number that could silently drift from the real cap.
+export const INTERVIEW_RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000; // 1 hour
+export const MAX_CLIENT_MESSAGES_PER_WINDOW = 20;
+
+export const THROTTLE_REPLY =
+  "Let's pick this back up in a little bit — send your next answer again shortly.";
+
+// The opener claim's TTL. last_prompt_at is bumped when a load claims the opener
+// slot (leaseOpenerSlot); a concurrent load within this window backs off rather
+// than re-posting/re-charging. Sized comfortably above one interviewTurn draft
+// call, and short enough that a crashed opener is reclaimable soon after.
+const OPENER_CLAIM_TTL_MS = 60 * 1000;
 
 // Interview turns only. Bounded so a long thread can't unbounded-scan or ship
 // the whole history to the browser (the real, paginated thread arrives in P6.1).
@@ -76,18 +101,63 @@ async function styleFor(
     .select("domain, profile")
     .eq("org_id", orgId)
     .eq("status", "confirmed");
-  return (data ?? [])
-    .map((s) => `${s.domain} style: ${JSON.stringify(s.profile)}`)
-    .join("\n");
+  return serializeConfirmedStyles(data);
 }
 
 async function stateFor(service: ReturnType<typeof createServiceClient>, clientId: string) {
   const { data } = await service
     .from("interview_state")
-    .select("client_id, org_id, section, answers, status, started_at")
+    .select("client_id, org_id, section, answers, status, started_at, last_prompt_at")
     .eq("client_id", clientId)
     .maybeSingle();
   return data;
+}
+
+// MF-6: this client's interview replies within the rolling budget window.
+// Counted from `messages` (the append-only record of record) rather than a
+// separate counter column, so it can never drift from what actually happened
+// and self-corrects if a turn fails partway through.
+async function clientMessagesInWindow(
+  service: ReturnType<typeof createServiceClient>,
+  clientId: string,
+): Promise<number> {
+  const since = new Date(Date.now() - INTERVIEW_RATE_LIMIT_WINDOW_MS).toISOString();
+  const { count } = await service
+    .from("messages")
+    .select("id", { count: "exact", head: true })
+    .eq("client_id", clientId)
+    .eq("kind", "interview")
+    .eq("sender", "client")
+    .gte("created_at", since);
+  return count ?? 0;
+}
+
+// Lease the opener slot with optimistic concurrency on last_prompt_at — the same
+// CAS pattern runInterviewNudges uses (stall.ts:41-52). Only the caller that
+// flips last_prompt_at from its previously-read value (NULL for a brand-new row,
+// or the last-known timestamp for a day-boundary reopen) wins the row; everyone
+// else backs off. That means concurrent loads — two tabs, a hover-prefetch
+// racing a click, or two overlapping day-2+ reopens — post the opener and pay
+// for the Sonnet call AT MOST ONCE.
+//
+// `section` is deliberately NOT written here: it's only advanced after the
+// opener message is actually saved (see below). If the AI call after a
+// successful lease throws, the DB's `section` marker stays put, so a later
+// reload is still detected as "not yet opened" and re-leases cleanly instead of
+// getting silently stuck.
+async function leaseOpenerSlot(
+  service: ReturnType<typeof createServiceClient>,
+  clientId: string,
+  lastPromptAt: string | null,
+): Promise<boolean> {
+  const query = service
+    .from("interview_state")
+    .update({ last_prompt_at: new Date().toISOString() })
+    .eq("client_id", clientId)
+    .eq("status", "in_progress");
+  const guarded = lastPromptAt === null ? query.is("last_prompt_at", null) : query.eq("last_prompt_at", lastPromptAt);
+  const { data: leased } = await guarded.select("client_id");
+  return !!leased && leased.length > 0;
 }
 
 function view(
@@ -128,27 +198,55 @@ export async function ensureInterview(
 
   let messages = await loadMessages(service, clientId);
 
-  // Opening turn: no history yet and there's a section to run. Tolerant of an
-  // agent failure (no API key in dev/CI) — the thread just opens empty rather
-  // than 500-ing the page.
-  if (messages.length === 0 && status === "in_progress" && section) {
-    try {
-      const turn = await interviewTurn({
-        section,
-        styleText: await styleFor(service, orgId),
-        history: [],
-        answersSoFar: answers[section] ?? {},
-        clientMessage: "",
-        clientName,
-      });
-      await say(service, orgId, clientId, "assistant", turn.reply);
-      await service
-        .from("interview_state")
-        .update({ section, last_prompt_at: new Date().toISOString() })
-        .eq("client_id", clientId);
-      messages = await loadMessages(service, clientId);
-    } catch (err) {
-      console.error("[interview] opening turn failed:", err);
+  // Opening turn: post the section opener when either (a) there's no history at
+  // all (brand-new interview), or (b) the currently-open section has moved past
+  // the section this row last posted for — e.g. a day-2+ reopen where a new
+  // section just unlocked (`interview_state.section` tracks the last section a
+  // turn actually ran for; `runTurn` keeps it in sync with `nextSection` on every
+  // within-day advance, so a mismatch here can only mean a fresh day unlocked a
+  // section nobody has been prompted for yet). Tolerant of an agent failure (no
+  // API key in dev/CI) — the thread just opens empty rather than 500-ing the
+  // page, and a later reload retries cleanly.
+  //
+  // Concurrency: last_prompt_at doubles as a short-lived opener CLAIM. A load
+  // arriving while the winner's ~2-4s interviewTurn call is still in flight sees
+  // a freshly-bumped last_prompt_at and backs off (openerClaimFresh) — that
+  // recency guard is what makes the claim self-invalidating; leaseOpenerSlot's
+  // plain CAS alone would re-match the already-leased value and let the second
+  // caller through (it does not post the opener / advance `section` until AFTER
+  // the AI call). The CAS still resolves the truly-simultaneous case (both reads
+  // see the same pre-lease value), and a claim older than OPENER_CLAIM_TTL_MS is
+  // reclaimable so a crashed opener call still retries. (Same claim-with-TTL
+  // shape as the preview lock in lib/preview/generate.ts.)
+  const openerClaimFresh =
+    !!state.last_prompt_at &&
+    Date.now() - new Date(state.last_prompt_at).getTime() < OPENER_CLAIM_TTL_MS;
+  if (
+    status === "in_progress" &&
+    section &&
+    (messages.length === 0 || section !== state.section) &&
+    !openerClaimFresh
+  ) {
+    const leased = await leaseOpenerSlot(service, clientId, state.last_prompt_at);
+    if (leased) {
+      try {
+        const turn = await interviewTurn({
+          section,
+          styleText: await styleFor(service, orgId),
+          history: [],
+          answersSoFar: answers[section] ?? {},
+          clientMessage: "",
+          clientName,
+        });
+        await say(service, orgId, clientId, "assistant", turn.reply);
+        await service
+          .from("interview_state")
+          .update({ section, last_prompt_at: new Date().toISOString() })
+          .eq("client_id", clientId);
+        messages = await loadMessages(service, clientId);
+      } catch (err) {
+        console.error("[interview] opening turn failed:", err);
+      }
     }
   }
 
@@ -181,9 +279,20 @@ export async function runTurn(
 
   const answers = (state.answers ?? {}) as AnswersBySection;
   const day = dayNumber(state.started_at);
+  const section = nextSection(answers, day);
 
-  // ── HARD RULE: health disclosure pauses everything ────────────────────────
-  const flags = await detectHealthFlags(text);
+  // ── Per-client AI budget (MF-6) ─────────────────────────────────────────────
+  // Bounds only the EXPENSIVE Sonnet draft (interviewTurn, further down). The
+  // health gate below is deliberately NOT throttled: detectHealthFlags always
+  // runs its full keyword ∪ classifier pass — the classifier is the cheap Haiku
+  // call, and skipping it under load could miss a nuance-only disclosure the
+  // keyword list can't catch. So a genuine disclosure ALWAYS pauses; only a
+  // non-flagged, over-budget turn is short-circuited before the draft call.
+  const throttled =
+    (await clientMessagesInWindow(service, clientId)) >= MAX_CLIENT_MESSAGES_PER_WINDOW;
+
+  // ── HARD RULE: health disclosure pauses everything (always, even throttled) ─
+  const flags: HealthFlagResult = await detectHealthFlags(text);
   if (flags.flagged) {
     await say(service, orgId, clientId, "client", text);
 
@@ -227,7 +336,15 @@ export async function runTurn(
     return view(await loadMessages(service, clientId), "paused_health", null, false);
   }
 
-  const section = nextSection(answers, day);
+  if (throttled) {
+    // Over budget and no health flag: skip the paid draft call entirely. Still
+    // record the exchange (nothing is silently dropped — a normal-cadence
+    // interview never reaches this branch, so this is not the common path).
+    await say(service, orgId, clientId, "client", text);
+    await say(service, orgId, clientId, "assistant", THROTTLE_REPLY);
+    return view(await loadMessages(service, clientId), status, section, !section);
+  }
+
   if (!section) {
     // Nothing open. If the intake is actually complete, finalize (self-heals a
     // prior completeIntake that didn't land); otherwise it's the between-days wait.

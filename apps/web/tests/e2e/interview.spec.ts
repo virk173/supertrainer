@@ -7,12 +7,22 @@ import {
   isInterviewComplete,
   isSectionComplete,
   nextSection,
+  type InterviewSection,
+  type SectionAnswers,
 } from "../../../../packages/ai/src/interview";
+import { dayNumber } from "../../lib/interview/pacing";
 import { isNudgeDue } from "../../lib/interview/nudge";
 import { consentClient, seedClient, serviceClient, uniqueEmail } from "./helpers";
 
 // DoD: the client funnel is verified on a phone viewport (mobile-first).
 test.use({ viewport: { width: 390, height: 844 } });
+
+// Mirrors MAX_CLIENT_MESSAGES_PER_WINDOW in ../../lib/interview/engine.ts.
+// Can't import it directly: engine.ts is `import "server-only"`-guarded (like
+// the rest of the DB-touching interview code) and Playwright's test bundler
+// enforces that guard the same way the app's client bundler does. Keep this in
+// sync if the real cap changes.
+const MAX_CLIENT_MESSAGES_PER_WINDOW = 20;
 
 // ── Pure logic (node-level, no browser, no AI) ───────────────────────────────
 
@@ -84,7 +94,19 @@ test("idle nudge is due after 24h and capped at 2", () => {
 async function seedInterviewClient(
   page: Page,
   prefix: string,
-  opts: { answers?: Record<string, unknown>; backdateDays?: number } = {},
+  opts: {
+    answers?: Record<string, unknown>;
+    backdateDays?: number;
+    /**
+     * The section `interview_state.section` should hold, i.e. the last section a
+     * turn actually ran (and posted an opener) for. Defaults to whatever's
+     * currently open for `answers`/`backdateDays` — correct for tests that don't
+     * care about the day-boundary opener gap. Pass this explicitly to simulate a
+     * PRIOR day's state (e.g. `section: "goals"` with day-1-only answers) so a
+     * later reload can exercise ensureInterview's day-2+ opener detection.
+     */
+    section?: InterviewSection;
+  } = {},
 ) {
   const { userId, orgId, tokenHash } = await seedClient(uniqueEmail(prefix));
   await consentClient(userId);
@@ -100,10 +122,13 @@ async function seedInterviewClient(
   const startedAt = new Date(
     Date.now() - (opts.backdateDays ?? 0) * 24 * 60 * 60 * 1000,
   ).toISOString();
+  const answers = (opts.answers ?? {}) as Record<string, SectionAnswers>;
+  const section = opts.section ?? nextSection(answers, dayNumber(startedAt)) ?? "logistics";
   await service.from("interview_state").insert({
     client_id: clientId,
     org_id: orgId,
-    answers: (opts.answers ?? {}) as Json,
+    answers: answers as Json,
+    section,
     started_at: startedAt,
   });
   await service.from("messages").insert({
@@ -169,6 +194,293 @@ test("a health disclosure pauses the interview and flags it for the trainer", as
     .eq("org_id", orgId)
     .eq("type", "health_flag_raised");
   expect((events ?? []).length).toBe(1);
+});
+
+// ── MF-6 / MF-8 write-path hardening ─────────────────────────────────────────
+// The budget test and the keyword-pause test need no ANTHROPIC_API_KEY (the
+// keyword pass is deterministic; the budget test skips the paid draft), and the
+// consent test never reaches runTurn. The classifier-pause test DOES need a key
+// — it proves the health gate's AI classifier still runs even when throttled.
+
+test("a client over the rolling-window budget is throttled instead of spending the paid draft call", async ({
+  page,
+}) => {
+  const { orgId, clientId } = await seedInterviewClient(page, "interview-throttle");
+
+  // Fast-forward straight to the cap: bulk-insert MAX_CLIENT_MESSAGES_PER_WINDOW
+  // prior client replies inside the rolling window. This bypasses runTurn on
+  // purpose — the test is about the budget gate, not conversation content.
+  const service = serviceClient();
+  await service.from("messages").insert(
+    Array.from({ length: MAX_CLIENT_MESSAGES_PER_WINDOW }, () => ({
+      org_id: orgId,
+      client_id: clientId,
+      sender: "client" as const,
+      kind: "interview",
+      body: "already at budget",
+    })),
+  );
+
+  await page.getByTestId("interview-input").fill("one more, please");
+  await page.getByTestId("interview-send").click();
+
+  // The gentle throttle reply, not a real coaching turn.
+  await expect(page.getByTestId("msg-coach").last()).toHaveText(
+    "Let's pick this back up in a little bit — send your next answer again shortly.",
+  );
+
+  // No progress was recorded — the turn was short-circuited before the section
+  // logic (and the paid draft call) ran.
+  const { data: state } = await service
+    .from("interview_state")
+    .select("answers, status")
+    .eq("client_id", clientId)
+    .single();
+  expect(state?.status).toBe("in_progress");
+  expect(state?.answers).toEqual({});
+});
+
+test("throttling never suppresses a genuine keyword health-flag pause (MF-6 safety invariant)", async ({
+  page,
+}) => {
+  const { clientId } = await seedInterviewClient(page, "interview-throttle-health");
+
+  const service = serviceClient();
+  const { data: before } = await service
+    .from("interview_state")
+    .select("org_id")
+    .eq("client_id", clientId)
+    .single();
+  await service.from("messages").insert(
+    Array.from({ length: MAX_CLIENT_MESSAGES_PER_WINDOW }, () => ({
+      org_id: before!.org_id,
+      client_id: clientId,
+      sender: "client" as const,
+      kind: "interview",
+      body: "already at budget",
+    })),
+  );
+
+  // A keyword disclosure, sent while over budget — the deterministic keyword
+  // pass (no AI call) must still pause the interview, so this holds in CI with no
+  // key. (The AI classifier now runs too, unthrottled — the next test proves it
+  // catches a keyword-free disclosure under the same budget pressure.)
+  await page.getByTestId("interview-input").fill(
+    "I'm in Chicago, but I should say I'm type 2 diabetic and take metformin",
+  );
+  await page.getByTestId("interview-send").click();
+
+  await expect(page.getByTestId("interview-paused")).toBeVisible();
+
+  const { data: state } = await service
+    .from("interview_state")
+    .select("status")
+    .eq("client_id", clientId)
+    .single();
+  expect(state?.status).toBe("paused_health");
+
+  const { data: client } = await service
+    .from("clients")
+    .select("health_flags")
+    .eq("id", clientId)
+    .single();
+  const flags = client?.health_flags as {
+    interview?: { categories?: string[]; source?: string };
+  };
+  expect(flags.interview?.categories).toEqual(
+    expect.arrayContaining(["condition", "medication"]),
+  );
+  // The health gate flagged via the deterministic keyword pass under budget
+  // pressure. Source is "keyword" with no AI key (CI) and "both" when the
+  // always-on classifier also fires locally — either way the keyword floor held.
+  expect(["keyword", "both"]).toContain(flags.interview?.source);
+});
+
+test("throttling still runs the AI classifier — a keyword-free disclosure pauses under budget (MF-6 hardening)", async ({
+  page,
+}) => {
+  test.skip(!process.env.ANTHROPIC_API_KEY, "needs ANTHROPIC_API_KEY — exercises the live classifier");
+  test.setTimeout(60_000);
+  const { clientId } = await seedInterviewClient(page, "interview-throttle-classifier");
+
+  const service = serviceClient();
+  const { data: before } = await service
+    .from("interview_state")
+    .select("org_id")
+    .eq("client_id", clientId)
+    .single();
+  await service.from("messages").insert(
+    Array.from({ length: MAX_CLIENT_MESSAGES_PER_WINDOW }, () => ({
+      org_id: before!.org_id,
+      client_id: clientId,
+      sender: "client" as const,
+      kind: "interview",
+      body: "already at budget",
+    })),
+  );
+
+  // A disclosure with NO health keyword (verified against escalation.ts KEYWORDS)
+  // — only the AI classifier can catch it. Sent while over budget, it proves the
+  // health gate is NOT throttled: detectHealthFlags always runs its classifier
+  // pass, so a nuance-only disclosure still pauses even at the rate cap.
+  await page.getByTestId("interview-input").fill(
+    "My doctor diagnosed me with a long-term illness last month, so I have to be careful with training",
+  );
+  await page.getByTestId("interview-send").click();
+
+  await expect(page.getByTestId("interview-paused")).toBeVisible();
+
+  const { data: state } = await service
+    .from("interview_state")
+    .select("status")
+    .eq("client_id", clientId)
+    .single();
+  expect(state?.status).toBe("paused_health");
+
+  // source === "classifier" proves it was the AI pass (not the keyword floor)
+  // that flagged — the classifier genuinely ran despite the budget throttle.
+  const { data: client } = await service
+    .from("clients")
+    .select("health_flags")
+    .eq("id", clientId)
+    .single();
+  const flags = client?.health_flags as { interview?: { source?: string } };
+  expect(flags.interview?.source).toBe("classifier");
+});
+
+// MF-8: sendAnswer's only gate is JWT claims (role === 'client'); the page's
+// requireConsentedClient redirect never runs for a direct call. Reproduces the
+// exact bypass the audit describes: capture the real POST a consented client's
+// browser sends when calling the sendAnswer server action, then replay those
+// exact bytes (same Next-Action id, same body, same origin/referer — nothing
+// Next's same-origin check cares about differs) against the SAME endpoint from
+// an authenticated-but-unconsented client's own session. The assertion is on
+// DB side effects, not on parsing the RSC response: a fail-closed gate must
+// leave no interview_state/messages row for the unconsented client at all.
+test("an un-consented client's sendAnswer write is rejected even called directly, bypassing the page (MF-8)", async ({
+  page,
+  browser,
+}) => {
+  const consented = await seedInterviewClient(page, "interview-consent-a");
+
+  const [sendRequest] = await Promise.all([
+    page.waitForRequest(
+      (req) => req.method() === "POST" && req.headers()["next-action"] !== undefined,
+    ),
+    (async () => {
+      await page.getByTestId("interview-input").fill("I'm type 2 diabetic and take metformin");
+      await page.getByTestId("interview-send").click();
+    })(),
+  ]);
+  const url = sendRequest.url();
+  const headers = await sendRequest.allHeaders();
+  const body = sendRequest.postDataBuffer();
+  expect(body).not.toBeNull();
+  // Replay must not carry client A's session — context B supplies its own.
+  delete headers["cookie"];
+  delete headers["content-length"];
+
+  // An authenticated client who has deliberately NOT been consented.
+  const service = serviceClient();
+  const { userId: bUserId, tokenHash: bTokenHash } = await seedClient(
+    uniqueEmail("interview-consent-b"),
+  );
+  const { data: bClient } = await service
+    .from("clients")
+    .select("id")
+    .eq("profile_id", bUserId)
+    .single();
+  const bClientId = bClient!.id;
+
+  const bCtx = await browser.newContext();
+  const bPage = await bCtx.newPage();
+  // Establish B's session cookie without ever loading the gated interview page
+  // (that's the whole point — B never sees /welcome/interview, never gets
+  // redirected to /consent; we're hitting the server action endpoint cold).
+  await bPage.goto(`/auth/confirm?token_hash=${bTokenHash}&type=email&next=/portal`);
+
+  await bCtx.request.post(url, { headers, data: body! });
+
+  // Fail-closed: no interview_state and no messages row for B, at all.
+  const { data: bState } = await service
+    .from("interview_state")
+    .select("client_id")
+    .eq("client_id", bClientId)
+    .maybeSingle();
+  expect(bState).toBeNull();
+  const { count: bMessageCount } = await service
+    .from("messages")
+    .select("id", { count: "exact", head: true })
+    .eq("client_id", bClientId);
+  expect(bMessageCount ?? 0).toBe(0);
+
+  // Sanity: the SAME replay mechanics actually work end-to-end (proves this
+  // isn't passing because the replay itself is broken) — client A, whose request
+  // we captured, really did get a message recorded. A's input is a KEYWORD
+  // health disclosure so it records via the deterministic keyword-flag path
+  // (which pauses without the paid coaching call), keeping this assertion valid
+  // in CI where no ANTHROPIC_API_KEY is present and interviewTurn would throw.
+  const { count: aMessageCount } = await service
+    .from("messages")
+    .select("id", { count: "exact", head: true })
+    .eq("client_id", consented.clientId)
+    .eq("sender", "client");
+  expect(aMessageCount ?? 0).toBeGreaterThan(0);
+
+  await bCtx.close();
+});
+
+// LIVE: MF-2/MF-3 — a day-2+ reopen must post exactly one opener for the newly
+// unlocked section (MF-3), not zero (the old messages.length===0-only gate) and
+// not two (MF-2's missing lease). Day 1's logistics+goals are seeded complete
+// with interview_state.section left at "goals" — the true post-day-1 value a
+// real flow would leave it at — and started_at backdated a day so `dayNumber`
+// reads 2. seedInterviewClient's own initial page load is the "day-2 reopen":
+// ensureInterview must see section("nutrition") !== state.section("goals") and
+// post nutrition's opener.
+test("live: a day-2 reopen posts the newly-unlocked section's opener exactly once", async ({
+  page,
+}) => {
+  test.skip(!process.env.ANTHROPIC_API_KEY, "needs ANTHROPIC_API_KEY for the opener's live turn");
+  test.setTimeout(60_000);
+
+  const { clientId } = await seedInterviewClient(page, "interview-day2", {
+    backdateDays: 1,
+    answers: {
+      logistics: {
+        timezone: "Asia/Kolkata",
+        preferredLanguage: "English",
+        weighInDays: ["Monday"],
+      },
+      goals: { primaryGoal: "lose fat" },
+    },
+    section: "goals",
+  });
+
+  const service = serviceClient();
+
+  // Exactly 2 messages: day 1's seeded opener + day 2's new nutrition opener.
+  const { data: messages } = await service
+    .from("messages")
+    .select("sender, created_at")
+    .eq("client_id", clientId)
+    .eq("kind", "interview")
+    .order("created_at", { ascending: true });
+  expect(messages).toHaveLength(2);
+  expect(messages?.every((m) => m.sender === "assistant")).toBe(true);
+
+  // The lease must have advanced the row to the section it just opened for.
+  const { data: state } = await service
+    .from("interview_state")
+    .select("section, last_prompt_at")
+    .eq("client_id", clientId)
+    .single();
+  expect(state?.section).toBe("nutrition");
+  expect(state?.last_prompt_at).toBeTruthy();
+
+  // The client sees the fresh nutrition prompt, not a stale day-1 bubble with an
+  // open input the client's first reply would misread as an unprompted answer.
+  await expect(page.getByTestId("interview-input")).toBeVisible();
 });
 
 // LIVE: the completion path — one real turn finishes the last section and must

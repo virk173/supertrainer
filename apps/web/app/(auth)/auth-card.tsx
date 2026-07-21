@@ -36,7 +36,9 @@ export function AuthCard({
     <main className="flex min-h-screen items-center justify-center p-6">
       <Card className="w-full max-w-sm">
         <CardHeader>
-          <CardTitle className="text-xl">{title}</CardTitle>
+          <CardTitle asChild className="text-xl">
+            <h1>{title}</h1>
+          </CardTitle>
           <CardDescription>{description}</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">

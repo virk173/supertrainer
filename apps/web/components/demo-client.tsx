@@ -112,7 +112,7 @@ export function DemoClient({
           {allergies.length > 0 && (
             <div className="flex justify-between gap-3 text-sm">
               <dt className="text-muted-foreground">Allergies</dt>
-              <dd className="text-right font-medium text-warning">
+              <dd className="text-right font-medium text-warning-text">
                 {allergies.join(", ")}
               </dd>
             </div>

@@ -14,16 +14,26 @@ export interface ChannelResult {
 // Resolves the signed-in client's own client row. Uses the authenticated client
 // (RLS scopes it to their own record) — notification_channel is the client's own
 // preference, not a privileged column.
+//
+// Same-class gap as MF-8 (audit, interview/actions.ts): this is the WRITE
+// path's only gate, so it must fail closed exactly like the render path
+// (requireConsentedClient / the /welcome/notifications page). Resolving purely
+// from JWT claims let an authenticated-but-unconsented client drive
+// enablePush/skipPush directly, bypassing the page's consent redirect
+// entirely. Re-checking clients.consent_signed_at here closes that gap
+// without a second DB round trip (it's one extra selected column).
 async function ownClient() {
   const { orgId, userId, role } = await getSessionClaims();
   if (!orgId || !userId || role !== "client") return null;
   const supabase = await createClient();
   const { data } = await supabase
     .from("clients")
-    .select("id")
+    .select("id, consent_signed_at")
     .eq("profile_id", userId)
     .maybeSingle();
-  return data ? { clientId: data.id, orgId, supabase } : null;
+  if (!data) return null;
+  if (!data.consent_signed_at) return null;
+  return { clientId: data.id, orgId, supabase };
 }
 
 export interface PushSubscriptionInput {

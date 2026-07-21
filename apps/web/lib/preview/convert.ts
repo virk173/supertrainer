@@ -2,6 +2,7 @@ import "server-only";
 
 import type { Json } from "@supertrainer/db/types";
 
+import { buildClientMagicLinkUrl, provisionClientAuthAccount } from "@/lib/auth/provision-client";
 import { getOrgThemeBySlug } from "@/lib/brand/theme";
 import { createServiceClient } from "@/lib/supabase/server";
 import { trackServer } from "@/lib/analytics/server";
@@ -61,23 +62,17 @@ export async function convertLead(
   }
 
   // Account first — the email uniqueness constraint is the concurrency guard.
-  const { data: created, error: createError } =
-    await service.auth.admin.createUser({ email, email_confirm: true });
-  if (createError || !created?.user) {
-    // Email already registered: either a prior conversion, or a concurrent
-    // request won the race. Don't create a duplicate client or clobber the
-    // lead — just send them to sign in.
-    return { redirectTo: "/login" };
-  }
-  const userId = created.user.id;
-
-  const { error: profileError } = await service
-    .from("profiles")
-    .insert({ id: userId, org_id: theme.orgId, role: "client" });
-  if (profileError) {
-    await service.auth.admin.deleteUser(userId);
+  const provisioned = await provisionClientAuthAccount(service, theme.orgId, email);
+  if (!provisioned.ok) {
+    if (provisioned.step === "create_user") {
+      // Email already registered: either a prior conversion, or a concurrent
+      // request won the race. Don't create a duplicate client or clobber the
+      // lead — just send them to sign in.
+      return { redirectTo: "/login" };
+    }
     return { redirectTo: "/login?error=Could%20not%20start%20your%20onboarding" };
   }
+  const userId = provisioned.userId;
 
   const intake = {
     ...(lead.answers as Record<string, unknown>),
@@ -117,19 +112,6 @@ export async function convertLead(
     properties: { lead_id: lead.id, tier_id: selectedTierId },
   });
 
-  return { redirectTo: await magicLink(service, email) };
-}
-
-// A one-time magic-link confirm URL that signs the just-created client in and
-// lands them on /portal.
-async function magicLink(
-  service: ReturnType<typeof createServiceClient>,
-  email: string,
-): Promise<string> {
-  const { data: link, error } = await service.auth.admin.generateLink({
-    type: "magiclink",
-    email,
-  });
-  if (error || !link?.properties?.hashed_token) return "/login";
-  return `/auth/confirm?token_hash=${link.properties.hashed_token}&type=email&next=/portal`;
+  const magicLinkUrl = await buildClientMagicLinkUrl(service, email);
+  return { redirectTo: magicLinkUrl ?? "/login" };
 }

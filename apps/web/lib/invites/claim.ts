@@ -1,5 +1,6 @@
 import "server-only";
 
+import { buildClientMagicLinkUrl, provisionClientAuthAccount } from "@/lib/auth/provision-client";
 import { createServiceClient } from "@/lib/supabase/server";
 import { trackServer } from "@/lib/analytics/server";
 
@@ -54,23 +55,18 @@ export async function claimInvite(token: string): Promise<ClaimResult> {
 
   // Create the auth account (email pre-confirmed — the invite link is the
   // verification). An existing account for this email means they should sign in.
-  const { data: created, error: createError } =
-    await service.auth.admin.createUser({ email, email_confirm: true });
-  if (createError || !created?.user) {
-    return { ok: false, redirectTo: "/login", reason: "email_taken" };
+  const provisioned = await provisionClientAuthAccount(service, invite.org_id, email);
+  if (!provisioned.ok) {
+    if (provisioned.step === "create_user") {
+      return { ok: false, redirectTo: "/login", reason: "email_taken" };
+    }
+    return {
+      ok: false,
+      redirectTo: "/login?error=Invite%20is%20invalid%20or%20expired",
+      reason: "profile_failed",
+    };
   }
-  const userId = created.user.id;
-
-  const { error: profileError } = await service.from("profiles").insert({
-    id: userId,
-    org_id: invite.org_id,
-    role: "client",
-  });
-  if (profileError) {
-    // Roll back the orphaned auth user so a retry is clean.
-    await service.auth.admin.deleteUser(userId);
-    return { ok: false, redirectTo: "/login?error=Invite%20is%20invalid%20or%20expired", reason: "profile_failed" };
-  }
+  const userId = provisioned.userId;
 
   await service
     .from("clients")
@@ -90,16 +86,12 @@ export async function claimInvite(token: string): Promise<ClaimResult> {
   });
 
   // Magic-link token logs the new client in via /auth/confirm, then /portal.
-  const { data: link, error: linkError } =
-    await service.auth.admin.generateLink({ type: "magiclink", email });
-  if (linkError || !link?.properties?.hashed_token) {
+  const magicLinkUrl = await buildClientMagicLinkUrl(service, email);
+  if (!magicLinkUrl) {
     return { ok: false, redirectTo: "/login", reason: "link_failed" };
   }
 
-  return {
-    ok: true,
-    redirectTo: `/auth/confirm?token_hash=${link.properties.hashed_token}&type=email&next=/portal`,
-  };
+  return { ok: true, redirectTo: magicLinkUrl };
 }
 
 // Records the first open of an invite (funnel: invite_opened). Best-effort.

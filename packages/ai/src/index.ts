@@ -26,7 +26,9 @@ export {
 export { visionExtractText, type VisionMediaType } from "./style/vision";
 export {
   serializeStyleProfile,
+  serializeConfirmedStyles,
   STYLE_DOMAINS,
+  type ConfirmedStyleRow,
 } from "./style/serialize";
 export {
   mapColumns,
@@ -50,7 +52,6 @@ export {
   type PreviewCandidate,
   type PreviewAgentInput,
   generatePreviewDraft,
-  PREVIEW_MODEL,
 } from "./preview";
 export {
   type HealthFlagCategory,

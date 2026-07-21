@@ -188,7 +188,7 @@ export function ImportWizard() {
                 htmlFor={`map-${field}`}
                 className={cn(
                   "text-xs",
-                  field === "allergies" ? "font-medium text-warning" : "text-muted-foreground",
+                  field === "allergies" ? "font-medium text-warning-text" : "text-muted-foreground",
                 )}
               >
                 {FIELD_LABELS[field]}
@@ -259,7 +259,7 @@ export function ImportWizard() {
         </p>
 
         {validation.allergiesUnmapped && (
-          <p className="flex items-center gap-2 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-warning" data-testid="allergies-warning">
+          <p className="flex items-center gap-2 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-warning-text" data-testid="allergies-warning">
             <AlertTriangle className="size-4 shrink-0" />
             No allergies column mapped — allergy safety checks won&apos;t have data.
           </p>

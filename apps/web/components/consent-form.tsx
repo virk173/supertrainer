@@ -47,23 +47,34 @@ export function ConsentForm({
 }) {
   const router = useRouter();
   const scrollRef = React.useRef<HTMLDivElement>(null);
+  const endRef = React.useRef<HTMLDivElement>(null);
   const [scrolledEnd, setScrolledEnd] = React.useState(false);
   const [name, setName] = React.useState("");
   const [agreed, setAgreed] = React.useState(false);
   const [submitting, setSubmitting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
-  // Enable once the client has actually reached the bottom (or the doc is short
-  // enough to need no scrolling).
-  const checkScrolled = React.useCallback(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    if (el.scrollHeight - el.scrollTop - el.clientHeight < 24) setScrolledEnd(true);
-  }, []);
-
+  // Enable only once the client has actually reached the end of the agreement
+  // (or the doc is short enough that the end is visible with no scrolling at
+  // all). A sentinel element after the document text is watched with an
+  // IntersectionObserver rather than comparing scrollHeight/clientHeight on
+  // the doc div: that comparison false-positives at mount time whenever an
+  // ancestor's layout lets the *page* scroll instead of the div (the div then
+  // reports scrollHeight === clientHeight even though the agreement was never
+  // read). Intersection is computed against the real, clipped visual position
+  // of the sentinel, so this is correct whichever element physically scrolls.
   React.useEffect(() => {
-    checkScrolled();
-  }, [checkScrolled]);
+    const sentinel = endRef.current;
+    if (!sentinel) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) setScrolledEnd(true);
+      },
+      { threshold: 0 },
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, []);
 
   const canSign = scrolledEnd && name.trim().length >= 2 && agreed && !submitting;
 
@@ -86,12 +97,16 @@ export function ConsentForm({
     <div className="flex flex-1 flex-col">
       <div
         ref={scrollRef}
-        onScroll={checkScrolled}
         data-testid="consent-doc"
-        className="min-h-0 flex-1 overflow-y-auto rounded-lg border bg-card p-4"
+        tabIndex={0}
+        role="region"
+        aria-label="Coaching agreement document"
+        className="max-h-[60vh] min-h-0 flex-1 overflow-y-auto rounded-lg border bg-card p-4"
       >
         <ConsentDoc text={docText} />
         <p className="mt-6 text-[11px] text-muted-foreground">Document version {docVersion}</p>
+        {/* End-of-document sentinel for the IntersectionObserver read-gate above. */}
+        <div ref={endRef} data-testid="consent-doc-end" aria-hidden="true" className="h-px" />
       </div>
 
       {!scrolledEnd && (

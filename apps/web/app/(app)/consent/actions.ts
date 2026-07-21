@@ -10,6 +10,7 @@ import {
 } from "@/lib/consent/doc";
 import { deliverConsentPdf } from "@/lib/consent/deliver";
 import { renderConsentPdf } from "@/lib/consent/pdf";
+import { clientIp } from "@/lib/http/client-ip";
 import { getSessionClaims } from "@/lib/onboarding/state";
 import { trackServer } from "@/lib/analytics/server";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
@@ -20,9 +21,12 @@ export interface RecordConsentResult {
 }
 
 // Records a client's click-wrap consent (Phase 2.3). The signer must be the
-// authenticated client; the IP, user agent, document hash, and timestamp are all
-// captured server-side (never client-supplied). Writes go through the service
-// role because they also set client-restricted columns (consent_signed_at/hash).
+// authenticated client; the user agent, document hash, and timestamp are all
+// captured server-side. The IP is best-effort trusted-hop evidence (see
+// clientIp()) — it favors infra-set headers over client-suppliable ones, but
+// no proxy-derived IP is cryptographically unspoofable. Writes go through the
+// service role because they also set client-restricted columns
+// (consent_signed_at/hash).
 export async function recordConsent(
   signedName: string,
 ): Promise<RecordConsentResult> {
@@ -52,7 +56,7 @@ export async function recordConsent(
   const docSha256 = consentDocHash(docText);
 
   const hdrs = await headers();
-  const ip = hdrs.get("x-forwarded-for")?.split(",")[0]?.trim() || null;
+  const ip = clientIp(hdrs);
   const userAgent = hdrs.get("user-agent") || null;
   const signedAt = new Date().toISOString();
 
