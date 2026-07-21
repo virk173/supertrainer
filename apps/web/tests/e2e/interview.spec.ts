@@ -197,9 +197,10 @@ test("a health disclosure pauses the interview and flags it for the trainer", as
 });
 
 // ── MF-6 / MF-8 write-path hardening ─────────────────────────────────────────
-// None of these need ANTHROPIC_API_KEY: the throttle tests exercise the branch
-// that specifically SKIPS the paid calls, and the consent test never reaches
-// runTurn at all.
+// The budget test and the keyword-pause test need no ANTHROPIC_API_KEY (the
+// keyword pass is deterministic; the budget test skips the paid draft), and the
+// consent test never reaches runTurn. The classifier-pause test DOES need a key
+// — it proves the health gate's AI classifier still runs even when throttled.
 
 test("a client over the rolling-window budget is throttled instead of spending the paid draft call", async ({
   page,
@@ -260,9 +261,10 @@ test("throttling never suppresses a genuine keyword health-flag pause (MF-6 safe
     })),
   );
 
-  // A keyword-only disclosure, sent while over budget — the deterministic
-  // keyword pass must still run and still pause the interview even though the
-  // paid classifier nuance-pass is being withheld for budget reasons.
+  // A keyword disclosure, sent while over budget — the deterministic keyword
+  // pass (no AI call) must still pause the interview, so this holds in CI with no
+  // key. (The AI classifier now runs too, unthrottled — the next test proves it
+  // catches a keyword-free disclosure under the same budget pressure.)
   await page.getByTestId("interview-input").fill(
     "I'm in Chicago, but I should say I'm type 2 diabetic and take metformin",
   );
@@ -288,9 +290,62 @@ test("throttling never suppresses a genuine keyword health-flag pause (MF-6 safe
   expect(flags.interview?.categories).toEqual(
     expect.arrayContaining(["condition", "medication"]),
   );
-  // Proves the throttled (keyword-only) branch actually ran, not the full
-  // classifier path — the safety invariant held under budget pressure.
-  expect(flags.interview?.source).toBe("keyword");
+  // The health gate flagged via the deterministic keyword pass under budget
+  // pressure. Source is "keyword" with no AI key (CI) and "both" when the
+  // always-on classifier also fires locally — either way the keyword floor held.
+  expect(["keyword", "both"]).toContain(flags.interview?.source);
+});
+
+test("throttling still runs the AI classifier — a keyword-free disclosure pauses under budget (MF-6 hardening)", async ({
+  page,
+}) => {
+  test.skip(!process.env.ANTHROPIC_API_KEY, "needs ANTHROPIC_API_KEY — exercises the live classifier");
+  test.setTimeout(60_000);
+  const { clientId } = await seedInterviewClient(page, "interview-throttle-classifier");
+
+  const service = serviceClient();
+  const { data: before } = await service
+    .from("interview_state")
+    .select("org_id")
+    .eq("client_id", clientId)
+    .single();
+  await service.from("messages").insert(
+    Array.from({ length: MAX_CLIENT_MESSAGES_PER_WINDOW }, () => ({
+      org_id: before!.org_id,
+      client_id: clientId,
+      sender: "client" as const,
+      kind: "interview",
+      body: "already at budget",
+    })),
+  );
+
+  // A disclosure with NO health keyword (verified against escalation.ts KEYWORDS)
+  // — only the AI classifier can catch it. Sent while over budget, it proves the
+  // health gate is NOT throttled: detectHealthFlags always runs its classifier
+  // pass, so a nuance-only disclosure still pauses even at the rate cap.
+  await page.getByTestId("interview-input").fill(
+    "My doctor diagnosed me with a long-term illness last month, so I have to be careful with training",
+  );
+  await page.getByTestId("interview-send").click();
+
+  await expect(page.getByTestId("interview-paused")).toBeVisible();
+
+  const { data: state } = await service
+    .from("interview_state")
+    .select("status")
+    .eq("client_id", clientId)
+    .single();
+  expect(state?.status).toBe("paused_health");
+
+  // source === "classifier" proves it was the AI pass (not the keyword floor)
+  // that flagged — the classifier genuinely ran despite the budget throttle.
+  const { data: client } = await service
+    .from("clients")
+    .select("health_flags")
+    .eq("id", clientId)
+    .single();
+  const flags = client?.health_flags as { interview?: { source?: string } };
+  expect(flags.interview?.source).toBe("classifier");
 });
 
 // MF-8: sendAnswer's only gate is JWT claims (role === 'client'); the page's

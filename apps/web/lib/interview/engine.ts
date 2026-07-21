@@ -4,7 +4,6 @@ import {
   detectHealthFlags,
   interviewTurn,
   isInterviewComplete,
-  keywordHealthFlags,
   nextSection,
   serializeConfirmedStyles,
   type HealthFlagResult,
@@ -38,9 +37,10 @@ const PAUSE_REPLY =
 
 // Per-client AI-call budget for the write path (MF-6 security audit finding).
 // Every runTurn call can make up to two paid Claude calls — detectHealthFlags's
-// classify pass (unconditional, runs even in the between-days "waiting" state)
-// and interviewTurn's draft pass — with nothing else bounding how often a
-// client can invoke sendAnswer (a stable POST endpoint). A real interview is
+// cheap classify pass (unconditional — the health gate ALWAYS runs, even when
+// throttled) and interviewTurn's expensive draft pass. The budget below gates
+// the draft pass ONLY; nothing else bounds how often a client can invoke
+// sendAnswer (a stable POST endpoint). A real interview is
 // short: 6 sections (INTERVIEW_SECTIONS), each usually answered in a handful of
 // messages, spread across up to 3 days. This rolling window is sized generously
 // above any normal-cadence conversation, so it only ever engages a caller
@@ -124,22 +124,6 @@ async function clientMessagesInWindow(
     .eq("sender", "client")
     .gte("created_at", since);
   return count ?? 0;
-}
-
-// Keyword-only shape of HealthFlagResult, used when the turn is throttled
-// (MF-6). Free and synchronous — no AI call — and independently authoritative
-// for flagging (escalation.ts: "the keyword pass alone can flag"), so a
-// genuine disclosure still pauses the interview even when the paid classifier
-// nuance-pass is being withheld for budget reasons.
-function keywordOnlyFlags(text: string): HealthFlagResult {
-  const kw = keywordHealthFlags(text);
-  const flagged = kw.categories.length > 0;
-  return {
-    flagged,
-    categories: kw.categories,
-    matched: kw.matched,
-    source: flagged ? "keyword" : "none",
-  };
 }
 
 // Lease the opener slot with optimistic concurrency on last_prompt_at — the same
@@ -278,17 +262,17 @@ export async function runTurn(
   const section = nextSection(answers, day);
 
   // ── Per-client AI budget (MF-6) ─────────────────────────────────────────────
-  // Checked BEFORE either paid call below (the classify pass right after this,
-  // and interviewTurn's draft pass further down). This must never weaken the
-  // health gate: when throttled, the classify call is skipped but the free,
-  // synchronous keyword pass still runs and is still authoritative for
-  // flagging — see keywordOnlyFlags — so a genuine disclosure still pauses the
-  // interview. Only a non-flagged turn gets short-circuited.
+  // Bounds only the EXPENSIVE Sonnet draft (interviewTurn, further down). The
+  // health gate below is deliberately NOT throttled: detectHealthFlags always
+  // runs its full keyword ∪ classifier pass — the classifier is the cheap Haiku
+  // call, and skipping it under load could miss a nuance-only disclosure the
+  // keyword list can't catch. So a genuine disclosure ALWAYS pauses; only a
+  // non-flagged, over-budget turn is short-circuited before the draft call.
   const throttled =
     (await clientMessagesInWindow(service, clientId)) >= MAX_CLIENT_MESSAGES_PER_WINDOW;
 
-  // ── HARD RULE: health disclosure pauses everything ────────────────────────
-  const flags: HealthFlagResult = throttled ? keywordOnlyFlags(text) : await detectHealthFlags(text);
+  // ── HARD RULE: health disclosure pauses everything (always, even throttled) ─
+  const flags: HealthFlagResult = await detectHealthFlags(text);
   if (flags.flagged) {
     await say(service, orgId, clientId, "client", text);
 
