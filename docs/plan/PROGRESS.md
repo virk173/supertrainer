@@ -106,3 +106,12 @@ Built the three hardening items deferred at the Phase 2 review (spec: `docs/supe
 Verified: typecheck 4/4 · lint clean · **pgTAP 118** · **Playwright 57/57 non-AI green**. The 3 live-AI e2e tests (interview/preview/style) are blocked ONLY by the Anthropic account being out of API credits (proven via direct API probe — `HTTP 400 credit balance too low`), not by any code change. New env vars `LEAD_IP_HASH_SECRET` + `CRON_SECRET` documented in `.env.example` (both no-op-safe; cron fails closed).
 
 **Still deferred (unchanged intent):** nudge push/email *delivery* + push-storage e2e (Phase 6 + VAPID keys); phone *verification* (SMS/OTP) + phone-uniqueness-at-conversion (later phase — low value until the phone is verified, and family-shared numbers); the few sub-ms duplicate-query micro-opts. **Ops before prod:** top up Anthropic credits for the live-AI tests; `vercel.json` lives at `apps/web/vercel.json` (Vercel project Root Directory = `apps/web`); set `CRON_SECRET` (and optionally `LEAD_IP_HASH_SECRET`) in the Vercel/CI env.
+
+## Pre–Phase 3 hardening audit — SHIPPED (2026-07-21, PR #7, commit `1e63677`)
+Deep multi-agent audit of Phases 0–2 + backstops (adversarially verified; report `docs/audit/2026-07-21-pre-phase3-audit.md`) → all **14 defects fixed** (8 MUST-FIX + 6 SHOULD-FIX), plus a security-review follow-up (health classifier always runs under throttle) and a max-effort-review fix (opener lease made self-invalidating). Verified typecheck 4/4 · lint · pgTAP 120 · Playwright 75; merged to main; migrations `demo_client_unique` + `lead_preview_lock` applied to prod. Highlights: MF-1 allergen name-net now enforces multi-word pick-list labels (pea/dal safe); MF-4/MF-7 partial-unique + claim-lock backstops; MF-5 consent IP via trusted hop; MF-6/8 interview rate-limit + consent gate.
+
+**This is the AUDIT BASELINE** (`docs/audit/AUDIT-BASELINE.md`): future hardening audits scope ONLY to new-phase diffs vs `1e63677` — Phases 0–2 are NOT re-audited.
+
+**6 PROPOSE-ONLY features (PO-1…PO-6)** from the audit are NOT built (owner's product call). To build them: run `docs/audit/apply-po-features.md`. Most map to planned phases (PO-1/5/6 → P7, PO-4 → P6/P9); PO-3 (consent re-sign on version bump) is the one worth earlier attention (compliance).
+
+**Next build phase: Phase 3 — Adherence Ledger** (`docs/plan/PHASE-3-adherence-ledger.md`).
