@@ -494,6 +494,7 @@ export type Database = {
           phone: string | null
           preview: Json | null
           preview_generated_at: string | null
+          preview_generating_at: string | null
           status: Database["public"]["Enums"]["lead_status"]
           turnstile_verified: boolean
           updated_at: string
@@ -511,6 +512,7 @@ export type Database = {
           phone?: string | null
           preview?: Json | null
           preview_generated_at?: string | null
+          preview_generating_at?: string | null
           status?: Database["public"]["Enums"]["lead_status"]
           turnstile_verified?: boolean
           updated_at?: string
@@ -528,6 +530,7 @@ export type Database = {
           phone?: string | null
           preview?: Json | null
           preview_generated_at?: string | null
+          preview_generating_at?: string | null
           status?: Database["public"]["Enums"]["lead_status"]
           turnstile_verified?: boolean
           updated_at?: string

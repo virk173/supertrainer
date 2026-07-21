@@ -47,6 +47,13 @@ type FoodRow = {
 
 const DIET_VALUES: DietPreference[] = ["veg", "non_veg", "vegan"];
 
+// Stale-claim window (MF-7): if generation crashes mid-flight (process killed
+// after claiming, before writing the preview or releasing the claim), the row
+// is stuck with preview_generating_at set and preview still null. Treating a
+// claim older than this as abandoned means a dead process can never
+// permanently block generation for a lead.
+const CLAIM_TTL_MS = 2 * 60 * 1000;
+
 function buildMeal(
   title: string,
   rawItems: { foodId: string; grams: number }[],
@@ -85,8 +92,11 @@ function fallbackItems(pool: FoodRow[], n: number): { foodId: string; grams: num
 }
 
 // Returns the lead's cached preview, or generates + caches one. Generation is a
-// paid AI call, so it runs at most once per lead. Returns null if generation
-// isn't possible (no API key / model failure) — the caller shows a pending state.
+// paid AI call, so it runs at most once per lead — enforced by a conditional
+// claim (preview_generating_at) below, not just the read-then-check, so
+// concurrent loads can't both trigger a paid generation (MF-7). Returns null
+// if generation isn't possible (no API key / model failure / lost the claim
+// race) — the caller shows a pending state.
 export async function getOrCreatePreview(
   leadId: string,
 ): Promise<PreviewContent | null> {
@@ -101,6 +111,39 @@ export async function getOrCreatePreview(
 
   if (lead.preview) return lead.preview as unknown as PreviewContent;
 
+  // CLAIM (MF-7): serialize generation with a conditional UPDATE instead of
+  // the old read-then-check. Only the caller whose UPDATE affects a row
+  // (preview still null AND no fresh claim in flight) proceeds to the paid
+  // Sonnet call below. Concurrent losers — a second tab, a hover-prefetch +
+  // click, a double navigation — do NOT generate.
+  const staleBefore = new Date(Date.now() - CLAIM_TTL_MS).toISOString();
+  const { data: claimed } = await service
+    .from("leads")
+    .update({ preview_generating_at: new Date().toISOString() })
+    .eq("id", leadId)
+    .is("preview", null)
+    .or(`preview_generating_at.is.null,preview_generating_at.lt.${staleBefore}`)
+    .select("id");
+  if (!claimed || claimed.length === 0) {
+    // Lost the claim race. Either another caller holds a fresh claim (still
+    // generating — re-reading will show preview===null, which is exactly the
+    // existing "pending" UI state), or a concurrent winner already finished
+    // between our read above and now (re-reading returns the fresh cache
+    // instead of manufacturing a spurious pending state).
+    const { data: recheck } = await service
+      .from("leads")
+      .select("preview")
+      .eq("id", leadId)
+      .maybeSingle();
+    return (recheck?.preview as unknown as PreviewContent | null) ?? null;
+  }
+
+  // This call now owns the claim. Release it (set back to null) on every
+  // early-return below — a legitimate "can't generate" outcome (no safe
+  // foods, model failure) must not block a retry for the full TTL.
+  const releaseClaim = () =>
+    service.from("leads").update({ preview_generating_at: null }).eq("id", leadId);
+
   // Global verified foods only (org_id null) — the shared reference DB.
   const { data: foods } = await service
     .from("foods")
@@ -108,7 +151,10 @@ export async function getOrCreatePreview(
       "id, name, name_normalized, allergen_tags, kcal_per_100g, protein_per_100g, carbs_per_100g, fat_per_100g, fiber_per_100g",
     )
     .is("org_id", null);
-  if (!foods || foods.length === 0) return null;
+  if (!foods || foods.length === 0) {
+    await releaseClaim();
+    return null;
+  }
 
   const answers = (lead.answers ?? {}) as Record<string, unknown>;
   const pref: DietPreference = DIET_VALUES.includes(answers.diet as DietPreference)
@@ -119,7 +165,10 @@ export async function getOrCreatePreview(
   // this pool.
   const safe = filterSafeFoods(foods as FoodRow[], lead.allergens ?? []);
   const pool = filterByDiet(safe, pref);
-  if (pool.length === 0) return null;
+  if (pool.length === 0) {
+    await releaseClaim();
+    return null;
+  }
   const poolById = new Map(pool.map((f) => [f.id, f as FoodRow]));
 
   // Trainer's confirmed style (voice + food/exercise choices), if ingested.
@@ -155,6 +204,7 @@ export async function getOrCreatePreview(
     });
   } catch (err) {
     console.error("[preview] generation failed:", err);
+    await releaseClaim();
     return null;
   }
 
@@ -188,11 +238,14 @@ export async function getOrCreatePreview(
 
   // Cache on the lead UNCONDITIONALLY (this is the never-regenerate guarantee —
   // a paid Sonnet call must be cached even if the lead already converted).
+  // Also releases the claim — though once preview is non-null, the claim's
+  // `.is("preview", null)` guard already makes it permanently unclaimable.
   await service
     .from("leads")
     .update({
       preview: content as unknown as Json,
       preview_generated_at: content.generatedAt,
+      preview_generating_at: null,
     })
     .eq("id", leadId);
 
