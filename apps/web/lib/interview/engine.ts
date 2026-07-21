@@ -6,6 +6,7 @@ import {
   isInterviewComplete,
   keywordHealthFlags,
   nextSection,
+  serializeConfirmedStyles,
   type HealthFlagResult,
   type InterviewSection,
   type SectionAnswers,
@@ -94,9 +95,7 @@ async function styleFor(
     .select("domain, profile")
     .eq("org_id", orgId)
     .eq("status", "confirmed");
-  return (data ?? [])
-    .map((s) => `${s.domain} style: ${JSON.stringify(s.profile)}`)
-    .join("\n");
+  return serializeConfirmedStyles(data);
 }
 
 async function stateFor(service: ReturnType<typeof createServiceClient>, clientId: string) {

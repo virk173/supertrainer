@@ -18,6 +18,30 @@ export function serializeStyleProfile(
   return `<style_profile domain="${domain}">\n${stable}\n</style_profile>`;
 }
 
+export interface ConfirmedStyleRow {
+  domain: string;
+  profile: unknown;
+}
+
+// Plain-text serialization of an org's confirmed style profiles for injection
+// into the interview and preview agent prompts (SF-4 dedup — was hand-rolled
+// identically in apps/web/lib/interview/engine.ts `styleFor()` and
+// apps/web/lib/preview/generate.ts `getOrCreatePreview()`).
+//
+// Deliberately NOT serializeStyleProfile's `<style_profile>`/sorted-key format:
+// that format is byte-different (tags, per-domain block, canonicalized key
+// order) and swapping it in here would change the exact prompt text sent to
+// interviewTurn/generatePreviewDraft — a live AI-behavior change, not a pure
+// refactor. This preserves the original `${domain} style: ${json}` wire format
+// so both call sites can share one implementation with zero behavior change.
+export function serializeConfirmedStyles(
+  rows: ConfirmedStyleRow[] | null | undefined,
+): string {
+  return (rows ?? [])
+    .map((s) => `${s.domain} style: ${JSON.stringify(s.profile)}`)
+    .join("\n");
+}
+
 function stableStringify(value: unknown): string {
   if (Array.isArray(value)) {
     return `[${value.map(stableStringify).join(",")}]`;

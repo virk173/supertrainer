@@ -3,6 +3,7 @@ import "server-only";
 import {
   filterSafeFoods,
   generatePreviewDraft,
+  serializeConfirmedStyles,
   type PreviewCandidate,
 } from "@supertrainer/ai";
 import type { Json } from "@supertrainer/db/types";
@@ -177,9 +178,7 @@ export async function getOrCreatePreview(
     .select("domain, profile")
     .eq("org_id", lead.org_id)
     .eq("status", "confirmed");
-  const styleText = (styles ?? [])
-    .map((s) => `${s.domain} style: ${JSON.stringify(s.profile)}`)
-    .join("\n");
+  const styleText = serializeConfirmedStyles(styles);
 
   const candidates: PreviewCandidate[] = pool.map((f) => ({
     id: f.id,

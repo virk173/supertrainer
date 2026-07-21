@@ -26,7 +26,9 @@ export {
 export { visionExtractText, type VisionMediaType } from "./style/vision";
 export {
   serializeStyleProfile,
+  serializeConfirmedStyles,
   STYLE_DOMAINS,
+  type ConfirmedStyleRow,
 } from "./style/serialize";
 export {
   mapColumns,
