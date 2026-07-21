@@ -4,7 +4,9 @@ import {
   detectHealthFlags,
   interviewTurn,
   isInterviewComplete,
+  keywordHealthFlags,
   nextSection,
+  type HealthFlagResult,
   type InterviewSection,
   type SectionAnswers,
 } from "@supertrainer/ai";
@@ -32,6 +34,22 @@ type AnswersBySection = Record<string, SectionAnswers>;
 
 const PAUSE_REPLY =
   "Thanks for telling me that — that's important. I'm going to have your coach look at this personally before we go any further, rather than guess. They'll pick this up with you shortly.";
+
+// Per-client AI-call budget for the write path (MF-6 security audit finding).
+// Every runTurn call can make up to two paid Claude calls — detectHealthFlags's
+// classify pass (unconditional, runs even in the between-days "waiting" state)
+// and interviewTurn's draft pass — with nothing else bounding how often a
+// client can invoke sendAnswer (a stable POST endpoint). A real interview is
+// short: 6 sections (INTERVIEW_SECTIONS), each usually answered in a handful of
+// messages, spread across up to 3 days. This rolling window is sized generously
+// above any normal-cadence conversation, so it only ever engages a caller
+// hammering the action in a loop. Exported so the regression test doesn't
+// hardcode a number that could silently drift from the real cap.
+export const INTERVIEW_RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000; // 1 hour
+export const MAX_CLIENT_MESSAGES_PER_WINDOW = 20;
+
+export const THROTTLE_REPLY =
+  "Let's pick this back up in a little bit — send your next answer again shortly.";
 
 // Interview turns only. Bounded so a long thread can't unbounded-scan or ship
 // the whole history to the browser (the real, paginated thread arrives in P6.1).
@@ -88,6 +106,41 @@ async function stateFor(service: ReturnType<typeof createServiceClient>, clientI
     .eq("client_id", clientId)
     .maybeSingle();
   return data;
+}
+
+// MF-6: this client's interview replies within the rolling budget window.
+// Counted from `messages` (the append-only record of record) rather than a
+// separate counter column, so it can never drift from what actually happened
+// and self-corrects if a turn fails partway through.
+async function clientMessagesInWindow(
+  service: ReturnType<typeof createServiceClient>,
+  clientId: string,
+): Promise<number> {
+  const since = new Date(Date.now() - INTERVIEW_RATE_LIMIT_WINDOW_MS).toISOString();
+  const { count } = await service
+    .from("messages")
+    .select("id", { count: "exact", head: true })
+    .eq("client_id", clientId)
+    .eq("kind", "interview")
+    .eq("sender", "client")
+    .gte("created_at", since);
+  return count ?? 0;
+}
+
+// Keyword-only shape of HealthFlagResult, used when the turn is throttled
+// (MF-6). Free and synchronous — no AI call — and independently authoritative
+// for flagging (escalation.ts: "the keyword pass alone can flag"), so a
+// genuine disclosure still pauses the interview even when the paid classifier
+// nuance-pass is being withheld for budget reasons.
+function keywordOnlyFlags(text: string): HealthFlagResult {
+  const kw = keywordHealthFlags(text);
+  const flagged = kw.categories.length > 0;
+  return {
+    flagged,
+    categories: kw.categories,
+    matched: kw.matched,
+    source: flagged ? "keyword" : "none",
+  };
 }
 
 // Lease the opener slot with optimistic concurrency on last_prompt_at — the same
@@ -223,9 +276,20 @@ export async function runTurn(
 
   const answers = (state.answers ?? {}) as AnswersBySection;
   const day = dayNumber(state.started_at);
+  const section = nextSection(answers, day);
+
+  // ── Per-client AI budget (MF-6) ─────────────────────────────────────────────
+  // Checked BEFORE either paid call below (the classify pass right after this,
+  // and interviewTurn's draft pass further down). This must never weaken the
+  // health gate: when throttled, the classify call is skipped but the free,
+  // synchronous keyword pass still runs and is still authoritative for
+  // flagging — see keywordOnlyFlags — so a genuine disclosure still pauses the
+  // interview. Only a non-flagged turn gets short-circuited.
+  const throttled =
+    (await clientMessagesInWindow(service, clientId)) >= MAX_CLIENT_MESSAGES_PER_WINDOW;
 
   // ── HARD RULE: health disclosure pauses everything ────────────────────────
-  const flags = await detectHealthFlags(text);
+  const flags: HealthFlagResult = throttled ? keywordOnlyFlags(text) : await detectHealthFlags(text);
   if (flags.flagged) {
     await say(service, orgId, clientId, "client", text);
 
@@ -269,7 +333,15 @@ export async function runTurn(
     return view(await loadMessages(service, clientId), "paused_health", null, false);
   }
 
-  const section = nextSection(answers, day);
+  if (throttled) {
+    // Over budget and no health flag: skip the paid draft call entirely. Still
+    // record the exchange (nothing is silently dropped — a normal-cadence
+    // interview never reaches this branch, so this is not the common path).
+    await say(service, orgId, clientId, "client", text);
+    await say(service, orgId, clientId, "assistant", THROTTLE_REPLY);
+    return view(await loadMessages(service, clientId), status, section, !section);
+  }
+
   if (!section) {
     // Nothing open. If the intake is actually complete, finalize (self-heals a
     // prior completeIntake that didn't land); otherwise it's the between-days wait.
