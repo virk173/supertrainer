@@ -166,6 +166,39 @@ const TAXONOMY: AllergenGroup[] = [
   },
 ];
 
+// Pick-list / free-text allergens with NO seeded food tag — notably
+// "Peas / Legumes", plus "Mustard" and "Corn". Their multi-word labels never
+// appear verbatim in food names, so the raw-label name-net cannot catch them
+// (this was the MF-1 hole: legume-allergic prospects saw pea/dal/chickpea foods).
+// Here we match KNOWN food-name fragments instead: `triggers` select the group
+// from the user's allergy text; `nameSynonyms` mark a food unsafe when they
+// appear in its normalized name. Fail-closed: broad matches only OVER-exclude,
+// which is the safe direction.
+interface NameOnlyAllergen {
+  label: string;
+  triggers: string[];
+  nameSynonyms: string[];
+}
+
+const NAME_ONLY_ALLERGENS: NameOnlyAllergen[] = [
+  {
+    label: "Peas / Legumes",
+    // "peas" (not bare "pea") so a peanut allergy doesn't needlessly trigger this.
+    triggers: [
+      "peas", "legume", "pulse", "lentil", "dal", "daal", "chana",
+      "chickpea", "rajma", "moong", "mung", "masoor", "urad", "toor",
+      "arhar", "cowpea", "lobia", "gram",
+    ],
+    nameSynonyms: [
+      "pea", "chickpea", "chana", "dal", "daal", "lentil", "rajma",
+      "moong", "mung", "masoor", "urad", "toor", "arhar", "cowpea",
+      "lobia", "gram", "pulse", "legume", "bean",
+    ],
+  },
+  { label: "Mustard", triggers: ["mustard", "sarson"], nameSynonyms: ["mustard", "sarson"] },
+  { label: "Corn", triggers: ["corn", "maize", "makka", "makki", "bhutta"], nameSynonyms: ["corn", "maize", "makka", "makki", "bhutta"] },
+];
+
 // A food shape this module can filter (foods rows and preview candidates match).
 export interface FoodLike {
   name_normalized: string;
@@ -186,24 +219,42 @@ export function excludedAllergenTags(userAllergens: string[]): Set<AllergenTag> 
   return tags;
 }
 
-// Free-text safety net: allergy terms (≥4 chars) matched as substrings of a
-// food's normalized name, catching allergens the taxonomy doesn't map. 4-char
-// floor avoids netting unrelated foods on tiny tokens (e.g. "egg" in "eggplant"
-// — eggs are already covered by the tag path). Over-matching here is safe.
+// Free-text safety net: TOKENS (≥4 chars) of the user's allergy entries matched
+// as substrings of a food's normalized name, catching allergens the taxonomy
+// doesn't map. Tokenizing on non-alphanumerics is what makes multi-word labels
+// like "Peas / Legumes" or "Milk / Dairy" work — the raw whole-label substring
+// never appears in a food name. The 4-char floor avoids netting unrelated foods
+// on tiny tokens (e.g. "egg" in "eggplant" — eggs are covered by the tag path).
+// Over-matching here is safe (fail-closed).
 function nameNetTerms(userAllergens: string[]): string[] {
-  return userAllergens
-    .map((a) => a.toLowerCase().trim())
-    .filter((a) => a.length >= 4);
+  const terms = new Set<string>();
+  for (const entry of userAllergens) {
+    for (const token of entry.toLowerCase().split(/[^a-z0-9]+/)) {
+      if (token.length >= 4) terms.add(token);
+    }
+  }
+  return [...terms];
 }
 
-// True when a food is safe for someone with these allergies. Excludes on either
-// a tag match or a name-net hit — fail-closed.
+// True when a food is safe for someone with these allergies. Excludes on a tag
+// match, a name-only-allergen food-name hit, or a free-text name-net hit — all
+// fail-closed.
 export function isFoodSafe(food: FoodLike, userAllergens: string[]): boolean {
   if (userAllergens.length === 0) return true;
   const excluded = excludedAllergenTags(userAllergens);
   if (food.allergen_tags.some((t) => excluded.has(t as AllergenTag))) return false;
 
   const name = food.name_normalized.toLowerCase();
+
+  // Name-only allergens (pick-list/free-text items with no seeded food tag):
+  // if the user's text selects the group, exclude foods whose name carries any
+  // of its known fragments.
+  const normText = userAllergens.map((a) => a.toLowerCase().trim()).filter(Boolean);
+  for (const grp of NAME_ONLY_ALLERGENS) {
+    const selected = normText.some((s) => grp.triggers.some((t) => s.includes(t)));
+    if (selected && grp.nameSynonyms.some((n) => name.includes(n))) return false;
+  }
+
   if (nameNetTerms(userAllergens).some((term) => name.includes(term))) return false;
 
   return true;

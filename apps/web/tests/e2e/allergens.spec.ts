@@ -44,6 +44,40 @@ test("empty allergies keep everything", () => {
   expect(filterSafeFoods(foods, [])).toHaveLength(2);
 });
 
+test("MF-1: 'Peas / Legumes' pick-list allergen (no food tag) is enforced by name", () => {
+  // These seed-style foods carry NO allergen tag — before the fix they slipped
+  // straight through for a legume-allergic prospect.
+  const legumeFoods = [
+    f("Green peas, cooked", []),
+    f("Chickpeas (chana), cooked", []),
+    f("Pigeon pea (toor dal), cooked", []),
+    f("Kidney beans (rajma), cooked", []),
+    f("Red lentils (masoor dal), cooked", []),
+  ];
+  expect(filterSafeFoods(legumeFoods, ["Peas / Legumes"])).toEqual([]);
+  // Non-legume foods stay safe for the same client.
+  expect(isFoodSafe(f("White rice, cooked", []), ["Peas / Legumes"])).toBe(true);
+  expect(isFoodSafe(f("Grilled chicken breast", []), ["Peas / Legumes"])).toBe(true);
+  // Free-text singular / specific pulse names also work.
+  expect(isFoodSafe(f("Toor dal, cooked", []), ["toor dal"])).toBe(false);
+  expect(isFoodSafe(f("Chickpea salad", []), ["chickpeas"])).toBe(false);
+});
+
+test("MF-1: 'Mustard' and 'Corn' pick-list allergens are enforced by name", () => {
+  expect(isFoodSafe(f("Mustard greens, cooked", []), ["Mustard"])).toBe(false);
+  expect(isFoodSafe(f("Sweet corn, boiled", []), ["Corn"])).toBe(false);
+  expect(isFoodSafe(f("White rice, cooked", []), ["Corn"])).toBe(true);
+});
+
+test("MF-1: name-net tokenizes multi-word entries (whole-label substring no longer required)", () => {
+  // Tokenized: "peas" from "Peas / Legumes" matches "green peas".
+  expect(isFoodSafe(f("Green peas, cooked", []), ["Peas / Legumes"])).toBe(false);
+  // A single-word tag allergen is unaffected by tokenization.
+  expect(isFoodSafe(f("Almond flour", ["tree_nut"]), ["tree nuts"])).toBe(false);
+  // Tokens under 4 chars don't net unrelated foods.
+  expect(isFoodSafe(f("Rice and something", []), ["ab / cd"])).toBe(true);
+});
+
 // PROPERTY TEST (DoD): for every allergen in the taxonomy, no food carrying that
 // allergen's tag may survive the filter — run across the real seeded foods DB.
 test("property: no allergen-tagged food survives its own allergen, across the whole seed", async () => {
