@@ -59,37 +59,43 @@ export async function seedDemoClient(supabase: Db, orgId: string): Promise<strin
   let clientId = existing?.id;
 
   if (!clientId) {
-    const { data, error } = await supabase
-      .from("clients")
-      .insert({
-        org_id: orgId,
-        status: "active",
-        source: "invite",
-        is_demo: true,
-        intake: DEMO_INTAKE as unknown as Json,
-        health_flags: DEMO_HEALTH_FLAGS as unknown as Json,
-      })
-      .select("id")
-      .single();
-    if (error) {
-      // A racing invocation (double-click, or seedDemo racing resetDemo)
-      // beat us here: the partial-unique index on clients(org_id) where
-      // is_demo (20260721120000_demo_client_unique.sql, mirroring the
-      // plan_requests_onboarding_unique.sql backstop) rejects our insert
-      // with 23505 once the winner's row already exists. Treat that as
-      // "already seeded" and adopt the winner's row instead of throwing, so
-      // a racing double-invoke is a no-op rather than a 500.
+    // Insert-or-adopt with a bounded retry. The partial-unique index on
+    // clients(org_id) where is_demo (20260721120000_demo_client_unique.sql,
+    // mirroring plan_requests_onboarding_unique.sql) rejects a racing second
+    // insert (double-click, or seedDemo racing resetDemo) with 23505 once a
+    // winner exists — we adopt the winner instead of throwing. If that winner
+    // was itself deleted in the window (seedDemo racing resetDemo — the exact
+    // race MF-4 targets), the adopt read misses, so we retry the insert rather
+    // than 500 on a now-missing row.
+    for (let attempt = 0; attempt < 3 && !clientId; attempt++) {
+      const { data, error } = await supabase
+        .from("clients")
+        .insert({
+          org_id: orgId,
+          status: "active",
+          source: "invite",
+          is_demo: true,
+          intake: DEMO_INTAKE as unknown as Json,
+          health_flags: DEMO_HEALTH_FLAGS as unknown as Json,
+        })
+        .select("id")
+        .single();
+      if (!error) {
+        clientId = data.id;
+        break;
+      }
       if (error.code !== "23505") throw error;
-      const { data: winner, error: refetchError } = await supabase
+      const { data: winner } = await supabase
         .from("clients")
         .select("id")
         .eq("org_id", orgId)
         .eq("is_demo", true)
-        .single();
-      if (refetchError) throw refetchError;
-      clientId = winner.id;
-    } else {
-      clientId = data.id;
+        .maybeSingle();
+      if (winner) clientId = winner.id;
+      // else: the winner was deleted in the race window — loop to retry the insert.
+    }
+    if (!clientId) {
+      throw new Error("demo client seed failed after retries (concurrent reset?)");
     }
   } else {
     await supabase
