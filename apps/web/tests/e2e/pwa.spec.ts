@@ -149,3 +149,93 @@ test("skipping is allowed and records email_only (flow is not blocking)", async 
   expect(channel).toBe("email_only");
   expect(types.has("push_skipped")).toBe(true);
 });
+
+// ── Consent-gate on the write path (same class as MF-8, audit) ──────────────
+// enablePush/skipPush's only gate used to be JWT claims (role === 'client');
+// the page's requireConsentedClient redirect never runs for a direct call to
+// the server action. Reproduces the exact bypass the audit describes for the
+// interview and closes here too: capture the real POST a consented client's
+// browser sends when calling enablePush, then replay those exact bytes (same
+// Next-Action id, same body, same origin/referer — nothing Next's same-origin
+// check cares about differs) against the SAME endpoint from an
+// authenticated-but-unconsented client's own session. The assertion is on DB
+// side effects, not on parsing the RSC response: a fail-closed gate must leave
+// the unconsented client's notification_channel at its default and no
+// push_enabled event recorded.
+test("an un-consented client's enablePush write is rejected even called directly, bypassing the page", async ({
+  page,
+  browser,
+}) => {
+  await mockPermission(page, "granted");
+  const consented = await signedInClient(page, "notif-consent-a");
+
+  const [sendRequest] = await Promise.all([
+    page.waitForRequest(
+      (req) => req.method() === "POST" && req.headers()["next-action"] !== undefined,
+    ),
+    page.getByTestId("enable-push").click(),
+  ]);
+  const url = sendRequest.url();
+  const headers = await sendRequest.allHeaders();
+  const body = sendRequest.postDataBuffer();
+  expect(body).not.toBeNull();
+  // Replay must not carry client A's session — context B supplies its own.
+  delete headers["cookie"];
+  delete headers["content-length"];
+
+  // An authenticated client who has deliberately NOT been consented.
+  const service = serviceClient();
+  const { userId: bUserId, orgId: bOrgId, tokenHash: bTokenHash } = await seedClient(
+    uniqueEmail("notif-consent-b"),
+  );
+  const { data: bClientBefore } = await service
+    .from("clients")
+    .select("id, notification_channel")
+    .eq("profile_id", bUserId)
+    .single();
+  const bClientId = bClientBefore!.id;
+  expect(bClientBefore!.notification_channel).toBe("email_only");
+
+  const bCtx = await browser.newContext();
+  const bPage = await bCtx.newPage();
+  // Establish B's session cookie without ever loading the gated
+  // /welcome/notifications page (that's the whole point — B never sees it,
+  // never gets redirected to /consent; we're hitting the server action
+  // endpoint cold).
+  await bPage.goto(`/auth/confirm?token_hash=${bTokenHash}&type=email&next=/portal`);
+
+  await bCtx.request.post(url, { headers, data: body! });
+
+  // Fail-closed: B's channel is unchanged and no push_enabled event exists.
+  const { data: bAfter } = await service
+    .from("clients")
+    .select("notification_channel")
+    .eq("id", bClientId)
+    .single();
+  expect(bAfter?.notification_channel).toBe("email_only");
+
+  const { count: bPushEventCount } = await service
+    .from("events")
+    .select("id", { count: "exact", head: true })
+    .eq("org_id", bOrgId)
+    .eq("type", "push_enabled");
+  expect(bPushEventCount ?? 0).toBe(0);
+
+  const { count: bSubCount } = await service
+    .from("push_subscriptions")
+    .select("id", { count: "exact", head: true })
+    .eq("client_id", bClientId);
+  expect(bSubCount ?? 0).toBe(0);
+
+  // Sanity: the SAME replay mechanics actually work end-to-end (proves this
+  // isn't passing because the replay itself is broken) — client A, whose
+  // request we captured, really did get moved to the push channel.
+  const { data: aClient } = await service
+    .from("clients")
+    .select("notification_channel")
+    .eq("profile_id", consented.userId)
+    .single();
+  expect(aClient?.notification_channel).toBe("push");
+
+  await bCtx.close();
+});

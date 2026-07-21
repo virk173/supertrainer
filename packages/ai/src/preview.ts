@@ -1,6 +1,5 @@
 import { z } from "zod";
 
-import { modelRouter } from "./modelRouter";
 import { zodOutput } from "./zodOutput";
 
 // Composite teaser-preview agent (Phase 2.2, ORIGINAL-SPEC §10). Produces the
@@ -113,6 +112,3 @@ Produce: breakfast (1-3 items) and lunch (1-3 items) as food ids + grams, a day-
     maxTokens: 2000,
   });
 }
-
-// Model id backing the preview (for tracing/tests).
-export const PREVIEW_MODEL = modelRouter("draft");
