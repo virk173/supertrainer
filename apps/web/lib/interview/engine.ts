@@ -52,6 +52,12 @@ export const MAX_CLIENT_MESSAGES_PER_WINDOW = 20;
 export const THROTTLE_REPLY =
   "Let's pick this back up in a little bit — send your next answer again shortly.";
 
+// The opener claim's TTL. last_prompt_at is bumped when a load claims the opener
+// slot (leaseOpenerSlot); a concurrent load within this window backs off rather
+// than re-posting/re-charging. Sized comfortably above one interviewTurn draft
+// call, and short enough that a crashed opener is reclaimable soon after.
+const OPENER_CLAIM_TTL_MS = 60 * 1000;
+
 // Interview turns only. Bounded so a long thread can't unbounded-scan or ship
 // the whole history to the browser (the real, paginated thread arrives in P6.1).
 async function loadMessages(service: ReturnType<typeof createServiceClient>, clientId: string) {
@@ -198,14 +204,28 @@ export async function ensureInterview(
   // section just unlocked (`interview_state.section` tracks the last section a
   // turn actually ran for; `runTurn` keeps it in sync with `nextSection` on every
   // within-day advance, so a mismatch here can only mean a fresh day unlocked a
-  // section nobody has been prompted for yet). Leased (see leaseOpenerSlot above)
-  // so concurrent loads never double-post or double-charge. Tolerant of an agent
-  // failure (no API key in dev/CI) — the thread just opens empty rather than
-  // 500-ing the page, and a later reload retries cleanly.
+  // section nobody has been prompted for yet). Tolerant of an agent failure (no
+  // API key in dev/CI) — the thread just opens empty rather than 500-ing the
+  // page, and a later reload retries cleanly.
+  //
+  // Concurrency: last_prompt_at doubles as a short-lived opener CLAIM. A load
+  // arriving while the winner's ~2-4s interviewTurn call is still in flight sees
+  // a freshly-bumped last_prompt_at and backs off (openerClaimFresh) — that
+  // recency guard is what makes the claim self-invalidating; leaseOpenerSlot's
+  // plain CAS alone would re-match the already-leased value and let the second
+  // caller through (it does not post the opener / advance `section` until AFTER
+  // the AI call). The CAS still resolves the truly-simultaneous case (both reads
+  // see the same pre-lease value), and a claim older than OPENER_CLAIM_TTL_MS is
+  // reclaimable so a crashed opener call still retries. (Same claim-with-TTL
+  // shape as the preview lock in lib/preview/generate.ts.)
+  const openerClaimFresh =
+    !!state.last_prompt_at &&
+    Date.now() - new Date(state.last_prompt_at).getTime() < OPENER_CLAIM_TTL_MS;
   if (
     status === "in_progress" &&
     section &&
-    (messages.length === 0 || section !== state.section)
+    (messages.length === 0 || section !== state.section) &&
+    !openerClaimFresh
   ) {
     const leased = await leaseOpenerSlot(service, clientId, state.last_prompt_at);
     if (leased) {
