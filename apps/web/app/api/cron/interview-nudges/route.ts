@@ -4,7 +4,8 @@ import { runInterviewNudges } from "@/lib/interview/stall";
 
 export const dynamic = "force-dynamic";
 
-// Vercel Cron hits this hourly (see vercel.json), sending Authorization:
+// Vercel Cron hits this once daily (see vercel.json; the Hobby plan caps crons
+// at once/day, which is fine for a 24h-idle nudge), sending Authorization:
 // Bearer ${CRON_SECRET}. This is a public URL, so it fails CLOSED: no secret
 // configured → refuse; wrong/absent bearer → 401. Unlike the app's "no-op
 // without keys" integrations, an unauthenticated background trigger must never
