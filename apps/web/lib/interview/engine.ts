@@ -11,6 +11,7 @@ import {
 import type { Json } from "@supertrainer/db/types";
 
 import { trackServer } from "@/lib/analytics/server";
+import { dayNumber } from "@/lib/interview/pacing";
 import { createServiceClient } from "@/lib/supabase/server";
 
 // Stage B interview engine (Phase 2.5). Every turn is written server-side with
@@ -31,14 +32,6 @@ type AnswersBySection = Record<string, SectionAnswers>;
 
 const PAUSE_REPLY =
   "Thanks for telling me that — that's important. I'm going to have your coach look at this personally before we go any further, rather than guess. They'll pick this up with you shortly.";
-
-// Day 1 on the day they start; sections unlock across days 1–3.
-function dayNumber(startedAt: string): number {
-  const days = Math.floor(
-    (Date.now() - new Date(startedAt).getTime()) / (24 * 60 * 60 * 1000),
-  );
-  return Math.max(1, days + 1);
-}
 
 // Interview turns only. Bounded so a long thread can't unbounded-scan or ship
 // the whole history to the browser (the real, paginated thread arrives in P6.1).
@@ -342,11 +335,20 @@ async function completeIntake(
     .eq("client_id", clientId)
     .eq("trigger", "onboarding");
   if ((existing ?? 0) === 0) {
-    await service.from("plan_requests").insert([
+    const { error: queueError } = await service.from("plan_requests").insert([
       { org_id: orgId, client_id: clientId, kind: "diet", trigger: "onboarding" },
       { org_id: orgId, client_id: clientId, kind: "split", trigger: "onboarding" },
     ]);
-    await trackServer({ orgId, event: "intake_complete", clientId });
+    // The partial-unique index is the real backstop: a concurrent finalize that
+    // slipped past the count-check hits 23505 here. That means the rows already
+    // exist (the winner queued them and fired intake_complete once) — treat it
+    // as a no-op and do NOT re-fire the event. Any other error still surfaces.
+    if (queueError && queueError.code !== "23505") {
+      throw new Error(`failed to queue plan_requests: ${queueError.message}`);
+    }
+    if (!queueError) {
+      await trackServer({ orgId, event: "intake_complete", clientId });
+    }
   }
 
   // Mark complete LAST — every downstream artifact now exists.

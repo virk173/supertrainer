@@ -487,7 +487,9 @@ export type Database = {
           converted_client_id: string | null
           created_at: string
           email: string
+          email_normalized: string | null
           id: string
+          ip_hash: string | null
           org_id: string
           phone: string | null
           preview: Json | null
@@ -502,7 +504,9 @@ export type Database = {
           converted_client_id?: string | null
           created_at?: string
           email: string
+          email_normalized?: string | null
           id?: string
+          ip_hash?: string | null
           org_id: string
           phone?: string | null
           preview?: Json | null
@@ -517,7 +521,9 @@ export type Database = {
           converted_client_id?: string | null
           created_at?: string
           email?: string
+          email_normalized?: string | null
           id?: string
+          ip_hash?: string | null
           org_id?: string
           phone?: string | null
           preview?: Json | null
