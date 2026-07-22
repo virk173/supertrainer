@@ -3,6 +3,11 @@ import type { z } from "zod";
 
 import { getClaudeClient } from "./claude";
 import { modelRouter, type AiTask } from "./modelRouter";
+import {
+  callWithResilience,
+  fallbackModelFor,
+  isAiApiError,
+} from "./resilience";
 import { withAiTask } from "./tracing";
 
 export interface ZodOutputParams {
@@ -54,12 +59,12 @@ export async function zodOutput<T>(
       : params.system
     : undefined;
 
-  // Run inside the task context so the traced client (claude.ts) tags this
-  // generation with the AiTask in Langfuse.
-  const attempt = () =>
+  // One call to one model, run inside the task context so the traced client
+  // (claude.ts) tags the generation with the AiTask + the model actually used.
+  const callModel = (useModel: string) =>
     withAiTask(params.task, () =>
       client.messages.parse({
-        model,
+        model: useModel,
         max_tokens: params.maxTokens ?? 16000,
         ...(system ? { system } : {}),
         messages: [{ role: "user", content: params.prompt }],
@@ -67,15 +72,25 @@ export async function zodOutput<T>(
       }),
     );
 
-  // A schema-validation failure surfaces two ways depending on the SDK path:
-  // messages.parse() THROWS a parse/validation error, or it resolves with a
-  // null parsed_output (e.g. a refusal or unparseable turn). Treat both as a
-  // failed attempt so the retry-once-then-throw contract holds either way.
+  // PO-4: route the API call through the resilience layer — retry/backoff on
+  // transient errors, a cheaper-model fallback on overload (draft Sonnet → Haiku),
+  // and a circuit breaker that fails fast during a broad outage. Schema/refusal
+  // misses are NOT API errors: callWithResilience re-throws them untouched, and
+  // the retry-once-then-throw contract below handles them exactly as before.
+  const fallbackModel = fallbackModelFor(params.task);
   const tryOnce = async (): Promise<T | null> => {
     try {
-      const response = await attempt();
+      const response = await callWithResilience(callModel, {
+        primaryModel: model,
+        fallbackModel,
+      });
       return response.parsed_output ?? null;
-    } catch {
+    } catch (err) {
+      // A hard API failure or an open breaker must propagate (so best-effort
+      // callers degrade and the funnel can show honest holding copy) rather than
+      // be masked as a schema-validation retry. Only a schema/refusal miss is
+      // retried.
+      if (isAiApiError(err)) throw err;
       return null;
     }
   };

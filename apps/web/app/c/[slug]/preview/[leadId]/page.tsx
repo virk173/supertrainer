@@ -1,3 +1,4 @@
+import { isAiDegraded } from "@supertrainer/ai";
 import { notFound } from "next/navigation";
 
 import { TierCard } from "@supertrainer/ui/components/tier-card";
@@ -44,6 +45,10 @@ export default async function PreviewPage({
   if (!lead || lead.org_id !== theme.orgId) notFound();
 
   const preview = await getOrCreatePreview(leadId);
+  // PO-4: when the preview couldn't be generated AND the AI resilience layer has
+  // tripped its breaker (a broad Anthropic outage / exhausted credits), show
+  // honest holding copy instead of implying the coach is finishing it by hand.
+  const aiDegraded = !preview && isAiDegraded();
 
   const { data: tiers } = await service
     .from("tiers")
@@ -152,9 +157,11 @@ export default async function PreviewPage({
           <section
             className="rounded-xl border bg-card p-5 text-sm text-muted-foreground shadow-sm"
             data-testid="preview-pending"
+            data-ai-degraded={aiDegraded ? "true" : "false"}
           >
-            Your coach is finalizing your personalized preview. Choose a plan below
-            to save your spot.
+            {aiDegraded
+              ? "Our AI is briefly busy building previews right now — refresh in a moment and it'll appear. You can still choose a plan below to save your spot."
+              : "Your coach is finalizing your personalized preview. Choose a plan below to save your spot."}
           </section>
         )}
 

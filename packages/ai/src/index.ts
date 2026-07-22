@@ -11,6 +11,19 @@ export {
   type ZodOutputParams,
 } from "./zodOutput";
 export {
+  AiDegradedError,
+  CircuitBreaker,
+  callWithResilience,
+  classifyAiError,
+  fallbackModelFor,
+  isAiApiError,
+  isAiDegraded,
+  isFallbackEligible,
+  isRetryable,
+  resetAiCircuitForTests,
+  type AiErrorKind,
+} from "./resilience";
+export {
   flushTracing,
   withAiTask,
   currentAiTask,
