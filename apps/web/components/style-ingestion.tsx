@@ -15,6 +15,7 @@ import { Button } from "@supertrainer/ui/components/button";
 import { Badge } from "@supertrainer/ui/components/badge";
 import { Input } from "@supertrainer/ui/components/input";
 import { Label } from "@supertrainer/ui/components/label";
+import { Progress } from "@supertrainer/ui/components/progress";
 import { cn } from "@supertrainer/ui/lib/utils";
 import { createSupabaseBrowserClient } from "@supertrainer/db/browser";
 
@@ -23,6 +24,7 @@ import {
   ingestUploads,
   type StyleDraft,
 } from "@/app/onboarding/style/actions";
+import { humanizeField, styleCoverage } from "@/lib/style/coverage";
 import type { StyleDomain } from "@/lib/style/profiles";
 
 const ACCEPTED = [
@@ -43,35 +45,33 @@ const DOMAIN_META: Record<StyleDomain, { title: string; lead: string }> = {
   voice: { title: "Your coaching voice", lead: "Here's how I read the way you talk to clients:" },
 };
 
-function humanize(key: string): string {
-  const spaced = key.replace(/([A-Z])/g, " $1").replace(/[_-]+/g, " ");
-  return spaced.charAt(0).toUpperCase() + spaced.slice(1).toLowerCase();
-}
-
 export function StyleIngestion({
   orgId,
   initialDrafts,
   confirmedDomains,
+  confirmedProfiles,
 }: {
   orgId: string;
   initialDrafts: StyleDraft[];
   confirmedDomains: StyleDomain[];
+  confirmedProfiles: { domain: StyleDomain; profile: Record<string, unknown> }[];
 }) {
   const [files, setFiles] = React.useState<File[]>([]);
   const [drafts, setDrafts] = React.useState<StyleDraft[]>(initialDrafts);
   const [confirmed, setConfirmed] = React.useState<Set<StyleDomain>>(
     new Set(confirmedDomains),
   );
-  const [phase, setPhase] = React.useState<"upload" | "processing" | "confirm">(
-    initialDrafts.length > 0 ? "confirm" : "upload",
+  const [phase, setPhase] = React.useState<
+    "upload" | "processing" | "confirm" | "summary"
+  >(
+    initialDrafts.length > 0
+      ? "confirm"
+      : confirmedDomains.length > 0
+        ? "summary"
+        : "upload",
   );
   const [error, setError] = React.useState<string | null>(null);
   const [pending, setPending] = React.useState(false);
-
-  const allDone =
-    drafts.length > 0 && drafts.every((d) => confirmed.has(d.domain));
-  const initiallyComplete =
-    initialDrafts.length === 0 && confirmedDomains.length > 0;
 
   function addFiles(list: FileList | null) {
     if (!list) return;
@@ -134,26 +134,75 @@ export function StyleIngestion({
       setError(result.message ?? "Couldn't save.");
       return;
     }
-    setConfirmed((prev) => new Set(prev).add(draft.domain));
+    const next = new Set(confirmed).add(draft.domain);
+    setConfirmed(next);
+    // Once every draft is confirmed, flip to the strength summary (PO-2), which
+    // keeps a persistent "add more examples" affordance to re-run extraction.
+    if (drafts.every((d) => next.has(d.domain))) setPhase("summary");
   }
 
-  if (initiallyComplete || allDone) {
+  function addMoreExamples() {
+    setPhase("upload");
+    setFiles([]);
+    setError(null);
+  }
+
+  if (phase === "summary") {
+    // Meters from the just-confirmed drafts if we have them, else the confirmed
+    // profiles the page loaded with.
+    const summaryProfiles =
+      drafts.length > 0
+        ? drafts.map((d) => ({ domain: d.domain, profile: d.profile }))
+        : confirmedProfiles;
     return (
-      <div
-        data-testid="style-confirmed"
-        className="flex flex-col items-center gap-3 rounded-lg border bg-surface p-8 text-center"
-      >
-        <Sparkles aria-hidden="true" className="size-8 text-success" />
-        <div className="space-y-1">
-          <h2 className="text-lg font-semibold tracking-tight">
-            Your style is locked in
-          </h2>
-          <p className="max-w-sm text-sm text-muted-foreground">
-            Every draft the AI writes from here on will sound like you. You can
-            keep refining it any time as you edit its suggestions.
-          </p>
+      <div className="space-y-6" data-testid="style-confirmed">
+        <div className="flex flex-col items-center gap-3 rounded-lg border bg-surface p-8 text-center">
+          <Sparkles aria-hidden="true" className="size-8 text-success" />
+          <div className="space-y-1">
+            <h2 className="text-lg font-semibold tracking-tight">
+              Your style is locked in
+            </h2>
+            <p className="max-w-sm text-sm text-muted-foreground">
+              Every draft the AI writes from here on will sound like you.
+            </p>
+          </div>
         </div>
-        <Button asChild>
+
+        {summaryProfiles.length > 0 && (
+          <div className="space-y-3">
+            <h3 className="text-sm font-medium">How well the AI knows your style</h3>
+            {summaryProfiles.map((p) => (
+              <div
+                key={p.domain}
+                data-testid={`style-summary-${p.domain}`}
+                className="rounded-lg border bg-card p-4"
+              >
+                <p className="mb-2 text-sm font-medium">{DOMAIN_META[p.domain].title}</p>
+                <StyleMeter profile={p.profile} />
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="rounded-lg border border-dashed bg-surface p-4" data-testid="sharpen-affordance">
+          <p className="text-sm font-medium">Add more examples to sharpen your AI</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            More plans and check-ins make every draft sound more like you. New
+            uploads are combined with what you&apos;ve already added.
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="mt-3"
+            onClick={addMoreExamples}
+            data-testid="add-more-examples"
+          >
+            <Upload aria-hidden="true" className="size-4" /> Add more examples
+          </Button>
+        </div>
+
+        <Button asChild variant="ghost">
           <Link href="/onboarding">Back to checklist</Link>
         </Button>
       </div>
@@ -190,15 +239,16 @@ export function StyleIngestion({
             >
               <div className="mb-3 flex items-center justify-between gap-3">
                 <h3 className="font-semibold tracking-tight">{meta.title}</h3>
-                {isConfirmed ? (
+                {isConfirmed && (
                   <Badge variant="success" data-testid={`confirmed-${draft.domain}`}>
                     <Check aria-hidden="true" /> Confirmed
                   </Badge>
-                ) : draft.confidence < 1 ? (
-                  <Badge variant="warning">Low confidence</Badge>
-                ) : null}
+                )}
               </div>
-              <p className="mb-4 text-sm text-muted-foreground">{meta.lead}</p>
+              <p className="mb-3 text-sm text-muted-foreground">{meta.lead}</p>
+              <div className="mb-4">
+                <StyleMeter profile={draft.profile} />
+              </div>
 
               <div className="space-y-3">
                 {Object.entries(draft.profile).map(([key, value]) => (
@@ -305,6 +355,38 @@ export function StyleIngestion({
   );
 }
 
+// PO-2 style-strength meter — per-domain coverage computed in code from what was
+// extracted. Color is reserved for state (design rule): a thin profile flags with
+// the WCAG-safe warning FILL badge (never amber text), strong reads as success.
+const BAND_META = {
+  strong: { label: "Strong", variant: "success" as const },
+  developing: { label: "Developing", variant: "secondary" as const },
+  thin: { label: "Thin", variant: "warning" as const },
+};
+
+function StyleMeter({ profile }: { profile: Record<string, unknown> }) {
+  const cov = styleCoverage(profile);
+  const pct = Math.round(cov.score * 100);
+  const band = BAND_META[cov.band];
+  return (
+    <div className="space-y-1.5" data-testid="style-meter">
+      <div className="flex items-center justify-between gap-2 text-xs">
+        <span className="metric-label text-muted-foreground">AI style strength</span>
+        <Badge variant={band.variant} data-testid="style-meter-band">
+          {band.label}
+        </Badge>
+      </div>
+      <Progress value={pct} aria-label={`Style strength ${pct} percent`} />
+      {cov.weak.length > 0 && (
+        <p className="text-xs text-muted-foreground" data-testid="style-meter-weak">
+          Add examples covering {cov.weak.slice(0, 3).join(", ").toLowerCase()} to
+          sharpen this.
+        </p>
+      )}
+    </div>
+  );
+}
+
 // Generic editor for a profile field: arrays as comma-separated, numbers as
 // number inputs, everything else as text.
 function FieldEditor({
@@ -324,7 +406,7 @@ function FieldEditor({
   return (
     <div className="grid grid-cols-1 gap-1 sm:grid-cols-[10rem_1fr] sm:items-center sm:gap-3">
       <Label htmlFor={`f-${fieldKey}`} className="text-xs text-muted-foreground">
-        {humanize(fieldKey)}
+        {humanizeField(fieldKey)}
       </Label>
       <Input
         id={`f-${fieldKey}`}

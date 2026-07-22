@@ -6,6 +6,7 @@ import { extractStyleProfile } from "@supertrainer/ai";
 import type { Json } from "@supertrainer/db/types";
 
 import { completeStep } from "@/app/onboarding/actions";
+import { styleCoverage } from "@/lib/style/coverage";
 import { extractTextFromFile } from "@/lib/style/extract-text";
 import {
   STYLE_DOMAIN_ORDER,
@@ -96,20 +97,32 @@ export async function ingestUploads(
     if (row) uploadIds.push(row.id);
   }
 
-  const combined = texts.join("\n\n---\n\n").trim();
-  if (!combined) {
+  // PO-2: re-extraction is additive. "Add more examples to sharpen your AI"
+  // re-runs over the WHOLE corpus (every prior upload plus the files just added,
+  // all now rows in `uploads`), so coverage only grows — adding one more doc can
+  // never regress a profile. `texts` above only tells us whether THIS run
+  // contributed any readable material.
+  const newReadable = texts.length;
+  const { data: corpusRows } = await service
+    .from("uploads")
+    .select("extracted_text")
+    .eq("org_id", orgId)
+    .eq("extraction_status", "done");
+  const combined = (corpusRows ?? [])
+    .map((r) => r.extracted_text)
+    .filter((t): t is string => !!t && t.trim().length > 0)
+    .join("\n\n---\n\n")
+    .trim();
+  if (newReadable === 0 || !combined) {
     return {
       ok: false,
       message: "Couldn't read any text from those files. Try clearer scans or a text-based export.",
     };
   }
 
-  // Confidence scales with how much material actually extracted; files that
-  // failed to download or parse don't count (using the submitted files.length
-  // would overstate confidence when some uploads yield no text). <3 → low.
-  const confidence = Math.min(1, texts.length / 3);
-
-  // Extract all three domains from the combined material in parallel.
+  // Extract all three domains from the combined material in parallel. Each
+  // profile's stored confidence is its CODE-computed coverage (PO-2) — the share
+  // of schema fields that came back with real content — not a file count.
   let drafts: StyleDraft[];
   try {
     drafts = await Promise.all(
@@ -118,7 +131,7 @@ export async function ingestUploads(
           string,
           unknown
         >;
-        return { domain, profile, confidence };
+        return { domain, profile, confidence: styleCoverage(profile).score };
       }),
     );
   } catch (err) {
