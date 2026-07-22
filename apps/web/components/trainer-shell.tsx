@@ -12,6 +12,7 @@ import {
   PanelLeft,
   Rocket,
   Settings,
+  UserSearch,
   Users,
   X,
 } from "lucide-react";
@@ -23,6 +24,7 @@ import { isPathActive } from "@/lib/routes";
 
 const NAV_ITEMS = [
   { label: "Home", href: "/trainer", icon: Home },
+  { label: "Prospects", href: "/trainer/prospects", icon: UserSearch },
   { label: "Inbox", href: "/trainer/inbox", icon: Inbox },
   { label: "Clients", href: "/trainer/clients", icon: Users },
   { label: "Plans", href: "/trainer/plans", icon: ClipboardList },
