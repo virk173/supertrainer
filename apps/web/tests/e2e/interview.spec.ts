@@ -558,4 +558,38 @@ test("live: finishing the last section assembles intake and queues plan requests
     .eq("org_id", orgId)
     .eq("type", "intake_complete");
   expect((events ?? []).length).toBe(1);
+
+  // PO-5: a neutral-voice trainer brief was generated from the captured intake
+  // and stored, with the teaser allergy surfaced authoritatively (code-derived,
+  // not model-derived). Poll briefly — the brief is drafted best-effort right
+  // after completion is committed.
+  type StoredBrief = { summary?: string; healthFlags?: string[] };
+  let brief: StoredBrief | null = null;
+  for (let i = 0; i < 20 && !brief; i++) {
+    const { data: bc } = await service
+      .from("clients")
+      .select("brief")
+      .eq("id", clientId)
+      .single();
+    brief = (bc?.brief as StoredBrief | null) ?? null;
+    if (!brief) await new Promise((r) => setTimeout(r, 500));
+  }
+  expect(brief, "a client brief should be generated on completion").toBeTruthy();
+  expect(typeof brief?.summary).toBe("string");
+  expect((brief?.summary ?? "").length).toBeGreaterThan(0);
+  expect(brief?.healthFlags).toContain("Allergy: Peanuts");
+
+  const { data: briefRow } = await service
+    .from("clients")
+    .select("brief_generated_at")
+    .eq("id", clientId)
+    .single();
+  expect(briefRow?.brief_generated_at).toBeTruthy();
+
+  const { data: briefEvents } = await service
+    .from("events")
+    .select("type")
+    .eq("org_id", orgId)
+    .eq("type", "client_brief_generated");
+  expect((briefEvents ?? []).length).toBe(1);
 });

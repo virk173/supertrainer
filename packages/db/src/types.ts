@@ -88,6 +88,8 @@ export type Database = {
       clients: {
         Row: {
           approved_manually: boolean
+          brief: Json | null
+          brief_generated_at: string | null
           consent_doc_hash: string | null
           consent_doc_version: string | null
           consent_signed_at: string | null
@@ -106,6 +108,8 @@ export type Database = {
         }
         Insert: {
           approved_manually?: boolean
+          brief?: Json | null
+          brief_generated_at?: string | null
           consent_doc_hash?: string | null
           consent_doc_version?: string | null
           consent_signed_at?: string | null
@@ -124,6 +128,8 @@ export type Database = {
         }
         Update: {
           approved_manually?: boolean
+          brief?: Json | null
+          brief_generated_at?: string | null
           consent_doc_hash?: string | null
           consent_doc_version?: string | null
           consent_signed_at?: string | null

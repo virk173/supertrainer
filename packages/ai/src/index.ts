@@ -61,6 +61,12 @@ export {
   detectHealthFlags,
 } from "./escalation";
 export {
+  ClientBriefSchema,
+  type ClientBrief,
+  type ClientBriefInput,
+  generateClientBrief,
+} from "./brief";
+export {
   INTERVIEW_SECTIONS,
   SECTION_DAY,
   SECTION_SCHEMAS,

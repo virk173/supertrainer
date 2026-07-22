@@ -2,6 +2,7 @@ import "server-only";
 
 import {
   detectHealthFlags,
+  generateClientBrief,
   interviewTurn,
   isInterviewComplete,
   nextSection,
@@ -13,6 +14,7 @@ import {
 import type { Json } from "@supertrainer/db/types";
 
 import { trackServer } from "@/lib/analytics/server";
+import { serializeIntakeForBrief, summarizeHealthFlags } from "@/lib/interview/brief";
 import { dayNumber } from "@/lib/interview/pacing";
 import { createServiceClient } from "@/lib/supabase/server";
 
@@ -420,7 +422,7 @@ async function completeIntake(
 
   const { data: client } = await service
     .from("clients")
-    .select("intake, profile_id")
+    .select("intake, profile_id, brief, health_flags")
     .eq("id", clientId)
     .maybeSingle();
 
@@ -473,4 +475,33 @@ async function completeIntake(
     .from("interview_state")
     .update({ status: "complete" })
     .eq("client_id", clientId);
+
+  // PO-5: draft the trainer's client brief. Best-effort and guarded on
+  // clients.brief being absent — a paid draft call that must never block a
+  // completed intake, and that self-heal retries must not re-pay for once it
+  // exists. The health-flag list is derived in CODE (authoritative) and stored
+  // alongside the model's neutral prose, so the model can neither drop nor invent
+  // a flag. Runs after completion is committed, so a failure here leaves a fully
+  // valid completed interview — the brief just fills in on the next finalize pass.
+  if (!client?.brief) {
+    try {
+      const healthFlags = summarizeHealthFlags(client?.health_flags);
+      const intakeName = (intake as Record<string, unknown>).name;
+      const draft = await generateClientBrief({
+        clientName: typeof intakeName === "string" ? intakeName : undefined,
+        intakeText: serializeIntakeForBrief(intake),
+        healthFlags,
+      });
+      await service
+        .from("clients")
+        .update({
+          brief: { ...draft, healthFlags } as Json,
+          brief_generated_at: new Date().toISOString(),
+        })
+        .eq("id", clientId);
+      await trackServer({ orgId, event: "client_brief_generated", clientId });
+    } catch (err) {
+      console.error("[interview] client brief generation failed (intake still complete):", err);
+    }
+  }
 }
