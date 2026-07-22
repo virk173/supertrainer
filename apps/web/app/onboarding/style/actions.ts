@@ -105,14 +105,24 @@ export async function ingestUploads(
   const newReadable = texts.length;
   const { data: corpusRows } = await service
     .from("uploads")
-    .select("extracted_text")
+    .select("extracted_text, created_at")
     .eq("org_id", orgId)
-    .eq("extraction_status", "done");
-  const combined = (corpusRows ?? [])
-    .map((r) => r.extracted_text)
-    .filter((t): t is string => !!t && t.trim().length > 0)
-    .join("\n\n---\n\n")
-    .trim();
+    .eq("extraction_status", "done")
+    .order("created_at", { ascending: false }); // newest first — recent style wins
+  // Cap the corpus so repeated "add more examples" re-runs stay bounded: without
+  // this, the whole history re-sends through 3 Opus calls every click, cost grows
+  // monotonically, and eventually the accumulated text exceeds the context window
+  // and every extractor throws — bricking the feature for exactly its power users.
+  const CORPUS_CHAR_BUDGET = 120_000; // ~30k tokens, well under the model context
+  const corpusTexts: string[] = [];
+  let budget = CORPUS_CHAR_BUDGET;
+  for (const row of corpusRows ?? []) {
+    const t = row.extracted_text;
+    if (!t || !t.trim() || budget <= 0) continue;
+    corpusTexts.push(t.slice(0, budget));
+    budget -= t.length;
+  }
+  const combined = corpusTexts.join("\n\n---\n\n").trim();
   if (newReadable === 0 || !combined) {
     return {
       ok: false,

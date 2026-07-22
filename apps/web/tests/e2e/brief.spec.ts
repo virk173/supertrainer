@@ -34,23 +34,32 @@ test("summarizeHealthFlags surfaces allergens and interview disclosures authorit
   expect(summarizeHealthFlags({ allergies: "not-an-array" })).toEqual([]);
 });
 
-test("serializeIntakeForBrief renders captured fields and skips bookkeeping keys", () => {
+test("serializeIntakeForBrief renders coaching answers but drops PII/internal keys", () => {
   const out = serializeIntakeForBrief({
     name: "Sam",
+    email: "sam@example.com",
+    phone: "+1 555 0100",
+    selected_tier_id: "tier-uuid-1234",
     goal: "build muscle",
     stage_b: {
       nutrition: { mealsPerDay: 4, mealTimes: ["08:00", "13:00"] },
       training: { daysPerWeek: 5 },
+      contact: { email: "nested@example.com" }, // dropped even nested
     },
     stage_b_completed_at: "2026-07-21T00:00:00.000Z",
   });
 
-  expect(out).toContain("name: Sam");
   expect(out).toContain("goal: build muscle");
   expect(out).toContain("stage_b.nutrition.mealsPerDay: 4");
   expect(out).toContain("stage_b.nutrition.mealTimes: 08:00, 13:00");
   expect(out).toContain("stage_b.training.daysPerWeek: 5");
-  // Derived bookkeeping key is excluded so the model isn't grounded on it.
+  // Data-minimization: identifying PII, internal ids, and bookkeeping never reach
+  // the model prompt — at any depth.
+  expect(out).not.toContain("Sam");
+  expect(out).not.toContain("sam@example.com");
+  expect(out).not.toContain("nested@example.com");
+  expect(out).not.toContain("555");
+  expect(out).not.toContain("tier-uuid-1234");
   expect(out).not.toContain("stage_b_completed_at");
 });
 

@@ -151,7 +151,10 @@ export async function submitLead(
     });
     await service
       .from("leads")
-      .update({ intent_band: intent.intentBand, intent_reason: intent.reason })
+      // Truncate here (not via a schema max that would reject a good band): the
+      // model doesn't reliably honor a length limit, so degrade to a trimmed
+      // stored value instead of dropping the whole scoring.
+      .update({ intent_band: intent.intentBand, intent_reason: intent.reason.slice(0, 240) })
       .eq("id", lead.id);
   } catch (err) {
     console.error("[teaser] lead intent scoring failed (lead still created):", err);

@@ -44,35 +44,52 @@ export function summarizeHealthFlags(healthFlags: unknown): string[] {
   return out;
 }
 
+// Data-minimization: identifying PII (name is passed to the agent separately;
+// email/phone are never needed to summarize coaching answers), internal ids, and
+// bookkeeping are dropped at ANY depth before anything reaches the model prompt.
+const SKIP_EXACT = new Set([
+  "email",
+  "phone",
+  "name",
+  "selected_tier_id",
+  "stage_b_completed_at",
+]);
+function isDroppedKey(key: string): boolean {
+  const k = key.toLowerCase();
+  return (
+    SKIP_EXACT.has(k) ||
+    k.includes("email") ||
+    k.includes("phone") ||
+    k.includes("mobile")
+  );
+}
+
 // Serializes the assembled intake (teaser answers + Stage B sections) into a
-// compact, readable block for the brief prompt. Only captured fields appear, so
-// the model is grounded strictly in what the client actually said. Bounded so a
-// pathological intake can't blow the prompt budget.
+// compact, readable block for the brief prompt. Only captured, non-PII fields
+// appear, so the model is grounded strictly in the coaching-relevant answers the
+// client gave. Bounded so a pathological intake can't blow the prompt budget.
 export function serializeIntakeForBrief(intake: Record<string, unknown>): string {
   const lines: string[] = [];
 
-  const walk = (prefix: string, value: unknown) => {
+  const walk = (prefix: string, key: string, value: unknown) => {
+    if (isDroppedKey(key)) return; // never serialize PII/internal keys, at any depth
+    const path = prefix ? `${prefix}.${key}` : key;
     if (value === null || value === undefined || value === "") return;
     if (Array.isArray(value)) {
       const items = value.map((v) => String(v)).filter(Boolean);
-      if (items.length) lines.push(`${prefix}: ${items.join(", ")}`);
+      if (items.length) lines.push(`${path}: ${items.join(", ")}`);
       return;
     }
     if (typeof value === "object") {
       for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
-        walk(prefix ? `${prefix}.${k}` : k, v);
+        walk(path, k, v);
       }
       return;
     }
-    lines.push(`${prefix}: ${String(value)}`);
+    lines.push(`${path}: ${String(value)}`);
   };
 
-  // Skip derived/bookkeeping keys so the model sees only substantive answers.
-  const SKIP = new Set(["stage_b_completed_at"]);
-  for (const [k, v] of Object.entries(intake)) {
-    if (SKIP.has(k)) continue;
-    walk(k, v);
-  }
+  for (const [k, v] of Object.entries(intake)) walk("", k, v);
 
   return lines.join("\n").slice(0, 4000);
 }

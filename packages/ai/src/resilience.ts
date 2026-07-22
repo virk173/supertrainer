@@ -6,53 +6,75 @@ import { MODEL_IDS, type AiTask } from "./modelRouter";
 // the two highest-intent funnel moments, silently failing. This centralizes:
 //   1. retry with exponential backoff on transient errors,
 //   2. an optional cheaper-model fallback on overload/5xx (draft Sonnet → Haiku),
-//   3. a short circuit breaker that fails fast during a broad outage, and
-//   4. a process-local "AI degraded" flag the funnel can read for honest holding
-//      copy.
+//   3. a PER-MODEL circuit breaker that fails fast during that model's outage
+//      (and lets a call skip a known-down model straight to its fallback), and
+//   4. an "AI degraded" flag the funnel can read for honest holding copy.
 // CAVEAT (from the audit): a same-provider tier fallback does NOT cure credit
 // exhaustion — every Anthropic model shares one balance — so a credit error skips
 // the fallback and trips the breaker directly.
 
-export type AiErrorKind = "overload" | "rate_limit" | "credit" | "server" | "other";
+export type AiErrorKind =
+  | "overload"
+  | "rate_limit"
+  | "credit"
+  | "server"
+  | "auth"
+  | "invalid_request"
+  | "other";
 
 // Classifies a thrown error by its API signal. Duck-typed against the Anthropic
-// SDK's error shape (a numeric `status`, and an `error.type`/message body) so we
-// don't couple to a specific SDK error class.
+// SDK's error shape (a numeric `status`, an `error.type`/message body, and the
+// error's `name` for connection failures that carry no status).
 export function classifyAiError(err: unknown): AiErrorKind {
   if (err instanceof AiDegradedError) return "overload";
   const e = err as {
     status?: number;
+    name?: string;
     message?: string;
     error?: { type?: string; message?: string };
   };
   const status = typeof e?.status === "number" ? e.status : undefined;
   const type = e?.error?.type ?? "";
+  const name = e?.name ?? "";
   const msg = `${e?.message ?? ""} ${e?.error?.message ?? ""}`.toLowerCase();
 
   // Credit exhaustion is a 400 with a distinctive message — not retryable and not
-  // curable by a same-provider fallback.
+  // curable by a same-provider fallback (shared balance).
   if (msg.includes("credit balance") || type === "billing") return "credit";
   if (status === 429 || type === "rate_limit_error") return "rate_limit";
   if (status === 529 || type === "overloaded_error") return "overload";
+  // Connection failures carry no HTTP status — treat as a retryable server blip
+  // (the SDK's own retries are disabled in claude.ts so this layer owns retry).
+  if (name === "APIConnectionError" || name === "APIConnectionTimeoutError") return "server";
   if (status !== undefined && status >= 500) return "server";
+  if (status === 401 || status === 403) return "auth"; // bad/blocked key → total outage
+  if (status !== undefined && status >= 400) return "invalid_request"; // per-request problem
+  // No status → a messages.parse schema/refusal throw or a generic Error.
   return "other";
 }
 
-// Transient kinds worth retrying. Credit/other are terminal for this call.
+// Transient kinds worth retrying. Credit/auth/invalid_request/other are terminal.
 export function isRetryable(kind: AiErrorKind): boolean {
   return kind === "rate_limit" || kind === "overload" || kind === "server";
 }
 
-// Kinds where a different (cheaper) model might succeed. NOT credit — the balance
-// is shared, so Haiku fails the same way.
+// Kinds where a different (cheaper) model might succeed. NOT credit (shared
+// balance), auth (shared key), or invalid_request (the request itself is bad).
 export function isFallbackEligible(kind: AiErrorKind): boolean {
   return kind === "rate_limit" || kind === "overload" || kind === "server";
 }
 
-// True for any error that reflects API health (so callers can distinguish a hard
-// API failure — propagate — from a schema/refusal miss — retry once).
+// True for any error that reflects API health, so a caller can distinguish a hard
+// API failure (propagate) from a schema/refusal miss (retry once).
 export function isAiApiError(err: unknown): boolean {
   return err instanceof AiDegradedError || classifyAiError(err) !== "other";
+}
+
+// A per-request problem (a bad prompt / bad model id, `invalid_request`) is not a
+// broad-outage signal, so it must not trip the breaker; a schema miss (`other`)
+// isn't an API failure at all.
+function tripsBreaker(kind: AiErrorKind): boolean {
+  return kind !== "other" && kind !== "invalid_request";
 }
 
 // The cheaper same-provider fallback for a task, or undefined. Only the Sonnet
@@ -70,12 +92,14 @@ export class AiDegradedError extends Error {
 }
 
 // A minimal circuit breaker. After `threshold` consecutive API failures it opens
-// (fail fast) for `cooldownMs`, then half-opens to allow one trial. Any success
-// resets it. Process-local by design (per serverless instance) — enough to stop
-// hammering a down API and to drive the degraded flag; it is not cluster-wide.
+// (fail fast) for `cooldownMs`, then half-opens to admit exactly ONE trial (a
+// single-flight guard, so a burst under load doesn't stampede a still-down API).
+// Any success resets it. Process-local by design (per serverless instance) —
+// enough to stop hammering a down model and to drive the degraded flag.
 export class CircuitBreaker {
   private failures = 0;
   private openedAt = 0;
+  private halfOpenInFlight = false;
 
   constructor(
     private readonly threshold = 5,
@@ -89,7 +113,14 @@ export class CircuitBreaker {
   }
 
   allowRequest(): boolean {
-    return this.state() !== "open";
+    const s = this.state();
+    if (s === "open") return false;
+    if (s === "half_open") {
+      if (this.halfOpenInFlight) return false; // single-flight the recovery probe
+      this.halfOpenInFlight = true;
+      return true;
+    }
+    return true; // closed
   }
 
   // Degraded = actively failing (open) or mid-recovery (half-open, awaiting a
@@ -101,26 +132,46 @@ export class CircuitBreaker {
   recordSuccess(): void {
     this.failures = 0;
     this.openedAt = 0;
+    this.halfOpenInFlight = false;
   }
 
   recordFailure(): void {
     this.failures += 1;
     if (this.failures >= this.threshold) this.openedAt = this.now();
+    this.halfOpenInFlight = false;
   }
 
   reset(): void {
     this.failures = 0;
     this.openedAt = 0;
+    this.halfOpenInFlight = false;
   }
 }
 
-// Process-global breaker + degraded flag the funnel reads.
-const globalBreaker = new CircuitBreaker();
-export function isAiDegraded(): boolean {
-  return globalBreaker.isDegraded();
+// Per-model breakers: an outage in one model (Sonnet drafts / Opus ingest) must
+// not fail-fast healthy calls to another (the Haiku health classifier especially,
+// which the interview engine intends to always run). A draft call whose primary
+// (Sonnet) breaker is open skips straight to its Haiku fallback.
+const breakers = new Map<string, CircuitBreaker>();
+function breakerFor(model: string): CircuitBreaker {
+  let b = breakers.get(model);
+  if (!b) {
+    b = new CircuitBreaker();
+    breakers.set(model, b);
+  }
+  return b;
 }
+
+// The funnel's "AI degraded" flag: true when any model we've touched is currently
+// unhealthy. Combined with a "generation failed" check at the call site, this
+// distinguishes a real outage from an ordinary one-off miss.
+export function isAiDegraded(): boolean {
+  for (const b of breakers.values()) if (b.isDegraded()) return true;
+  return false;
+}
+
 export function resetAiCircuitForTests(): void {
-  globalBreaker.reset();
+  breakers.clear();
 }
 
 const defaultSleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
@@ -148,15 +199,17 @@ export interface ResilienceOpts {
   attempts?: number;
   baseDelayMs?: number;
   sleep?: (ms: number) => Promise<void>;
-  breaker?: CircuitBreaker;
+  /** Resolves the breaker for a model. Defaults to the per-model registry. */
+  getBreaker?: (model: string) => CircuitBreaker;
 }
 
-// Runs `callModel(primaryModel)` with retry/backoff; on a fallback-eligible
-// failure and a defined fallbackModel, retries once through the cheaper model;
-// records the outcome to the circuit breaker; and fails fast (AiDegradedError)
-// while the breaker is open. Non-API ("other") errors — e.g. a schema/refusal
-// miss — pass straight through WITHOUT retry or tripping the breaker, so the
-// caller's own schema-retry handles them.
+// Tries `primaryModel`, then (on a fallback-eligible failure and a defined
+// fallbackModel) the cheaper model — each with retry/backoff, each gated by and
+// recorded against ITS OWN breaker, and skipping any model whose breaker is open.
+// A non-API ("other") error — a schema/refusal miss — passes straight through
+// WITHOUT retry, fallback, or tripping the breaker, so the caller's own
+// schema-retry handles it. Throws AiDegradedError only when every model's breaker
+// is open (nothing was attempted).
 export async function callWithResilience<T>(
   callModel: (model: string) => Promise<T>,
   opts: ResilienceOpts,
@@ -167,33 +220,39 @@ export async function callWithResilience<T>(
     attempts = 3,
     baseDelayMs = 250,
     sleep = defaultSleep,
-    breaker = globalBreaker,
+    getBreaker = breakerFor,
   } = opts;
 
-  if (!breaker.allowRequest()) throw new AiDegradedError();
+  const models = fallbackModel ? [primaryModel, fallbackModel] : [primaryModel];
+  let lastApiErr: unknown = null;
 
-  const run = (model: string) => withRetry(() => callModel(model), attempts, baseDelayMs, sleep);
+  for (const model of models) {
+    const breaker = getBreaker(model);
+    if (!breaker.allowRequest()) continue; // skip a known-down model
 
-  try {
-    const result = await run(primaryModel);
-    breaker.recordSuccess();
-    return result;
-  } catch (primaryErr) {
-    const kind = classifyAiError(primaryErr);
-    if (kind === "other") throw primaryErr; // not an API-health failure
-
-    if (fallbackModel && isFallbackEligible(kind)) {
-      try {
-        const result = await run(fallbackModel);
-        breaker.recordSuccess();
-        return result;
-      } catch (fallbackErr) {
-        if (classifyAiError(fallbackErr) !== "other") breaker.recordFailure();
-        throw fallbackErr;
+    try {
+      const result = await withRetry(() => callModel(model), attempts, baseDelayMs, sleep);
+      breaker.recordSuccess();
+      return result;
+    } catch (err) {
+      const kind = classifyAiError(err);
+      if (kind === "other") {
+        // A schema/refusal miss. On the primary with no prior API error, propagate
+        // it so zodOutput's schema-retry handles it. But if a prior model already
+        // failed with a real API error, a fallback schema miss must NOT mask that
+        // outage — surface the API error so the breaker reflects it and the caller
+        // treats it as an API failure, not a schema retry.
+        if (lastApiErr) throw lastApiErr;
+        throw err;
       }
+      if (tripsBreaker(kind)) breaker.recordFailure();
+      lastApiErr = err;
+      // Only a fallback-eligible outage is worth trying the next model for; a
+      // credit/auth/invalid_request error would fail the fallback the same way.
+      if (!isFallbackEligible(kind)) break;
     }
-
-    breaker.recordFailure();
-    throw primaryErr;
   }
+
+  if (lastApiErr) throw lastApiErr; // every attempted model failed with an API error
+  throw new AiDegradedError(); // every model's breaker was open — nothing attempted
 }

@@ -80,7 +80,11 @@ function instrument(anthropic: Anthropic): Anthropic {
 export function getClaudeClient(): Anthropic {
   if (!client) {
     // Resolves credentials from the environment (ANTHROPIC_API_KEY).
-    client = instrument(new Anthropic());
+    // maxRetries: 0 — the resilience layer (packages/ai/resilience.ts) owns all
+    // retry/backoff. Leaving the SDK's default (2 retries) on would multiply with
+    // withRetry (and again with the model fallback) into ~18 upstream calls per
+    // zodOutput during a persistent outage, and delay the circuit breaker.
+    client = instrument(new Anthropic({ maxRetries: 0 }));
   }
   return client;
 }

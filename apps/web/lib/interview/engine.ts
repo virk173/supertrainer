@@ -60,6 +60,13 @@ export const THROTTLE_REPLY =
 // call, and short enough that a crashed opener is reclaimable soon after.
 const OPENER_CLAIM_TTL_MS = 60 * 1000;
 
+// The client-brief claim's TTL (PO-5). completeIntake is reachable concurrently
+// (a completing runTurn racing the ensureInterview self-heal, two tabs), so the
+// brief's paid Sonnet call is guarded by a conditional claim on brief_generated_at
+// — same claim-with-TTL shape as the preview lock — so it runs AT MOST ONCE. A
+// crashed attempt is reclaimable after this window.
+const BRIEF_CLAIM_TTL_MS = 2 * 60 * 1000;
+
 // Interview turns only. Bounded so a long thread can't unbounded-scan or ship
 // the whole history to the browser (the real, paginated thread arrives in P6.1).
 async function loadMessages(service: ReturnType<typeof createServiceClient>, clientId: string) {
@@ -476,32 +483,46 @@ async function completeIntake(
     .update({ status: "complete" })
     .eq("client_id", clientId);
 
-  // PO-5: draft the trainer's client brief. Best-effort and guarded on
-  // clients.brief being absent — a paid draft call that must never block a
-  // completed intake, and that self-heal retries must not re-pay for once it
-  // exists. The health-flag list is derived in CODE (authoritative) and stored
-  // alongside the model's neutral prose, so the model can neither drop nor invent
-  // a flag. Runs after completion is committed, so a failure here leaves a fully
-  // valid completed interview — the brief just fills in on the next finalize pass.
+  // PO-5: draft the trainer's client brief. A paid draft call that must never
+  // block a completed intake, and that concurrent finalizes (a completing runTurn
+  // racing the ensureInterview self-heal, two tabs) must not each pay for. A
+  // conditional CLAIM on brief_generated_at (brief still null AND no fresh claim)
+  // serializes it — only the winner generates + stores + fires the event; a
+  // crashed attempt is reclaimable after BRIEF_CLAIM_TTL_MS. The health-flag list
+  // is derived in CODE (authoritative) and stored alongside the model's neutral
+  // prose, so the model can neither drop nor invent a flag. Runs after completion
+  // is committed, so a failure here leaves a fully valid completed interview.
   if (!client?.brief) {
-    try {
-      const healthFlags = summarizeHealthFlags(client?.health_flags);
-      const intakeName = (intake as Record<string, unknown>).name;
-      const draft = await generateClientBrief({
-        clientName: typeof intakeName === "string" ? intakeName : undefined,
-        intakeText: serializeIntakeForBrief(intake),
-        healthFlags,
-      });
-      await service
-        .from("clients")
-        .update({
-          brief: { ...draft, healthFlags } as Json,
-          brief_generated_at: new Date().toISOString(),
-        })
-        .eq("id", clientId);
-      await trackServer({ orgId, event: "client_brief_generated", clientId });
-    } catch (err) {
-      console.error("[interview] client brief generation failed (intake still complete):", err);
+    const staleBefore = new Date(Date.now() - BRIEF_CLAIM_TTL_MS).toISOString();
+    const { data: briefClaim } = await service
+      .from("clients")
+      .update({ brief_generated_at: new Date().toISOString() })
+      .eq("id", clientId)
+      .is("brief", null)
+      .or(`brief_generated_at.is.null,brief_generated_at.lt.${staleBefore}`)
+      .select("id");
+    if (briefClaim && briefClaim.length > 0) {
+      try {
+        const healthFlags = summarizeHealthFlags(client?.health_flags);
+        const intakeName = (intake as Record<string, unknown>).name;
+        const draft = await generateClientBrief({
+          clientName: typeof intakeName === "string" ? intakeName : undefined,
+          intakeText: serializeIntakeForBrief(intake),
+          healthFlags,
+        });
+        await service
+          .from("clients")
+          .update({
+            brief: { ...draft, healthFlags } as Json,
+            brief_generated_at: new Date().toISOString(),
+          })
+          .eq("id", clientId);
+        await trackServer({ orgId, event: "client_brief_generated", clientId });
+      } catch (err) {
+        console.error("[interview] client brief generation failed (intake still complete):", err);
+        // Leave the (now-claim-timestamped) brief_generated_at; a later finalize
+        // reclaims it once the TTL lapses and retries.
+      }
     }
   }
 }

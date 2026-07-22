@@ -15,13 +15,13 @@ export const LeadIntentSchema = z.object({
   intentBand: z
     .enum(LEAD_INTENT_BANDS)
     .describe("Qualitative follow-up priority: high, medium, or low. Not a number."),
-  // Generous bound + default: the model doesn't reliably honor a tight maxLength,
-  // so an over-length or omitted reason must degrade to a stored value, never a
-  // hard validation failure (this is best-effort triage). Trimmed by the caller
-  // via the column, which is unbounded text.
+  // No maxLength on the schema: the model doesn't reliably honor one, and a hard
+  // Zod rejection would throw away a perfectly good band (best-effort triage). An
+  // omitted reason degrades to "" (default); an over-length reason is accepted
+  // here and TRUNCATED by the caller before storage (see start/actions.ts). The
+  // prompt still asks for one short sentence, and maxTokens caps the worst case.
   reason: z
     .string()
-    .max(240)
     .default("")
     .describe("One short, neutral sentence (under 20 words) explaining the band — no numbers you had to calculate."),
 });
