@@ -67,6 +67,13 @@ export {
   generateClientBrief,
 } from "./brief";
 export {
+  LEAD_INTENT_BANDS,
+  LeadIntentSchema,
+  type LeadIntent,
+  type LeadIntentInput,
+  scoreLeadIntent,
+} from "./leadIntent";
+export {
   INTERVIEW_SECTIONS,
   SECTION_DAY,
   SECTION_SCHEMAS,
