@@ -116,6 +116,11 @@ export async function ingestUploads(
     .select("extracted_text, created_at")
     .eq("org_id", orgId)
     .eq("extraction_status", "done")
+    // Only rows WITH text count toward the row cap — otherwise a run of blank
+    // extractions (e.g. low-text check-in screenshots) could crowd the newest-200
+    // window and evict older text-rich docs the char budget still had room for,
+    // shrinking a profile's corpus (the additive-coverage invariant).
+    .not("extracted_text", "is", null)
     .order("created_at", { ascending: false }) // newest first — recent style wins
     .limit(MAX_CORPUS_UPLOADS);
   const corpusTexts: string[] = [];
