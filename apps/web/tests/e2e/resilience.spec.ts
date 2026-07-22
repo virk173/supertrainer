@@ -192,6 +192,40 @@ test("callWithResilience: a schema ('other') error passes through without retry 
   expect(breaker.isDegraded()).toBe(false); // not an API-health failure
 });
 
+test("callWithResilience: a half-open probe that misses on schema/invalid_request releases the latch (no brick)", async () => {
+  let clock = 0;
+
+  // A schema ('other') miss on the recovery probe must not wedge the breaker.
+  const b1 = new CircuitBreaker(1, 1000, () => clock);
+  b1.recordFailure(); // open
+  clock += 1000; // → half_open (admits one probe)
+  await expect(
+    callWithResilience(async () => { throw new Error("schema miss"); }, {
+      primaryModel: "sonnet",
+      attempts: 1,
+      baseDelayMs: 0,
+      sleep: noSleep,
+      getBreaker: () => b1,
+    }),
+  ).rejects.toThrow(/schema/);
+  expect(b1.allowRequest()).toBe(true); // latch released — next probe admitted, not bricked
+
+  // Same for a per-request invalid_request (400) probe.
+  const b2 = new CircuitBreaker(1, 1000, () => clock);
+  b2.recordFailure();
+  clock += 1000;
+  await expect(
+    callWithResilience(async () => { throw apiErr(400, "prompt is too long"); }, {
+      primaryModel: "sonnet",
+      attempts: 1,
+      baseDelayMs: 0,
+      sleep: noSleep,
+      getBreaker: () => b2,
+    }),
+  ).rejects.toMatchObject({ status: 400 });
+  expect(b2.allowRequest()).toBe(true);
+});
+
 test("callWithResilience: fails fast (AiDegradedError) when every model's breaker is open", async () => {
   const open = new CircuitBreaker(1, 60_000);
   open.recordFailure(); // opens it

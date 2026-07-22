@@ -141,6 +141,15 @@ export class CircuitBreaker {
     this.halfOpenInFlight = false;
   }
 
+  // Releases a claimed half-open probe WITHOUT recording an outcome — for a call
+  // that resolved with something that isn't an API-health signal (a schema/refusal
+  // miss, or a per-request invalid_request). Without this, such a probe would
+  // leave halfOpenInFlight stuck true and brick the breaker (allowRequest forever
+  // false, isAiDegraded forever true). The next call re-probes.
+  releaseProbe(): void {
+    this.halfOpenInFlight = false;
+  }
+
   reset(): void {
     this.failures = 0;
     this.openedAt = 0;
@@ -237,15 +246,20 @@ export async function callWithResilience<T>(
     } catch (err) {
       const kind = classifyAiError(err);
       if (kind === "other") {
-        // A schema/refusal miss. On the primary with no prior API error, propagate
-        // it so zodOutput's schema-retry handles it. But if a prior model already
-        // failed with a real API error, a fallback schema miss must NOT mask that
-        // outage — surface the API error so the breaker reflects it and the caller
-        // treats it as an API failure, not a schema retry.
+        // A schema/refusal miss — not an API-health signal. Release the half-open
+        // probe (if this was one) so the breaker isn't bricked. On the primary with
+        // no prior API error, propagate it so zodOutput's schema-retry handles it;
+        // but if a prior model already failed with a real API error, a fallback
+        // schema miss must NOT mask that outage — surface the API error instead.
+        breaker.releaseProbe();
         if (lastApiErr) throw lastApiErr;
         throw err;
       }
+      // A real API error: a broad-outage kind trips the breaker; a per-request
+      // invalid_request does not — but either way, release a claimed half-open
+      // probe (recordFailure releases it too; releaseProbe covers the else).
       if (tripsBreaker(kind)) breaker.recordFailure();
+      else breaker.releaseProbe();
       lastApiErr = err;
       // Only a fallback-eligible outage is worth trying the next model for; a
       // credit/auth/invalid_request error would fail the fallback the same way.

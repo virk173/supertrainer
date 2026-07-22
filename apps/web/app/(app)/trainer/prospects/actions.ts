@@ -83,7 +83,7 @@ export async function convertProspect(leadId: string): Promise<ConvertProspectRe
     .select("id");
   if (!claimed || claimed.length === 0) {
     // Lost the race — another convert already claimed this lead. Roll back the
-    // client we just created (service role — API roles have no DELETE grant).
+    // client we just created (service role — a clean rollback regardless of RLS).
     await service.from("clients").delete().eq("id", client.id);
     return { ok: false, message: "This prospect has already been converted." };
   }

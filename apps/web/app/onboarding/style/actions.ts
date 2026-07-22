@@ -103,17 +103,21 @@ export async function ingestUploads(
   // never regress a profile. `texts` above only tells us whether THIS run
   // contributed any readable material.
   const newReadable = texts.length;
+  // Cap the corpus so repeated "add more examples" re-runs stay bounded: without
+  // this, the whole history re-sends through 3 Opus calls every click, cost grows
+  // monotonically, and eventually the accumulated text exceeds the context window
+  // and every extractor throws — bricking the feature for exactly its power users.
+  // .limit() bounds the DB read/egress too (not just the AI text) — the newest
+  // MAX_CORPUS_UPLOADS docs comfortably fill the char budget in realistic cases.
+  const CORPUS_CHAR_BUDGET = 120_000; // ~30k tokens, well under the model context
+  const MAX_CORPUS_UPLOADS = 200;
   const { data: corpusRows } = await service
     .from("uploads")
     .select("extracted_text, created_at")
     .eq("org_id", orgId)
     .eq("extraction_status", "done")
-    .order("created_at", { ascending: false }); // newest first — recent style wins
-  // Cap the corpus so repeated "add more examples" re-runs stay bounded: without
-  // this, the whole history re-sends through 3 Opus calls every click, cost grows
-  // monotonically, and eventually the accumulated text exceeds the context window
-  // and every extractor throws — bricking the feature for exactly its power users.
-  const CORPUS_CHAR_BUDGET = 120_000; // ~30k tokens, well under the model context
+    .order("created_at", { ascending: false }) // newest first — recent style wins
+    .limit(MAX_CORPUS_UPLOADS);
   const corpusTexts: string[] = [];
   let budget = CORPUS_CHAR_BUDGET;
   for (const row of corpusRows ?? []) {

@@ -63,8 +63,13 @@ const OPENER_CLAIM_TTL_MS = 60 * 1000;
 // The client-brief claim's TTL (PO-5). completeIntake is reachable concurrently
 // (a completing runTurn racing the ensureInterview self-heal, two tabs), so the
 // brief's paid Sonnet call is guarded by a conditional claim on brief_generated_at
-// — same claim-with-TTL shape as the preview lock — so it runs AT MOST ONCE. A
-// crashed attempt is reclaimable after this window.
+// — same shape as the preview lock — so concurrent finalizes generate it AT MOST
+// ONCE (the loser sees the winner's fresh claim within this window and skips).
+// Unlike the preview lock, completeIntake is NOT re-entered after status flips to
+// 'complete', so the TTL does not power an automatic retry — the brief is
+// best-effort and generated once (the resilience layer already retries transient
+// API errors under the hood). Phase 7's per-client inbox is where a manual
+// "regenerate brief" would live.
 const BRIEF_CLAIM_TTL_MS = 2 * 60 * 1000;
 
 // Interview turns only. Bounded so a long thread can't unbounded-scan or ship
@@ -487,11 +492,11 @@ async function completeIntake(
   // block a completed intake, and that concurrent finalizes (a completing runTurn
   // racing the ensureInterview self-heal, two tabs) must not each pay for. A
   // conditional CLAIM on brief_generated_at (brief still null AND no fresh claim)
-  // serializes it — only the winner generates + stores + fires the event; a
-  // crashed attempt is reclaimable after BRIEF_CLAIM_TTL_MS. The health-flag list
-  // is derived in CODE (authoritative) and stored alongside the model's neutral
-  // prose, so the model can neither drop nor invent a flag. Runs after completion
-  // is committed, so a failure here leaves a fully valid completed interview.
+  // serializes it — only the winner generates + stores + fires the event. The
+  // health-flag list is derived in CODE (authoritative) and stored alongside the
+  // model's neutral prose, so the model can neither drop nor invent a flag. Runs
+  // after completion is committed, so a failure here leaves a fully valid
+  // completed interview — best-effort, generated at most once (see the TTL note).
   if (!client?.brief) {
     const staleBefore = new Date(Date.now() - BRIEF_CLAIM_TTL_MS).toISOString();
     const { data: briefClaim } = await service
@@ -520,8 +525,10 @@ async function completeIntake(
         await trackServer({ orgId, event: "client_brief_generated", clientId });
       } catch (err) {
         console.error("[interview] client brief generation failed (intake still complete):", err);
-        // Leave the (now-claim-timestamped) brief_generated_at; a later finalize
-        // reclaims it once the TTL lapses and retries.
+        // Best-effort: the intake is already complete. There is no automatic retry
+        // (completeIntake isn't re-entered post-completion) — a rare permanent miss
+        // degrades to the pre-PO-5 state (the trainer reads the raw intake), and
+        // Phase 7 can add a manual regenerate.
       }
     }
   }
