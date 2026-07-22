@@ -1,0 +1,63 @@
+# Audit baseline — Phases 0–2 hardened
+
+**Baseline commit:** `1e63677` (main, 2026-07-21) — "Pre–Phase 3 hardening — 14 audit fixes + review follow-ups (#7)".
+
+## What this baseline means
+
+Phases 0–2 + the Phase 2 backstops were **comprehensively audited** (deep multi-agent, adversarially verified — see `docs/audit/2026-07-21-pre-phase3-audit.md`) and **hardened**: all 14 confirmed defects (8 MUST-FIX + 6 SHOULD-FIX) plus the security-review and max-effort-review follow-ups were fixed, verified (typecheck 4/4 · lint · pgTAP 120 · Playwright 75), merged to main, and the migrations applied to prod.
+
+## Rule for future audits (do NOT re-burn tokens)
+
+**Never re-audit Phases 0–2.** Every future hardening audit is **scoped to the NEW work only** — the diff since this baseline (or the phase's own added/changed files). To audit a later phase:
+
+- Establish the diff to review: `git diff <baseline-or-prev-phase-merge>..HEAD` (start from `1e63677` for Phase 3), or the phase's file set. Do NOT read/scan Phases 0–2 code except where the new phase directly touches it.
+- Advance this baseline after each phase's audit ships: update the "Baseline commit" above to the phase's merge commit so the next audit starts from there.
+
+## Reusable phase-scoped audit prompt
+
+```
+COMPREHENSIVE AUDIT + REMEDIATION of the NEW work only (do NOT re-audit
+Phases 0–2 — see docs/audit/AUDIT-BASELINE.md). Act as a senior full-stack team.
+
+ORIENT: repo /Users/ranjeet/Claude Code/supertrainer. Read CLAUDE.md,
+docs/plan/PROGRESS.md, docs/audit/AUDIT-BASELINE.md, and the supertrainer-*
+memory. New branch: git checkout -b audit/<phase>-hardening. Docker + local
+Supabase up; Anthropic credits funded.
+
+SCOPE = ONLY the diff since the audit baseline: run
+`git diff <BASELINE_COMMIT>..HEAD` (BASELINE_COMMIT from AUDIT-BASELINE.md) and
+review just those changed files + the functions they touch. Do NOT scan
+Phases 0–2 code except where the new work directly calls into it.
+
+INVARIANTS (CLAUDE.md): all DB via packages/db; all AI via modelRouter(task);
+no LLM arithmetic; Zod-validate every AI output; every new table ships RLS +
+explicit grants + a pgTAP test; service-role bypasses RLS so cross-org
+reads/writes verify org_id in code; allergen filter only DROPS foods; health
+gate only ADDS flags.
+
+PROCESS — find → adversarially verify → triage → apply → re-verify:
+1. AUDIT the new diff across: correctness/errors; data-sync & cross-phase gaps;
+   security (RLS/grants/tenancy, public endpoints, input validation, secrets);
+   code quality; feature opportunities (PROPOSE ONLY); UI (bugs→FIX,
+   redesigns→PROPOSE). Cite file:line + a concrete failure scenario each.
+2. VERIFY every finding adversarially (kill false positives).
+3. TRIAGE → MUST-FIX / SHOULD-FIX / PROPOSE-ONLY.
+4. APPLY MUST + SHOULD, test-first, ONE change at a time. Do NOT build
+   PROPOSE-ONLY. REGRESSION SAFETY: full suite green after every change
+   (npm run typecheck; npm run lint; npx supabase db reset && npx supabase
+   test db; cd apps/web && npm run test); revert on any regression; never
+   weaken a test.
+5. REVIEW: /code-review (max) + /security-review; fix Critical/Important; then
+   ask me to run /code-review ultra.
+6. REPORT to docs/audit/<date>-<phase>-audit.md; open a PR when green.
+   After merge, update AUDIT-BASELINE.md's baseline commit to this merge.
+
+GUARDRAILS: don't break the green build; don't auto-add features/UI redesigns;
+STOP and ask before any ambiguous/product-shaped change.
+```
+
+## Notes for CI/deploy (carry-forward gotchas)
+
+- CI (`ci.yml`) intentionally does NOT pass `ANTHROPIC_API_KEY` to the Playwright job, so live-AI e2e tests SKIP in CI (deterministic, no credit dependency). Any new e2e that needs a live turn must be gated `test.skip(!process.env.ANTHROPIC_API_KEY, ...)` AND its no-key path must still pass, or the whole job goes red in CI.
+- `vercel.json` lives at `apps/web/vercel.json` (Vercel Root Directory = apps/web); Vercel Hobby caps crons at once/day.
+- Prod migrations are a manual gate: Actions → "Migrate (production DB)" → Run workflow on `main`.

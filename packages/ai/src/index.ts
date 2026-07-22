@@ -11,6 +11,19 @@ export {
   type ZodOutputParams,
 } from "./zodOutput";
 export {
+  AiDegradedError,
+  CircuitBreaker,
+  callWithResilience,
+  classifyAiError,
+  fallbackModelFor,
+  isAiApiError,
+  isAiDegraded,
+  isFallbackEligible,
+  isRetryable,
+  resetAiCircuitForTests,
+  type AiErrorKind,
+} from "./resilience";
+export {
   flushTracing,
   withAiTask,
   currentAiTask,
@@ -60,6 +73,19 @@ export {
   keywordHealthFlags,
   detectHealthFlags,
 } from "./escalation";
+export {
+  ClientBriefSchema,
+  type ClientBrief,
+  type ClientBriefInput,
+  generateClientBrief,
+} from "./brief";
+export {
+  LEAD_INTENT_BANDS,
+  LeadIntentSchema,
+  type LeadIntent,
+  type LeadIntentInput,
+  scoreLeadIntent,
+} from "./leadIntent";
 export {
   INTERVIEW_SECTIONS,
   SECTION_DAY,

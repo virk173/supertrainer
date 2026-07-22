@@ -6,6 +6,7 @@ import { extractStyleProfile } from "@supertrainer/ai";
 import type { Json } from "@supertrainer/db/types";
 
 import { completeStep } from "@/app/onboarding/actions";
+import { styleCoverage } from "@/lib/style/coverage";
 import { extractTextFromFile } from "@/lib/style/extract-text";
 import {
   STYLE_DOMAIN_ORDER,
@@ -96,20 +97,51 @@ export async function ingestUploads(
     if (row) uploadIds.push(row.id);
   }
 
-  const combined = texts.join("\n\n---\n\n").trim();
-  if (!combined) {
+  // PO-2: re-extraction is additive. "Add more examples to sharpen your AI"
+  // re-runs over the WHOLE corpus (every prior upload plus the files just added,
+  // all now rows in `uploads`), so coverage only grows — adding one more doc can
+  // never regress a profile. `texts` above only tells us whether THIS run
+  // contributed any readable material.
+  const newReadable = texts.length;
+  // Cap the corpus so repeated "add more examples" re-runs stay bounded: without
+  // this, the whole history re-sends through 3 Opus calls every click, cost grows
+  // monotonically, and eventually the accumulated text exceeds the context window
+  // and every extractor throws — bricking the feature for exactly its power users.
+  // .limit() bounds the DB read/egress too (not just the AI text) — the newest
+  // MAX_CORPUS_UPLOADS docs comfortably fill the char budget in realistic cases.
+  const CORPUS_CHAR_BUDGET = 120_000; // ~30k tokens, well under the model context
+  const MAX_CORPUS_UPLOADS = 200;
+  const { data: corpusRows } = await service
+    .from("uploads")
+    .select("extracted_text, created_at")
+    .eq("org_id", orgId)
+    .eq("extraction_status", "done")
+    // Only rows WITH text count toward the row cap — otherwise a run of blank
+    // extractions (e.g. low-text check-in screenshots) could crowd the newest-200
+    // window and evict older text-rich docs the char budget still had room for,
+    // shrinking a profile's corpus (the additive-coverage invariant).
+    .not("extracted_text", "is", null)
+    .order("created_at", { ascending: false }) // newest first — recent style wins
+    .limit(MAX_CORPUS_UPLOADS);
+  const corpusTexts: string[] = [];
+  let budget = CORPUS_CHAR_BUDGET;
+  for (const row of corpusRows ?? []) {
+    const t = row.extracted_text;
+    if (!t || !t.trim() || budget <= 0) continue;
+    corpusTexts.push(t.slice(0, budget));
+    budget -= t.length;
+  }
+  const combined = corpusTexts.join("\n\n---\n\n").trim();
+  if (newReadable === 0 || !combined) {
     return {
       ok: false,
       message: "Couldn't read any text from those files. Try clearer scans or a text-based export.",
     };
   }
 
-  // Confidence scales with how much material actually extracted; files that
-  // failed to download or parse don't count (using the submitted files.length
-  // would overstate confidence when some uploads yield no text). <3 → low.
-  const confidence = Math.min(1, texts.length / 3);
-
-  // Extract all three domains from the combined material in parallel.
+  // Extract all three domains from the combined material in parallel. Each
+  // profile's stored confidence is its CODE-computed coverage (PO-2) — the share
+  // of schema fields that came back with real content — not a file count.
   let drafts: StyleDraft[];
   try {
     drafts = await Promise.all(
@@ -118,7 +150,7 @@ export async function ingestUploads(
           string,
           unknown
         >;
-        return { domain, profile, confidence };
+        return { domain, profile, confidence: styleCoverage(profile).score };
       }),
     );
   } catch (err) {

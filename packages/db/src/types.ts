@@ -88,7 +88,10 @@ export type Database = {
       clients: {
         Row: {
           approved_manually: boolean
+          brief: Json | null
+          brief_generated_at: string | null
           consent_doc_hash: string | null
+          consent_doc_version: string | null
           consent_signed_at: string | null
           created_at: string
           health_flags: Json
@@ -105,7 +108,10 @@ export type Database = {
         }
         Insert: {
           approved_manually?: boolean
+          brief?: Json | null
+          brief_generated_at?: string | null
           consent_doc_hash?: string | null
+          consent_doc_version?: string | null
           consent_signed_at?: string | null
           created_at?: string
           health_flags?: Json
@@ -122,7 +128,10 @@ export type Database = {
         }
         Update: {
           approved_manually?: boolean
+          brief?: Json | null
+          brief_generated_at?: string | null
           consent_doc_hash?: string | null
+          consent_doc_version?: string | null
           consent_signed_at?: string | null
           created_at?: string
           health_flags?: Json
@@ -489,6 +498,8 @@ export type Database = {
           email: string
           email_normalized: string | null
           id: string
+          intent_band: Database["public"]["Enums"]["lead_intent_band"] | null
+          intent_reason: string | null
           ip_hash: string | null
           org_id: string
           phone: string | null
@@ -507,6 +518,8 @@ export type Database = {
           email: string
           email_normalized?: string | null
           id?: string
+          intent_band?: Database["public"]["Enums"]["lead_intent_band"] | null
+          intent_reason?: string | null
           ip_hash?: string | null
           org_id: string
           phone?: string | null
@@ -525,6 +538,8 @@ export type Database = {
           email?: string
           email_normalized?: string | null
           id?: string
+          intent_band?: Database["public"]["Enums"]["lead_intent_band"] | null
+          intent_reason?: string | null
           ip_hash?: string | null
           org_id?: string
           phone?: string | null
@@ -1028,6 +1043,7 @@ export type Database = {
         | "health"
       interview_status: "in_progress" | "paused_health" | "complete"
       invite_channel: "copy_link" | "email"
+      lead_intent_band: "high" | "medium" | "low"
       lead_status: "started" | "preview_shown" | "converted" | "expired"
       message_sender: "client" | "coach" | "system" | "assistant"
       notification_channel: "push" | "email_only"
@@ -1192,6 +1208,7 @@ export const Constants = {
       ],
       interview_status: ["in_progress", "paused_health", "complete"],
       invite_channel: ["copy_link", "email"],
+      lead_intent_band: ["high", "medium", "low"],
       lead_status: ["started", "preview_shown", "converted", "expired"],
       message_sender: ["client", "coach", "system", "assistant"],
       notification_channel: ["push", "email_only"],

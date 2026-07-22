@@ -114,3 +114,84 @@ test("consent gate blocks the portal, then signing unlocks it with an evidence t
   await page.goto("/consent");
   await expect(page).toHaveURL(/\/portal/);
 });
+
+// ── PO-3: re-consent when the client is behind a material doc version ─────────
+
+test("a client on a stale consent version is gated into re-signing, preserving history", async ({
+  page,
+}) => {
+  const email = uniqueEmail("reconsent-client");
+  const { userId, orgId, tokenHash } = await seedClient(email);
+  const service = serviceClient();
+
+  const { data: clientRow } = await service
+    .from("clients")
+    .select("id")
+    .eq("profile_id", userId)
+    .single();
+  const clientId = clientRow!.id;
+
+  // Simulate: this client signed an OLDER version of the agreement (evidence row
+  // + denormalized flags). "v0" is not the current required version, so the gate
+  // must treat them as needing to re-acknowledge.
+  const past = "2026-01-01T00:00:00.000Z";
+  await service.from("consents").insert({
+    org_id: orgId,
+    client_id: clientId,
+    doc_version: "v0",
+    doc_sha256: "0".repeat(64),
+    signed_name: "Alex Old",
+    signed_at: past,
+    user_agent: "seed",
+  });
+  await service
+    .from("clients")
+    .update({
+      consent_signed_at: past,
+      consent_doc_hash: "0".repeat(64),
+      consent_doc_version: "v0",
+    })
+    .eq("id", clientId);
+
+  // Signing in aiming for /portal — the stale-version gate diverts to /consent.
+  await page.goto(`/auth/confirm?token_hash=${tokenHash}&type=email&next=/portal`);
+  await expect(page).toHaveURL(/\/consent/);
+  // Re-consent framing (not the first-time "Before we begin" copy).
+  await expect(page.getByRole("heading", { name: /updated coaching agreement/i })).toBeVisible();
+
+  // Portal stays blocked until the client re-signs the current version.
+  await page.goto("/portal");
+  await expect(page).toHaveURL(/\/consent/);
+
+  // Re-sign the current agreement.
+  await page.getByTestId("consent-agree").check();
+  await page.getByTestId("consent-name").fill("Alex Client");
+  await page.getByTestId("consent-doc").evaluate((el) => el.scrollTo(0, el.scrollHeight));
+  await expect(page.getByTestId("consent-sign")).toBeEnabled();
+  await page.getByTestId("consent-sign").click();
+
+  // A re-signing existing client goes straight back to the portal (not the
+  // install/notification onboarding step).
+  await expect(page).toHaveURL(/\/portal/);
+
+  // History is append-only: the old v0 row is preserved and a new current-version
+  // row was added — two evidence rows for this client.
+  const { data: consents } = await service
+    .from("consents")
+    .select("doc_version, signed_at")
+    .eq("client_id", clientId)
+    .order("signed_at", { ascending: true });
+  expect(consents).toHaveLength(2);
+  expect(consents!.map((c) => c.doc_version)).toEqual(["v0", CONSENT_DOC_VERSION]);
+
+  // The denormalized version advanced to current, so the gate now lets them in.
+  const { data: client } = await service
+    .from("clients")
+    .select("consent_doc_version")
+    .eq("id", clientId)
+    .single();
+  expect(client?.consent_doc_version).toBe(CONSENT_DOC_VERSION);
+
+  await page.goto("/consent");
+  await expect(page).toHaveURL(/\/portal/);
+});

@@ -3,6 +3,7 @@
 import type { Json } from "@supertrainer/db/types";
 
 import { trackServer } from "@/lib/analytics/server";
+import { needsConsent } from "@/lib/consent/versions";
 import { getSessionClaims } from "@/lib/onboarding/state";
 import { createClient } from "@/lib/supabase/server";
 
@@ -20,19 +21,20 @@ export interface ChannelResult {
 // (requireConsentedClient / the /welcome/notifications page). Resolving purely
 // from JWT claims let an authenticated-but-unconsented client drive
 // enablePush/skipPush directly, bypassing the page's consent redirect
-// entirely. Re-checking clients.consent_signed_at here closes that gap
-// without a second DB round trip (it's one extra selected column).
+// entirely. Re-checking the client's current consent version here closes that
+// gap without a second DB round trip (it's one extra selected column). PO-3: a
+// stale material-version signer is treated as unconsented until they re-sign.
 async function ownClient() {
   const { orgId, userId, role } = await getSessionClaims();
   if (!orgId || !userId || role !== "client") return null;
   const supabase = await createClient();
   const { data } = await supabase
     .from("clients")
-    .select("id, consent_signed_at")
+    .select("id, consent_doc_version")
     .eq("profile_id", userId)
     .maybeSingle();
   if (!data) return null;
-  if (!data.consent_signed_at) return null;
+  if (needsConsent(data.consent_doc_version)) return null;
   return { clientId: data.id, orgId, supabase };
 }
 

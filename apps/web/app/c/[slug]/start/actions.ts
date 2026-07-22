@@ -2,6 +2,7 @@
 
 import { headers } from "next/headers";
 
+import { scoreLeadIntent } from "@supertrainer/ai";
 import type { Json } from "@supertrainer/db/types";
 
 import { trackServer } from "@/lib/analytics/server";
@@ -133,6 +134,31 @@ export async function submitLead(
     event: "lead_created",
     properties: { lead_id: lead.id, has_allergens: allergens.length > 0 },
   });
+
+  // PO-6: qualitative lead-intent triage (cheap Haiku classify). Best-effort —
+  // the lead is already persisted, so a scoring failure (or no API key in CI)
+  // just leaves the lead unscored; it never blocks the funnel. Bounded by the
+  // rate limits above (one classify per successfully-created lead).
+  try {
+    const a = parsed.data;
+    const intent = await scoreLeadIntent({
+      goal: a.goal,
+      experience: a.experience,
+      activity: a.activity,
+      trainingDaysPerWeek: a.trainingDaysPerWeek,
+      diet: a.diet,
+      allergenCount: allergens.length,
+    });
+    await service
+      .from("leads")
+      // Truncate here (not via a schema max that would reject a good band): the
+      // model doesn't reliably honor a length limit, so degrade to a trimmed
+      // stored value instead of dropping the whole scoring.
+      .update({ intent_band: intent.intentBand, intent_reason: intent.reason.slice(0, 240) })
+      .eq("id", lead.id);
+  } catch (err) {
+    console.error("[teaser] lead intent scoring failed (lead still created):", err);
+  }
 
   return { ok: true, leadId: lead.id };
 }

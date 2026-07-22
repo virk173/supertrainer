@@ -1,5 +1,6 @@
 "use server";
 
+import { needsConsent } from "@/lib/consent/versions";
 import { runTurn, type InterviewView } from "@/lib/interview/engine";
 import { getSessionClaims } from "@/lib/onboarding/state";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -12,20 +13,21 @@ import { createServiceClient } from "@/lib/supabase/server";
 // page). Resolving purely from JWT claims let an authenticated-but-unconsented
 // client drive the interview — including health-disclosure capture — by
 // calling sendAnswer directly, bypassing the page's consent redirect entirely.
-// Re-checking clients.consent_signed_at here closes that gap without a second
-// DB round trip (it's one extra selected column).
+// Re-checking the client's current consent version here closes that gap without
+// a second DB round trip (it's one extra selected column). PO-3: a stale
+// material-version signer is treated as unconsented until they re-sign.
 export async function ownClient() {
   const { orgId, userId, role } = await getSessionClaims();
   if (!orgId || !userId || role !== "client") return null;
   const service = createServiceClient();
   const { data } = await service
     .from("clients")
-    .select("id, intake, consent_signed_at")
+    .select("id, intake, consent_doc_version")
     .eq("profile_id", userId)
     .eq("org_id", orgId)
     .maybeSingle();
   if (!data) return null;
-  if (!data.consent_signed_at) return null;
+  if (needsConsent(data.consent_doc_version)) return null;
   return {
     orgId,
     clientId: data.id,

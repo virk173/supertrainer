@@ -2,6 +2,7 @@ import "server-only";
 
 import {
   detectHealthFlags,
+  generateClientBrief,
   interviewTurn,
   isInterviewComplete,
   nextSection,
@@ -13,6 +14,7 @@ import {
 import type { Json } from "@supertrainer/db/types";
 
 import { trackServer } from "@/lib/analytics/server";
+import { serializeIntakeForBrief, summarizeHealthFlags } from "@/lib/interview/brief";
 import { dayNumber } from "@/lib/interview/pacing";
 import { createServiceClient } from "@/lib/supabase/server";
 
@@ -57,6 +59,18 @@ export const THROTTLE_REPLY =
 // than re-posting/re-charging. Sized comfortably above one interviewTurn draft
 // call, and short enough that a crashed opener is reclaimable soon after.
 const OPENER_CLAIM_TTL_MS = 60 * 1000;
+
+// The client-brief claim's TTL (PO-5). completeIntake is reachable concurrently
+// (a completing runTurn racing the ensureInterview self-heal, two tabs), so the
+// brief's paid Sonnet call is guarded by a conditional claim on brief_generated_at
+// — same shape as the preview lock — so concurrent finalizes generate it AT MOST
+// ONCE (the loser sees the winner's fresh claim within this window and skips).
+// Unlike the preview lock, completeIntake is NOT re-entered after status flips to
+// 'complete', so the TTL does not power an automatic retry — the brief is
+// best-effort and generated once (the resilience layer already retries transient
+// API errors under the hood). Phase 7's per-client inbox is where a manual
+// "regenerate brief" would live.
+const BRIEF_CLAIM_TTL_MS = 2 * 60 * 1000;
 
 // Interview turns only. Bounded so a long thread can't unbounded-scan or ship
 // the whole history to the browser (the real, paginated thread arrives in P6.1).
@@ -420,7 +434,7 @@ async function completeIntake(
 
   const { data: client } = await service
     .from("clients")
-    .select("intake, profile_id")
+    .select("intake, profile_id, brief, health_flags")
     .eq("id", clientId)
     .maybeSingle();
 
@@ -473,4 +487,49 @@ async function completeIntake(
     .from("interview_state")
     .update({ status: "complete" })
     .eq("client_id", clientId);
+
+  // PO-5: draft the trainer's client brief. A paid draft call that must never
+  // block a completed intake, and that concurrent finalizes (a completing runTurn
+  // racing the ensureInterview self-heal, two tabs) must not each pay for. A
+  // conditional CLAIM on brief_generated_at (brief still null AND no fresh claim)
+  // serializes it — only the winner generates + stores + fires the event. The
+  // health-flag list is derived in CODE (authoritative) and stored alongside the
+  // model's neutral prose, so the model can neither drop nor invent a flag. Runs
+  // after completion is committed, so a failure here leaves a fully valid
+  // completed interview — best-effort, generated at most once (see the TTL note).
+  if (!client?.brief) {
+    const staleBefore = new Date(Date.now() - BRIEF_CLAIM_TTL_MS).toISOString();
+    const { data: briefClaim } = await service
+      .from("clients")
+      .update({ brief_generated_at: new Date().toISOString() })
+      .eq("id", clientId)
+      .is("brief", null)
+      .or(`brief_generated_at.is.null,brief_generated_at.lt.${staleBefore}`)
+      .select("id");
+    if (briefClaim && briefClaim.length > 0) {
+      try {
+        const healthFlags = summarizeHealthFlags(client?.health_flags);
+        const intakeName = (intake as Record<string, unknown>).name;
+        const draft = await generateClientBrief({
+          clientName: typeof intakeName === "string" ? intakeName : undefined,
+          intakeText: serializeIntakeForBrief(intake),
+          healthFlags,
+        });
+        await service
+          .from("clients")
+          .update({
+            brief: { ...draft, healthFlags } as Json,
+            brief_generated_at: new Date().toISOString(),
+          })
+          .eq("id", clientId);
+        await trackServer({ orgId, event: "client_brief_generated", clientId });
+      } catch (err) {
+        console.error("[interview] client brief generation failed (intake still complete):", err);
+        // Best-effort: the intake is already complete. There is no automatic retry
+        // (completeIntake isn't re-entered post-completion) — a rare permanent miss
+        // degrades to the pre-PO-5 state (the trainer reads the raw intake), and
+        // Phase 7 can add a manual regenerate.
+      }
+    }
+  }
 }

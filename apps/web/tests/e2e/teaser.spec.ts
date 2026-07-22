@@ -109,6 +109,24 @@ test("teaser: full Stage A flow persists a lead with promoted columns + answers"
     .eq("org_id", orgId)
     .eq("type", "lead_created");
   expect((events ?? []).length).toBe(1);
+
+  // PO-6: with a live key, the lead is triaged with a qualitative intent band +
+  // reason (best-effort, so this is key-gated — CI has no key and leaves the lead
+  // unscored, which must not fail the flow above). The form navigates to the
+  // preview only after submitLead fully resolves — the awaited scoring included —
+  // so waiting for that URL is a deterministic barrier past the (parallel-load-
+  // slowed) classify call before we read the committed result.
+  if (process.env.ANTHROPIC_API_KEY) {
+    await expect(page).toHaveURL(/\/c\/.+\/preview\//, { timeout: 30_000 });
+    const { data: scored } = await serviceClient()
+      .from("leads")
+      .select("intent_band, intent_reason")
+      .eq("org_id", orgId)
+      .eq("email", email)
+      .maybeSingle();
+    expect(["high", "medium", "low"]).toContain(scored?.intent_band);
+    expect((scored?.intent_reason ?? "").length).toBeGreaterThan(0);
+  }
 });
 
 test("teaser: allergies require an explicit choice — empty is blocked, 'none' proceeds", async ({

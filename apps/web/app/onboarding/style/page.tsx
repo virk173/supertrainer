@@ -22,6 +22,11 @@ export default async function StyleStepPage() {
   const confirmedDomains = profiles
     .filter((p) => p.status === "confirmed")
     .map((p) => p.domain);
+  // Confirmed profiles' data too, so the strength meter (PO-2) can render on the
+  // post-confirmation summary — not just during the draft-review step.
+  const confirmedProfiles = profiles
+    .filter((p) => p.status === "confirmed")
+    .map((p) => ({ domain: p.domain, profile: p.profile }));
 
   return (
     <main className="mx-auto min-h-screen w-full max-w-2xl px-6 py-10 sm:py-14">
@@ -46,6 +51,7 @@ export default async function StyleStepPage() {
         orgId={orgId}
         initialDrafts={drafts}
         confirmedDomains={confirmedDomains}
+        confirmedProfiles={confirmedProfiles}
       />
     </main>
   );
