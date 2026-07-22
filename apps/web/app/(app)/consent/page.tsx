@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 
 import { getOrgTheme } from "@/lib/brand/theme";
 import { CONSENT_DOC_VERSION, renderConsentDoc } from "@/lib/consent/doc";
+import { needsConsent } from "@/lib/consent/versions";
 import { getSessionClaims } from "@/lib/onboarding/state";
 import { roleHomePath } from "@/lib/routes";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -20,12 +21,16 @@ export default async function ConsentPage() {
   const service = createServiceClient();
   const { data: client } = await service
     .from("clients")
-    .select("id, consent_signed_at")
+    .select("id, consent_signed_at, consent_doc_version")
     .eq("profile_id", userId)
     .eq("org_id", orgId)
     .maybeSingle();
   if (!client) redirect("/login");
-  if (client.consent_signed_at) redirect("/portal");
+  // Only a client who still needs to (re-)sign sees the form; a client already on
+  // the current version is routed to the portal. PO-3: a prior signer on a stale
+  // material version lands here for re-consent, framed differently below.
+  if (!needsConsent(client.consent_doc_version)) redirect("/portal");
+  const isReconsent = Boolean(client.consent_signed_at);
 
   const theme = await getOrgTheme(orgId);
   const trainerName = theme?.name ?? "Your coach";
@@ -38,12 +43,20 @@ export default async function ConsentPage() {
     >
       <header className="mb-4">
         <p className="metric-label text-muted-foreground">{trainerName}</p>
-        <h1 className="text-2xl font-semibold tracking-tight">Before we begin</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">
+          {isReconsent ? "Updated coaching agreement" : "Before we begin"}
+        </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Please read and sign the coaching agreement to continue.
+          {isReconsent
+            ? "Your coach has updated the coaching agreement. Please review and re-sign to continue."
+            : "Please read and sign the coaching agreement to continue."}
         </p>
       </header>
-      <ConsentForm docText={docText} docVersion={CONSENT_DOC_VERSION} />
+      <ConsentForm
+        docText={docText}
+        docVersion={CONSENT_DOC_VERSION}
+        reconsent={isReconsent}
+      />
     </main>
   );
 }

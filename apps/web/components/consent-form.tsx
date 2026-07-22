@@ -41,9 +41,13 @@ function ConsentDoc({ text }: { text: string }) {
 export function ConsentForm({
   docText,
   docVersion,
+  reconsent = false,
 }: {
   docText: string;
   docVersion: string;
+  // PO-3: a re-signing existing client is already past onboarding — return them
+  // to the portal rather than through the install/notification step again.
+  reconsent?: boolean;
 }) {
   const router = useRouter();
   const scrollRef = React.useRef<HTMLDivElement>(null);
@@ -88,9 +92,9 @@ export function ConsentForm({
       setError(result.message ?? "Couldn't record your consent.");
       return;
     }
-    // Next funnel step: install + notification permission (Phase 2.4). Skippable
-    // there, so the portal is reachable either way.
-    router.push("/welcome/notifications");
+    // First-time signers continue to install + notification permission
+    // (Phase 2.4, skippable). A re-consent (PO-3) returns straight to the portal.
+    router.push(reconsent ? "/portal" : "/welcome/notifications");
   }
 
   return (

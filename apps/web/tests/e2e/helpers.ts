@@ -2,6 +2,8 @@ import { randomUUID } from "node:crypto";
 
 import { createSupabaseServiceRoleClient } from "@supertrainer/db/server";
 
+import { CONSENT_DOC_VERSION } from "../../lib/consent/template";
+
 const MAILPIT_URL = "http://127.0.0.1:54324";
 
 // Standing rule 1: all Supabase clients come from packages/db, tests included.
@@ -100,12 +102,17 @@ export async function seedTrainer(
 }
 
 // Marks a seeded client as having signed consent (Phase 2.3), so tests that
-// exercise the portal itself skip past the blocking consent gate.
+// exercise the portal itself skip past the blocking consent gate. Records the
+// CURRENT doc version so the PO-3 re-consent gate treats them as up to date.
 export async function consentClient(profileId: string): Promise<void> {
   const service = serviceClient();
   await service
     .from("clients")
-    .update({ consent_signed_at: new Date().toISOString(), consent_doc_hash: "test-hash" })
+    .update({
+      consent_signed_at: new Date().toISOString(),
+      consent_doc_hash: "test-hash",
+      consent_doc_version: CONSENT_DOC_VERSION,
+    })
     .eq("profile_id", profileId);
 }
 

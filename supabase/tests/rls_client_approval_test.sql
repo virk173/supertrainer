@@ -6,7 +6,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(3);
+select plan(4);
 
 insert into auth.users (id, email, aud, role) values
   ('a0000000-0000-0000-0000-000000000001', 'owner-a@test.local', 'authenticated', 'authenticated'),
@@ -50,6 +50,15 @@ select throws_like(
      where id = 'd0000000-0000-0000-0000-000000000001' $$,
   '%restricted columns%',
   'client cannot change their own status'
+);
+
+-- Self-bumping the signed consent version is blocked (PO-3): a client must not
+-- be able to fake being current on a new material consent doc to dodge re-sign.
+select throws_like(
+  $$ update public.clients set consent_doc_version = 'v99'
+     where id = 'd0000000-0000-0000-0000-000000000001' $$,
+  '%restricted columns%',
+  'client cannot set consent_doc_version'
 );
 
 select finish();

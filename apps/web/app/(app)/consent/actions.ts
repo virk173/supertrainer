@@ -75,10 +75,16 @@ export async function recordConsent(
   }
 
   // Denormalized flags the portal guard reads (service role — these are
-  // client-restricted columns).
+  // client-restricted columns). consent_doc_version drives the PO-3 re-sign gate:
+  // it records which version this signature satisfies. On a re-sign it advances to
+  // the current version while the consents row above preserves the full history.
   await service
     .from("clients")
-    .update({ consent_signed_at: signedAt, consent_doc_hash: docSha256 })
+    .update({
+      consent_signed_at: signedAt,
+      consent_doc_hash: docSha256,
+      consent_doc_version: CONSENT_DOC_VERSION,
+    })
     .eq("id", client.id);
 
   // PDF copy → storage + email. Best-effort; never blocks the client.

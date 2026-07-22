@@ -89,6 +89,7 @@ export type Database = {
         Row: {
           approved_manually: boolean
           consent_doc_hash: string | null
+          consent_doc_version: string | null
           consent_signed_at: string | null
           created_at: string
           health_flags: Json
@@ -106,6 +107,7 @@ export type Database = {
         Insert: {
           approved_manually?: boolean
           consent_doc_hash?: string | null
+          consent_doc_version?: string | null
           consent_signed_at?: string | null
           created_at?: string
           health_flags?: Json
@@ -123,6 +125,7 @@ export type Database = {
         Update: {
           approved_manually?: boolean
           consent_doc_hash?: string | null
+          consent_doc_version?: string | null
           consent_signed_at?: string | null
           created_at?: string
           health_flags?: Json

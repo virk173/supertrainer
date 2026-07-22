@@ -2,6 +2,7 @@ import "server-only";
 
 import { redirect } from "next/navigation";
 
+import { needsConsent } from "@/lib/consent/versions";
 import { getSessionClaims } from "@/lib/onboarding/state";
 import { roleHomePath } from "@/lib/routes";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -26,12 +27,14 @@ export async function requireConsentedClient(): Promise<ConsentedClient> {
   const service = createServiceClient();
   const { data: client } = await service
     .from("clients")
-    .select("id, consent_signed_at, intake")
+    .select("id, consent_doc_version, intake")
     .eq("profile_id", userId)
     .eq("org_id", orgId)
     .maybeSingle();
   if (!client) redirect("/login");
-  if (!client.consent_signed_at) redirect("/consent");
+  // Redirects when the client has never signed OR signed a stale material
+  // version (PO-3 re-consent) — the /consent page frames the two cases.
+  if (needsConsent(client.consent_doc_version)) redirect("/consent");
 
   return {
     orgId,
