@@ -949,32 +949,47 @@ export type Database = {
       messages: {
         Row: {
           body: string | null
+          body_tsv: unknown
           client_id: string
+          client_tag: string | null
           created_at: string
+          delivered_at: string | null
           id: string
-          kind: string
+          kind: Database["public"]["Enums"]["message_kind"]
           org_id: string
           payload: Json
+          read_at: string | null
+          reply_to: string | null
           sender: Database["public"]["Enums"]["message_sender"]
         }
         Insert: {
           body?: string | null
+          body_tsv?: unknown
           client_id: string
+          client_tag?: string | null
           created_at?: string
+          delivered_at?: string | null
           id?: string
-          kind?: string
+          kind?: Database["public"]["Enums"]["message_kind"]
           org_id: string
           payload?: Json
+          read_at?: string | null
+          reply_to?: string | null
           sender: Database["public"]["Enums"]["message_sender"]
         }
         Update: {
           body?: string | null
+          body_tsv?: unknown
           client_id?: string
+          client_tag?: string | null
           created_at?: string
+          delivered_at?: string | null
           id?: string
-          kind?: string
+          kind?: Database["public"]["Enums"]["message_kind"]
           org_id?: string
           payload?: Json
+          read_at?: string | null
+          reply_to?: string | null
           sender?: Database["public"]["Enums"]["message_sender"]
         }
         Relationships: [
@@ -990,6 +1005,13 @@ export type Database = {
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_reply_to_fkey"
+            columns: ["reply_to"]
+            isOneToOne: false
+            referencedRelation: "messages"
             referencedColumns: ["id"]
           },
         ]
@@ -2084,6 +2106,15 @@ export type Database = {
       lead_status: "started" | "preview_shown" | "converted" | "expired"
       meal_log_method: "text" | "photo" | "voice"
       meal_slot: "breakfast" | "lunch" | "dinner" | "snack" | "other"
+      message_kind:
+        | "text"
+        | "voice"
+        | "photo"
+        | "card"
+        | "plan_delivery"
+        | "log_confirmation"
+        | "reminder"
+        | "interview"
       message_sender: "client" | "coach" | "system" | "assistant"
       movement_pattern:
         | "squat"
@@ -2283,6 +2314,16 @@ export const Constants = {
       lead_status: ["started", "preview_shown", "converted", "expired"],
       meal_log_method: ["text", "photo", "voice"],
       meal_slot: ["breakfast", "lunch", "dinner", "snack", "other"],
+      message_kind: [
+        "text",
+        "voice",
+        "photo",
+        "card",
+        "plan_delivery",
+        "log_confirmation",
+        "reminder",
+        "interview",
+      ],
       message_sender: ["client", "coach", "system", "assistant"],
       movement_pattern: [
         "squat",
