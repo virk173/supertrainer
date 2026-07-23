@@ -5,6 +5,7 @@ import { ledgerDaysInRange } from "@supertrainer/db/queries";
 
 import { ClientScoreCard } from "@/components/client-score-card";
 import { DailyLog, type DailyState } from "@/components/daily-log";
+import { ReminderVacationToggle } from "@/components/reminder-vacation-toggle";
 import { getCurrentClientContext, tzDate } from "@/lib/ledger/log";
 import { computeClientLens, type ClientLens, type LedgerDayRow } from "@/lib/ledger/score";
 import { getSessionClaims } from "@/lib/onboarding/state";
@@ -66,8 +67,25 @@ async function clientLens(): Promise<ClientLens | null> {
   return computeClientLens(rows as unknown as LedgerDayRow[]);
 }
 
+// Are the client's reminders currently paused (vacation mode)? True only when
+// they have rules and all of them are disabled.
+async function remindersPaused(): Promise<boolean> {
+  const ctx = await getCurrentClientContext();
+  if (!ctx) return false;
+  const { data } = await createServiceClient()
+    .from("reminder_rules")
+    .select("enabled")
+    .eq("client_id", ctx.clientId);
+  return Boolean(data && data.length > 0 && data.every((r) => !r.enabled));
+}
+
 export default async function PortalHomePage() {
-  const [pending, daily, lens] = await Promise.all([interviewPending(), todayState(), clientLens()]);
+  const [pending, daily, lens, paused] = await Promise.all([
+    interviewPending(),
+    todayState(),
+    clientLens(),
+    remindersPaused(),
+  ]);
 
   return (
     <div className="space-y-4">
@@ -140,6 +158,10 @@ export default async function PortalHomePage() {
         >
           <Camera className="size-4" /> Progress photos
         </Link>
+      </div>
+
+      <div className="pt-1">
+        <ReminderVacationToggle initialPaused={paused} />
       </div>
     </div>
   );

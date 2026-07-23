@@ -818,6 +818,60 @@ export type Database = {
           },
         ]
       }
+      notifications: {
+        Row: {
+          channel: Database["public"]["Enums"]["notif_channel"]
+          client_id: string
+          created_at: string
+          dedupe_key: string
+          id: string
+          kind: string
+          org_id: string
+          payload: Json
+          status: Database["public"]["Enums"]["notif_status"]
+          updated_at: string
+        }
+        Insert: {
+          channel: Database["public"]["Enums"]["notif_channel"]
+          client_id: string
+          created_at?: string
+          dedupe_key: string
+          id?: string
+          kind: string
+          org_id: string
+          payload?: Json
+          status?: Database["public"]["Enums"]["notif_status"]
+          updated_at?: string
+        }
+        Update: {
+          channel?: Database["public"]["Enums"]["notif_channel"]
+          client_id?: string
+          created_at?: string
+          dedupe_key?: string
+          id?: string
+          kind?: string
+          org_id?: string
+          payload?: Json
+          status?: Database["public"]["Enums"]["notif_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       org_onboarding_state: {
         Row: {
           completed_at: string | null
@@ -1124,6 +1178,57 @@ export type Database = {
           },
           {
             foreignKeyName: "push_subscriptions_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      reminder_rules: {
+        Row: {
+          client_id: string
+          created_at: string
+          enabled: boolean
+          id: string
+          kind: Database["public"]["Enums"]["reminder_kind"]
+          org_id: string
+          quiet_hours: Json
+          schedule: Json
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          kind: Database["public"]["Enums"]["reminder_kind"]
+          org_id: string
+          quiet_hours?: Json
+          schedule?: Json
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          kind?: Database["public"]["Enums"]["reminder_kind"]
+          org_id?: string
+          quiet_hours?: Json
+          schedule?: Json
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reminder_rules_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reminder_rules_org_id_fkey"
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "orgs"
@@ -1584,6 +1689,8 @@ export type Database = {
       meal_log_method: "text" | "photo" | "voice"
       meal_slot: "breakfast" | "lunch" | "dinner" | "snack" | "other"
       message_sender: "client" | "coach" | "system" | "assistant"
+      notif_channel: "push" | "email" | "in_app"
+      notif_status: "queued" | "sent" | "delivered" | "failed"
       notification_channel: "push" | "email_only"
       onboarding_step:
         | "brand"
@@ -1598,6 +1705,7 @@ export type Database = {
       plan_request_status: "queued" | "running" | "drafted" | "failed"
       plan_trigger: "onboarding" | "monthly" | "manual"
       progress_pose: "front" | "side" | "back"
+      reminder_kind: "meal" | "weigh_in" | "checkin" | "custom"
       style_domain: "diet" | "training" | "voice"
       style_exemplar_source: "upload" | "edit_capture"
       style_profile_status: "draft" | "confirmed"
@@ -1755,6 +1863,8 @@ export const Constants = {
       meal_log_method: ["text", "photo", "voice"],
       meal_slot: ["breakfast", "lunch", "dinner", "snack", "other"],
       message_sender: ["client", "coach", "system", "assistant"],
+      notif_channel: ["push", "email", "in_app"],
+      notif_status: ["queued", "sent", "delivered", "failed"],
       notification_channel: ["push", "email_only"],
       onboarding_step: ["brand", "style", "tiers", "import", "demo", "invite"],
       onboarding_step_status: ["todo", "done", "skipped"],
@@ -1763,6 +1873,7 @@ export const Constants = {
       plan_request_status: ["queued", "running", "drafted", "failed"],
       plan_trigger: ["onboarding", "monthly", "manual"],
       progress_pose: ["front", "side", "back"],
+      reminder_kind: ["meal", "weigh_in", "checkin", "custom"],
       style_domain: ["diet", "training", "voice"],
       style_exemplar_source: ["upload", "edit_capture"],
       style_profile_status: ["draft", "confirmed"],

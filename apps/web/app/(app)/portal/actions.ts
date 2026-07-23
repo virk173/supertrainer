@@ -6,6 +6,7 @@ import { z } from "zod";
 
 import { trackServer } from "@/lib/analytics/server";
 import { toKg, type CheckinStatus } from "@/lib/ledger/checkin";
+import { setReminderVacation } from "@/lib/reminders/rules";
 import { getCurrentClientContext, tzDate } from "@/lib/ledger/log";
 import {
   upsertCheckin,
@@ -108,4 +109,12 @@ export async function saveProgressPhotoAction(input: z.infer<typeof ProgressPhot
   await upsertProgressPhoto(db, c, { pose, path });
   await trackServer({ orgId: c.orgId, clientId: c.clientId, event: "progress_photo_uploaded", properties: { pose } });
   return { ok: true as const, path };
+}
+
+// Kill switch: a client pausing/resuming their own reminders (vacation mode).
+export async function setReminderVacationAction(paused: boolean) {
+  const { db, c } = await ctx();
+  await setReminderVacation(db, c.clientId, paused);
+  await trackServer({ orgId: c.orgId, clientId: c.clientId, event: "reminders_vacation", properties: { paused } });
+  return { ok: true as const, paused };
 }
