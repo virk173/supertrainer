@@ -8,3 +8,19 @@ export { mifflinStJeorBMR, activityFactor, tdee } from "./tdee";
 export { calculateTargets } from "./targets";
 export { compileConstraints } from "./constraints";
 export { parseIntake, type ParseIntakeResult } from "./parse";
+export {
+  KCAL_TOLERANCE_PCT,
+  PROTEIN_TOLERANCE_G,
+  macrosForGrams,
+  validatePlanVersion,
+  assembleMeals,
+  fitPortions,
+  type FoodMacroRow,
+  type PlannedItem,
+  type PlannedMeal,
+  type PlannedDayType,
+  type PlanVersionInput,
+  type ComputedMacros,
+  type DayTypeValidation,
+  type ValidationResult,
+} from "./validator";

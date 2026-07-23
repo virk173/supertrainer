@@ -30,6 +30,32 @@ export function currentAiTask(): AiTask | undefined {
   return taskStore.getStore();
 }
 
+// ── Per-plan trace grouping (Phase 4.2) ──────────────────────────────────────
+// Groups every generation a multi-agent run makes under one Langfuse trace
+// (one trace per plan; each agent call is a generation/span under it, with cost
+// auto-derived by Langfuse). No-ops entirely without credentials.
+
+const traceStore = new AsyncLocalStorage<{ traceId: string }>();
+
+export async function withPlanTrace<T>(
+  meta: { name: string; metadata?: Record<string, unknown> },
+  fn: () => Promise<T>,
+): Promise<T> {
+  const client = getLangfuse();
+  if (!client) return fn();
+  let traceId: string | undefined;
+  try {
+    traceId = client.trace({ name: meta.name, metadata: meta.metadata }).id;
+  } catch {
+    // tracing must never break the pipeline
+  }
+  return traceId ? traceStore.run({ traceId }, fn) : fn();
+}
+
+function currentTraceId(): string | undefined {
+  return traceStore.getStore()?.traceId;
+}
+
 // ── Langfuse client (lazy, credential-gated singleton) ───────────────────────
 
 // undefined = not yet resolved, null = disabled (no credentials).
@@ -89,6 +115,7 @@ export function recordGeneration(record: GenerationRecord): void {
           }
         : undefined;
 
+    const traceId = currentTraceId();
     client.generation({
       name: record.task ? `claude:${record.task}` : "claude",
       model: record.model,
@@ -97,6 +124,7 @@ export function recordGeneration(record: GenerationRecord): void {
       input: record.input,
       output: record.output,
       ...(usageDetails ? { usageDetails } : {}),
+      ...(traceId ? { traceId } : {}),
       ...(record.task ? { metadata: { task: record.task } } : {}),
       level: record.error ? "ERROR" : "DEFAULT",
       ...(record.error ? { statusMessage: String(record.error) } : {}),
