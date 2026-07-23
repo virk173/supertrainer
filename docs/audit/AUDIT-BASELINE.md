@@ -1,8 +1,10 @@
-# Audit baseline — Phases 0–3 (Adherence Ledger shipped)
+# Audit baseline — Phases 0–4 (Diet Plan Generator shipped)
 
-**Baseline commit:** `2baacaf` (main, 2026-07-23) — "Phase 3 — Adherence Ledger (#10)". (Prior baselines: `8748b59` audit PROPOSE-ONLY features #8; `1e63677` pre–Phase 3 hardening #7.)
+**Baseline commit:** `7bd1aeb` (main, 2026-07-23) — "Phase 4 — Diet Plan Generator (#14)". (Prior baselines: `2baacaf` Phase 3 Adherence Ledger #10; `8748b59` audit PROPOSE-ONLY features #8; `1e63677` pre–Phase 3 hardening #7.)
 
-Phase 3 (the whole Adherence Ledger: verified nutrition DB, meal/photo/voice logging, weigh-ins/check-ins/working-sets/photos, timezone-correct day-close & auto-miss, two-lens scoring/streaks/comeback/banking, reminder engine) shipped green (pgTAP 124 → 183; new `packages/scoring`; ~14 new tables) after a **max-effort code review** whose findings were all fixed and re-verified (notably an allergen-tagging fail-open, a photo-bucket tenancy hole, and two feature-breaking reminder bugs). So this baseline now covers **everything through PR #10**; future audits diff from here.
+Phase 4 (the whole Diet Plan Generator: `packages/nutrition-engine` coded TDEE/macro engine + validator + fitPortions; the multi-agent `diet-pipeline` with coded validation and a deterministic fallback; trainer review/edit + edit-capture + approve→plans_active/supersede; the ledger-informed monthly adjustment loop; client delivery — portal plan, grocery list, react-pdf, fasting counter) shipped green (pgTAP 183 → 198; new `packages/nutrition-engine`; 2 new tables — `plans`, `draft_edits`) after a **high-effort code review** whose 5 findings were all fixed and re-verified (a carb-cycle adjustment-anchor bug, a wrap-around fasting-window bug, reject-note-not-injected, an N+1 in the renewal scheduler, and dead code). So this baseline now covers **everything through PR #14**; future audits diff from here (start from `7bd1aeb` for Phase 5).
+
+Phase 3 (the whole Adherence Ledger: verified nutrition DB, meal/photo/voice logging, weigh-ins/check-ins/working-sets/photos, timezone-correct day-close & auto-miss, two-lens scoring/streaks/comeback/banking, reminder engine) shipped green (pgTAP 124 → 183; new `packages/scoring`; ~14 new tables) after a **max-effort code review** whose findings were all fixed and re-verified (notably an allergen-tagging fail-open, a photo-bucket tenancy hole, and two feature-breaking reminder bugs).
 
 ## What this baseline means
 
@@ -14,7 +16,7 @@ The baseline then **advanced through the 6 audit PROPOSE-ONLY features (PO-1…P
 
 **Never re-audit Phases 0–2.** Every future hardening audit is **scoped to the NEW work only** — the diff since this baseline (or the phase's own added/changed files). To audit a later phase:
 
-- Establish the diff to review: `git diff <baseline-or-prev-phase-merge>..HEAD` (start from `2baacaf` for Phase 4), or the phase's file set. Do NOT read/scan Phases 0–3 code except where the new phase directly touches it.
+- Establish the diff to review: `git diff <baseline-or-prev-phase-merge>..HEAD` (start from `7bd1aeb` for Phase 5), or the phase's file set. Do NOT read/scan Phases 0–4 code except where the new phase directly touches it.
 - Advance this baseline after each phase's audit ships: update the "Baseline commit" above to the phase's merge commit so the next audit starts from there.
 
 ## Reusable phase-scoped audit prompt
