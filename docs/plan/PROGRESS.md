@@ -112,6 +112,15 @@ Deep multi-agent audit of Phases 0–2 + backstops (adversarially verified; repo
 
 **This is the AUDIT BASELINE** (`docs/audit/AUDIT-BASELINE.md`): future hardening audits scope ONLY to new-phase diffs vs `1e63677` — Phases 0–2 are NOT re-audited.
 
-**6 PROPOSE-ONLY features (PO-1…PO-6)** from the audit are NOT built (owner's product call). To build them: run `docs/audit/apply-po-features.md`. Most map to planned phases (PO-1/5/6 → P7, PO-4 → P6/P9); PO-3 (consent re-sign on version bump) is the one worth earlier attention (compliance).
+## Audit PROPOSE-ONLY features (PO-1…PO-6) — SHIPPED (2026-07-22, PR #8, commit `8748b59`)
+Built the 6 PROPOSE-ONLY features from the pre-Phase-3 audit (spec `docs/audit/apply-po-features.md`), one commit each off baseline `1e63677`:
+- **PO-3** consent re-sign on material doc-version bump (code version registry; `clients.consent_doc_version` backfilled + guarded; v1 dormant, zero current clients re-sign).
+- **PO-5** auto client brief on Stage B completion (`clients.brief`; neutral-voice draft, health flags code-derived, PII dropped from the prompt; best-effort claim-guarded).
+- **PO-6** lead-intent scoring on teaser submit (`leads.intent_band` enum + `intent_reason`; qualitative only; best-effort).
+- **PO-1** trainer `/trainer/prospects` pipeline (reuses leads RLS; "convert manually" = CAS-guarded inline invite).
+- **PO-2** style-strength/coverage meter (`lib/style/coverage.ts`, code-computed; additive re-extraction, corpus-capped).
+- **PO-4** AI resilience in modelRouter/zodOutput (`packages/ai/resilience.ts`: retry/backoff + Sonnet→Haiku fallback + per-model circuit breakers + `isAiDegraded()` funnel flag).
+
+3 new migrations (`consent_doc_version`, `client_brief`, `lead_intent`). Reviewed in 3 passes — max-effort `/code-review` (12 fixes) + `/security-review` (clean) + a second local max-effort pass (4 more fixes, incl. a circuit-breaker probe-leak) — all fixed. Green: typecheck 4/4 · lint · **pgTAP 124** · **Playwright 106**; PR #8 CI green; squash-merged to main. **This is the new AUDIT BASELINE** (`docs/audit/AUDIT-BASELINE.md`, `8748b59`).
 
 **Next build phase: Phase 3 — Adherence Ledger** (`docs/plan/PHASE-3-adherence-ledger.md`).
