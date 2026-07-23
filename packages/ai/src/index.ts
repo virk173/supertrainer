@@ -110,3 +110,17 @@ export {
   type VoiceProfile,
   type StyleProfileByDomain,
 } from "./style/schemas";
+export {
+  ParsedMealItemSchema,
+  ParsedMealSchema,
+  type ParsedMealItem,
+  type ParsedMeal,
+  parseMealText,
+  proposeMealFromPhoto,
+} from "./meal";
+export {
+  type SttMediaType,
+  SttNotConfiguredError,
+  transcribeAudio,
+  isSttConfigured,
+} from "./voice";

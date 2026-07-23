@@ -602,6 +602,72 @@ export type Database = {
           },
         ]
       }
+      meal_logs: {
+        Row: {
+          client_id: string
+          confirmed: boolean
+          created_at: string
+          id: string
+          items: Json
+          logged_at: string
+          meal_slot: Database["public"]["Enums"]["meal_slot"]
+          method: Database["public"]["Enums"]["meal_log_method"]
+          org_id: string
+          photo_path: string | null
+          raw_input: string | null
+          totals: Json
+          tz_date: string
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          confirmed?: boolean
+          created_at?: string
+          id?: string
+          items?: Json
+          logged_at?: string
+          meal_slot: Database["public"]["Enums"]["meal_slot"]
+          method: Database["public"]["Enums"]["meal_log_method"]
+          org_id: string
+          photo_path?: string | null
+          raw_input?: string | null
+          totals?: Json
+          tz_date: string
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          confirmed?: boolean
+          created_at?: string
+          id?: string
+          items?: Json
+          logged_at?: string
+          meal_slot?: Database["public"]["Enums"]["meal_slot"]
+          method?: Database["public"]["Enums"]["meal_log_method"]
+          org_id?: string
+          photo_path?: string | null
+          raw_input?: string | null
+          totals?: Json
+          tz_date?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meal_logs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meal_logs_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       messages: {
         Row: {
           body: string | null
@@ -759,6 +825,63 @@ export type Database = {
           },
           {
             foreignKeyName: "plan_requests_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      plans_active: {
+        Row: {
+          client_id: string
+          created_at: string
+          day_types: Json
+          effective_from: string | null
+          fast_window: Json | null
+          meal_slots: Json
+          org_id: string
+          plan_id: string | null
+          schedule: Json
+          targets: Json
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          day_types?: Json
+          effective_from?: string | null
+          fast_window?: Json | null
+          meal_slots?: Json
+          org_id: string
+          plan_id?: string | null
+          schedule?: Json
+          targets?: Json
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          day_types?: Json
+          effective_from?: string | null
+          fast_window?: Json | null
+          meal_slots?: Json
+          org_id?: string
+          plan_id?: string | null
+          schedule?: Json
+          targets?: Json
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plans_active_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plans_active_org_id_fkey"
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "orgs"
@@ -1106,6 +1229,8 @@ export type Database = {
       invite_channel: "copy_link" | "email"
       lead_intent_band: "high" | "medium" | "low"
       lead_status: "started" | "preview_shown" | "converted" | "expired"
+      meal_log_method: "text" | "photo" | "voice"
+      meal_slot: "breakfast" | "lunch" | "dinner" | "snack" | "other"
       message_sender: "client" | "coach" | "system" | "assistant"
       notification_channel: "push" | "email_only"
       onboarding_step:
@@ -1271,6 +1396,8 @@ export const Constants = {
       invite_channel: ["copy_link", "email"],
       lead_intent_band: ["high", "medium", "low"],
       lead_status: ["started", "preview_shown", "converted", "expired"],
+      meal_log_method: ["text", "photo", "voice"],
+      meal_slot: ["breakfast", "lunch", "dinner", "snack", "other"],
       message_sender: ["client", "coach", "system", "assistant"],
       notification_channel: ["push", "email_only"],
       onboarding_step: ["brand", "style", "tiers", "import", "demo", "invite"],

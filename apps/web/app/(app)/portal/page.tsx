@@ -1,7 +1,5 @@
 import Link from "next/link";
-import { MessageCircle, Sun } from "lucide-react";
-
-import { EmptyState } from "@supertrainer/ui/components/empty-state";
+import { MessageCircle, UtensilsCrossed } from "lucide-react";
 
 import { getSessionClaims } from "@/lib/onboarding/state";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -66,11 +64,27 @@ export default async function PortalHomePage() {
         </Link>
       )}
 
-      <EmptyState
-        icon={<Sun />}
-        title="Nothing to log yet"
-        description="Your trainer is setting things up. Your plan and daily check-ins will appear here."
-      />
+      <Link
+        href="/portal/log"
+        data-testid="log-meal-cta"
+        className="flex items-center gap-3 rounded-lg border bg-surface-raised p-4 transition-colors hover:bg-surface"
+      >
+        <span
+          className="flex size-9 shrink-0 items-center justify-center rounded-lg"
+          style={{
+            background: "var(--brand-primary, var(--color-primary))",
+            color: "var(--brand-on-primary, var(--color-primary-foreground))",
+          }}
+        >
+          <UtensilsCrossed className="size-4" />
+        </span>
+        <span>
+          <span className="block text-sm font-medium">Log a meal</span>
+          <span className="block text-sm text-muted-foreground">
+            Snap it, say it, or type it — takes about ten seconds.
+          </span>
+        </span>
+      </Link>
     </div>
   );
 }
