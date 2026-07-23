@@ -131,6 +131,26 @@ export async function runDietPipeline(
     bannedFoods: styleProfile?.bannedFoods,
   });
 
+  // A manual re-run after a reject-with-note: fold the trainer's note into the
+  // constraints the structure/recipe agents obey, so the rejection actually
+  // steers regeneration (the note is stored on the just-archived plan).
+  if (req.trigger === "manual") {
+    const { data: rejected } = await service
+      .from("plans")
+      .select("content")
+      .eq("client_id", client.id)
+      .eq("status", "archived")
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const note = (rejected?.content as { rejectNote?: string } | null)?.rejectNote;
+    if (note) {
+      constraints.dietaryNotes = [constraints.dietaryNotes, `Trainer note: ${note}`]
+        .filter(Boolean)
+        .join("; ");
+    }
+  }
+
   const { data: foods } = await service
     .from("foods")
     .select(POOL_FOOD_COLUMNS)

@@ -23,17 +23,20 @@ export async function enqueueRenewals(
     .lte("effective_from", cutoff);
 
   const rows = due ?? [];
+  if (rows.length === 0) return { due: 0, queued: 0 };
+
+  // One query for every diet request already in flight, rather than one per
+  // client — the loop below just checks membership.
+  const { data: inflight } = await service
+    .from("plan_requests")
+    .select("client_id")
+    .eq("kind", "diet")
+    .in("status", ["queued", "running"]);
+  const busy = new Set((inflight ?? []).map((r) => r.client_id));
+
   let queued = 0;
   for (const row of rows) {
-    // Skip clients that already have a diet request in flight.
-    const { count } = await service
-      .from("plan_requests")
-      .select("id", { count: "exact", head: true })
-      .eq("client_id", row.client_id)
-      .eq("kind", "diet")
-      .in("status", ["queued", "running"]);
-    if (count && count > 0) continue;
-
+    if (busy.has(row.client_id)) continue;
     const { error } = await service.from("plan_requests").insert({
       org_id: row.org_id,
       client_id: row.client_id,
@@ -41,7 +44,10 @@ export async function enqueueRenewals(
       trigger: "monthly",
       status: "queued",
     });
-    if (!error) queued += 1;
+    if (!error) {
+      queued += 1;
+      busy.add(row.client_id); // guard against duplicate plans_active rows for one client
+    }
   }
   return { due: rows.length, queued };
 }

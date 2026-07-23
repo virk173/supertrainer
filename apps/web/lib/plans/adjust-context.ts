@@ -67,12 +67,15 @@ export async function compileAdjustmentContext(
     .limit(1)
     .maybeSingle();
   const dayTypes = (plan?.day_types as DayTypeTarget[] | null) ?? [];
-  const standard = dayTypes[0];
-  const currentKcal = standard?.kcal ?? 0;
-  const currentProtein = standard?.protein_g ?? Math.round(1.6 * parsed.intake.weightKg);
+  // Anchor on the AVERAGE day-type kcal (≈ the primary/maintenance day), not
+  // day_types[0] — for a carb-cycle plan [0] is the HIGH day, which would inflate
+  // every monthly adjustment. Protein is held constant across day types.
+  const currentKcal = dayTypes.length
+    ? Math.round(dayTypes.reduce((s, d) => s + d.kcal, 0) / dayTypes.length)
+    : 0;
+  const currentProtein = dayTypes[0]?.protein_g ?? Math.round(1.6 * parsed.intake.weightKg);
 
   const from = new Date(asOf.getTime() - WINDOW_DAYS * 86400000).toISOString().slice(0, 10);
-  const to = asOf.toISOString().slice(0, 10);
 
   const { data: weighIns } = await service
     .from("weigh_ins")
@@ -118,7 +121,6 @@ export async function compileAdjustmentContext(
   const expectedRatePctPerWeek =
     goal === "lose_fat" ? DEFAULT_CUT_RATE_PCT_PER_WEEK : goal === "build_muscle" ? DEFAULT_BULK_RATE_PCT_PER_WEEK : 0;
 
-  void to;
   return {
     currentPlanId: plan?.id ?? null,
     context: {

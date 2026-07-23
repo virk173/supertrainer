@@ -87,6 +87,15 @@ test("after the window closes → fasting until tomorrow's open", () => {
   expect(s.minutesUntilChange).toBe(hm(14)); // 22:00 → 12:00 next day
 });
 
+test("a wrap-around window (20:00–04:00) is handled correctly", () => {
+  const eating = fastingState({ start: "20:00", end: "04:00" }, hm(22));
+  expect(eating.state).toBe("eating");
+  expect(eating.minutesUntilChange).toBe(hm(6)); // 22:00 → 04:00
+  const fasting = fastingState({ start: "20:00", end: "04:00" }, hm(10));
+  expect(fasting.state).toBe("fasting");
+  expect(fasting.minutesUntilChange).toBe(hm(10)); // 10:00 → 20:00
+});
+
 // ── Branded PDF ───────────────────────────────────────────────────────────────
 test("renders a valid branded plan PDF with the neutral footer", async () => {
   const buffer = await renderPlanPdf({

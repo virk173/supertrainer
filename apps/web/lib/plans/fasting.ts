@@ -30,14 +30,14 @@ export function fastingState(window: FastWindow, nowMinutes: number): FastStatus
   const end = toMinutes(window.end);
   const now = ((nowMinutes % DAY) + DAY) % DAY;
 
-  // Standard non-wrapping window (eating window doesn't cross midnight for IF).
-  if (now >= start && now < end) {
-    return { state: "eating", minutesUntilChange: end - now, nextChangeMinutes: end };
+  // Handle a window that crosses midnight (end < start, e.g. 20:00–04:00) as well
+  // as the common same-day window.
+  const inWindow = start <= end ? now >= start && now < end : now >= start || now < end;
+
+  if (inWindow) {
+    const untilClose = now < end ? end - now : DAY - now + end;
+    return { state: "eating", minutesUntilChange: untilClose, nextChangeMinutes: now + untilClose };
   }
-  if (now < start) {
-    return { state: "fasting", minutesUntilChange: start - now, nextChangeMinutes: start };
-  }
-  // After close → fasting until tomorrow's open.
-  const untilOpen = DAY - now + start;
+  const untilOpen = now < start ? start - now : DAY - now + start;
   return { state: "fasting", minutesUntilChange: untilOpen, nextChangeMinutes: now + untilOpen };
 }
