@@ -23,6 +23,19 @@ export function labelFrequency(schedule: Schedule): Map<string, number> {
   return freq;
 }
 
+// Each day paired with how many times per week it is trained. With a schedule,
+// days are weighted by their weekday frequency; without one (an un-scheduled
+// draft), each distinct day counts once. The shared basis for all weekly totals.
+function scheduledOccurrences(days: SplitDay[], schedule: Schedule): [SplitDay, number][] {
+  const byLabel = new Map(days.map((d) => [d.label, d]));
+  const freq = labelFrequency(schedule);
+  if (freq.size === 0) return days.map((d) => [d, 1]);
+  return [...freq].flatMap(([label, n]) => {
+    const d = byLabel.get(label);
+    return d ? ([[d, n]] as [SplitDay, number][]) : [];
+  });
+}
+
 // Direct working sets contributed to each muscle by a single day's exercises.
 // Counts PRIMARY muscles at full sets — the standard "hard sets per muscle"
 // metric the MEV/MRV landmarks are defined on. Synergist (secondary) work is
@@ -53,20 +66,8 @@ export function weeklySetVolume(
   schedule: Schedule,
   idx: Map<string, ExerciseMeta>,
 ): Map<MuscleGroup, number> {
-  const byLabel = new Map(days.map((d) => [d.label, d]));
-  const freq = labelFrequency(schedule);
   const weekly = new Map<MuscleGroup, number>();
-
-  // If a schedule is present, weight days by how often they're trained; otherwise
-  // fall back to one occurrence per distinct day (an un-scheduled draft).
-  const occurrences: [SplitDay, number][] = freq.size
-    ? [...freq].flatMap(([label, n]) => {
-        const d = byLabel.get(label);
-        return d ? ([[d, n]] as [SplitDay, number][]) : [];
-      })
-    : days.map((d) => [d, 1] as [SplitDay, number]);
-
-  for (const [day, n] of occurrences) {
+  for (const [day, n] of scheduledOccurrences(days, schedule)) {
     for (const [muscle, s] of daySetsPerMuscle(day, idx)) {
       weekly.set(muscle, (weekly.get(muscle) ?? 0) + s * n);
     }
@@ -81,17 +82,8 @@ function patternSets(
   patterns: readonly MovementPattern[],
 ): number {
   const set = new Set(patterns);
-  const byLabel = new Map(days.map((d) => [d.label, d]));
-  const freq = labelFrequency(schedule);
-  const occurrences: [SplitDay, number][] = freq.size
-    ? [...freq].flatMap(([label, n]) => {
-        const d = byLabel.get(label);
-        return d ? ([[d, n]] as [SplitDay, number][]) : [];
-      })
-    : days.map((d) => [d, 1] as [SplitDay, number]);
-
   let total = 0;
-  for (const [day, n] of occurrences) {
+  for (const [day, n] of scheduledOccurrences(days, schedule)) {
     for (const ex of day.exercises) {
       const meta = idx.get(ex.exercise_id);
       if (meta && meta.movement_patterns.some((p) => set.has(p))) total += ex.sets * n;

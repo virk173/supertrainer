@@ -74,7 +74,17 @@ export async function applySplitEditAndCapture(
   const { index, poolIds } = await revalidationContext(service, split.client_id, p.orgId, next);
   const validation = validateSplit(next, schedule, index, poolIds);
 
-  const meta = { ...(split.meta as object), needsAttention: !validation.ok, validation };
+  // Refresh the fields the review surface renders (the volume meter reads the
+  // top-level weeklyVolume/balance/warnings) — not just nested `validation`, or
+  // the meter would show stale generation-time numbers after every edit.
+  const meta = {
+    ...(split.meta as object),
+    needsAttention: !validation.ok,
+    weeklyVolume: validation.weeklyVolume,
+    balance: validation.balance,
+    warnings: validation.warnings,
+    validation,
+  };
   await service
     .from("splits")
     .update({ days: next as unknown as Json, meta: meta as unknown as Json })
@@ -150,15 +160,20 @@ export async function approveSplit(
     { onConflict: "client_id" },
   );
 
-  // Client notification (P6 delivers it) — idempotent per split.
-  await service.from("notifications").insert({
-    org_id: split.org_id,
-    client_id: split.client_id,
-    kind: "split_ready",
-    channel: "in_app",
-    payload: { split_id: split.id } as unknown as Json,
-    dedupe_key: `${split.client_id}:split_ready:${split.id}`,
-  });
+  // Client notification (P6 delivers it) — idempotent per split: a re-approve
+  // must not throw on the dedupe_key unique constraint after splits_active was
+  // already upserted.
+  await service.from("notifications").upsert(
+    {
+      org_id: split.org_id,
+      client_id: split.client_id,
+      kind: "split_ready",
+      channel: "in_app",
+      payload: { split_id: split.id } as unknown as Json,
+      dedupe_key: `${split.client_id}:split_ready:${split.id}`,
+    },
+    { onConflict: "dedupe_key", ignoreDuplicates: true },
+  );
 
   // Zero-edit-rate metric.
   const { count } = await service

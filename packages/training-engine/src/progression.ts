@@ -104,27 +104,9 @@ export function proposeProgression(
     return hold(`${ctx.name}: performance dipped off the cycle best — holding to check recovery/technique.`);
   }
 
-  // Stalled (no new best for STALL_SESSIONS) → deload or rotate per style.
-  if (trend.sessionsSinceBest >= STALL_SESSIONS) {
-    if (style === "rotation") {
-      return {
-        exerciseId: ctx.exerciseId,
-        changeKind: "rotate",
-        newSets: ctx.currentSets,
-        loadFactor: 1,
-        reason: `${ctx.name}: stalled ${trend.sessionsSinceBest} sessions — rotate to a variation to break the plateau.`,
-      };
-    }
-    return {
-      exerciseId: ctx.exerciseId,
-      changeKind: "deload",
-      newSets: ctx.currentSets,
-      loadFactor: DELOAD_FACTOR,
-      reason: `${ctx.name}: stalled ${trend.sessionsSinceBest} sessions — deload 10% and rebuild.`,
-    };
-  }
-
-  // Progressing and hit the TOP of the rep range → advance per style.
+  // Hitting the TOP of the rep range → advance per style. This is checked BEFORE
+  // the stall rule: a client parked at the top of the range for weeks isn't
+  // grinding — they've earned a load increase (double progression), not a deload.
   if (last.reps >= ctx.repTop) {
     if (style === "volume") {
       const newSets = Math.min(MAX_SETS_PER_EXERCISE, ctx.currentSets + 1);
@@ -154,6 +136,28 @@ export function proposeProgression(
       newSets: ctx.currentSets,
       loadFactor: Math.min(MAX_LOAD_STEP, LOAD_STEP),
       reason: `${ctx.name}: hit the top of the range — add ~2.5% load next block.`,
+    };
+  }
+
+  // Grinding BELOW the top of the range with no new best for STALL_SESSIONS → a
+  // genuine plateau: deload (or rotate) to rebuild. (Reached only when the last
+  // session did NOT hit the top of the range — that case advanced above.)
+  if (trend.sessionsSinceBest >= STALL_SESSIONS) {
+    if (style === "rotation") {
+      return {
+        exerciseId: ctx.exerciseId,
+        changeKind: "rotate",
+        newSets: ctx.currentSets,
+        loadFactor: 1,
+        reason: `${ctx.name}: stalled ${trend.sessionsSinceBest} sessions — rotate to a variation to break the plateau.`,
+      };
+    }
+    return {
+      exerciseId: ctx.exerciseId,
+      changeKind: "deload",
+      newSets: ctx.currentSets,
+      loadFactor: DELOAD_FACTOR,
+      reason: `${ctx.name}: stalled ${trend.sessionsSinceBest} sessions — deload 10% and rebuild.`,
     };
   }
 

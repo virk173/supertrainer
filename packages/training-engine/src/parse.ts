@@ -32,9 +32,13 @@ const FULL_GYM = [...EQUIPMENT_TOKENS];
 // can ALWAYS do bodyweight, so it's implicit unless the pool would be empty.
 export function normalizeEquipmentAccess(text: string): string[] {
   const s = text.toLowerCase();
-  if (/\b(full gym|commercial gym|big gym|globo|gym|fitness center|fitness centre)\b/.test(s)) {
-    return [...FULL_GYM];
-  }
+  // A commercial/full gym → everything. A bare "gym" counts too, EXCEPT "home
+  // gym", which usually means a limited home setup — fall through to detect its
+  // actual equipment rather than over-granting barbell/machine/cable.
+  const fullGym =
+    /\b(full gym|commercial gym|big gym|globo|fitness cent(?:er|re))\b/.test(s) ||
+    (/\bgym\b/.test(s) && !/\bhome\b/.test(s));
+  if (fullGym) return [...FULL_GYM];
   // Detect real (weighted) equipment separately from an explicit bodyweight-only
   // signal — so "bodyweight only" narrows, but an unrecognized phrase doesn't.
   const found = new Set<string>();

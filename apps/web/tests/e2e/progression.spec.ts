@@ -50,20 +50,34 @@ test("progressing (hit top of range): load style adds load, volume adds a set", 
   expect(rotation.changeKind).toBe("rotate");
 });
 
-test("stalled (3 sessions no PR): load style deloads, rotation rotates", () => {
+test("stalled BELOW range (3 sessions no PR, not hitting top): deload / rotate", () => {
+  // Grinding 5 reps when the target top is 12, no new best for 3+ sessions.
   const stalled = [
     sess("2026-07-01", 100, 5),
     sess("2026-07-08", 100, 5),
     sess("2026-07-15", 100, 5),
     sess("2026-07-22", 100, 5),
   ];
-  const deload = proposeProgression(ctx(stalled, { repTop: 5 }), "load");
+  const deload = proposeProgression(ctx(stalled, { repTop: 12 }), "load");
   expect(deload.changeKind).toBe("deload");
   expect(deload.loadFactor).toBe(0.9);
   expect(deload.reason).toContain("deload");
 
-  const rotate = proposeProgression(ctx(stalled, { repTop: 5 }), "rotation");
+  const rotate = proposeProgression(ctx(stalled, { repTop: 12 }), "rotation");
   expect(rotate.changeKind).toBe("rotate");
+});
+
+test("plateau AT the top of the range → add load, not deload (double progression)", () => {
+  // 100kg x 5 for 4 weeks with repTop 5 = hitting the top every session.
+  const topPlateau = [
+    sess("2026-07-01", 100, 5),
+    sess("2026-07-08", 100, 5),
+    sess("2026-07-15", 100, 5),
+    sess("2026-07-22", 100, 5),
+  ];
+  const p = proposeProgression(ctx(topPlateau, { repTop: 5 }), "load");
+  expect(p.changeKind).toBe("add_load");
+  expect(p.loadFactor).toBeLessThanOrEqual(1.1);
 });
 
 test("regressing: hold and check recovery (never push a downtrend)", () => {
