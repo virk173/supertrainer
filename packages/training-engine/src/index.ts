@@ -33,3 +33,13 @@ export {
   normalizeExperience,
   type ParseTrainingResult,
 } from "./parse";
+export {
+  estimated1RM,
+  parseRepTop,
+  proposeProgression,
+  type ProgressionStyle,
+  type ExerciseSession,
+  type ProgressionContext,
+  type ProgressionKind,
+  type ProgressionProposal,
+} from "./progression";

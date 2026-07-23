@@ -15,10 +15,15 @@ import {
   type TrainingProfile,
 } from "@supertrainer/ai";
 import type { Database, Json } from "@supertrainer/db/types";
-import { parseTrainingIntake } from "@supertrainer/training-engine";
+import {
+  parseTrainingIntake,
+  type ProgressionStyle,
+  type SplitDay,
+} from "@supertrainer/training-engine";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { compileSplitPool } from "@/lib/splits/pool";
+import { applyProgression, compileProgressionContext } from "@/lib/splits/progression";
 
 type ServiceClient = SupabaseClient<Database>;
 
@@ -87,6 +92,20 @@ export async function runSplitPipeline(
     .eq("status", "confirmed")
     .maybeSingle();
   const styleProfile = (styleRow?.profile as TrainingProfile | undefined) ?? undefined;
+
+  // ── Monthly progression: base on the active split + the client's actual logged
+  // performance (coded, no LLM) rather than generating fresh. ────────────────────
+  if (req.trigger === "monthly") {
+    const drafted = await draftMonthlyProgression(service, {
+      orgId: req.org_id,
+      clientId: client.id,
+      style: styleProfile?.progressionStyle ?? "load",
+      onDrafted: opts.onDrafted,
+    });
+    if (drafted.status === "failed") return fail(drafted.reason ?? "progression failed");
+    await service.from("plan_requests").update({ status: "drafted" }).eq("id", req.id);
+    return { status: "drafted", splitId: drafted.splitId };
+  }
 
   const { pool, excluded, cautionCount } = await compileSplitPool(
     service,
@@ -172,5 +191,69 @@ export async function runSplitPipeline(
     needsAttention: result.status === "needs_attention",
   });
 
+  return { status: "drafted", splitId: split.id };
+}
+
+// The monthly progression draft: the active split's days progressed per the
+// client's actual logged performance (coded), based_on the live split. No LLM —
+// the numbers are the engine's; each exercise carries a plain-English reason.
+async function draftMonthlyProgression(
+  service: ServiceClient,
+  p: { orgId: string; clientId: string; style: ProgressionStyle; onDrafted?: RunSplitPipelineOptions["onDrafted"] },
+): Promise<RunSplitPipelineResult> {
+  // The live approved split carries the real day structure to progress.
+  const { data: base } = await service
+    .from("splits")
+    .select("id, org_id, days, schedule, version")
+    .eq("client_id", p.clientId)
+    .eq("status", "approved")
+    .order("version", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (!base || base.org_id !== p.orgId) return { status: "failed", reason: "no active split to progress" };
+
+  const compiled = await compileProgressionContext(service, p.clientId, p.orgId, new Date());
+  if (!compiled) return { status: "failed", reason: "no active split context" };
+
+  const { days, proposals } = applyProgression(
+    base.days as unknown as SplitDay[],
+    compiled.contexts,
+    p.style,
+  );
+
+  const { data: last } = await service
+    .from("splits")
+    .select("version")
+    .eq("client_id", p.clientId)
+    .order("version", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const version = (last?.version ?? 0) + 1;
+  const changed = proposals.filter((pr) => pr.changeKind !== "hold").length;
+
+  const { data: split, error } = await service
+    .from("splits")
+    .insert({
+      org_id: p.orgId,
+      client_id: p.clientId,
+      version,
+      status: "draft",
+      days: days as unknown as Json,
+      schedule: base.schedule as Json,
+      based_on_split_id: base.id,
+      meta: {
+        archetype: "monthly progression",
+        source: "monthly",
+        progression: proposals,
+        needsAttention: false,
+      } as unknown as Json,
+      rationale: `Monthly progression — ${changed} exercise${changed === 1 ? "" : "s"} advanced from logged performance`,
+      source: "monthly",
+    })
+    .select("id")
+    .maybeSingle();
+  if (error || !split) return { status: "failed", reason: `progression insert failed: ${error?.message ?? "no row"}` };
+
+  await p.onDrafted?.({ orgId: p.orgId, clientId: p.clientId, splitId: split.id, needsAttention: false });
   return { status: "drafted", splitId: split.id };
 }
