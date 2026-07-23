@@ -51,6 +51,98 @@ export async function searchFoods(
   return data ?? [];
 }
 
+// ── Exercise search (Phase 5.1) ──────────────────────────────────────────────
+
+export type ExerciseSearchResult =
+  Database["public"]["Functions"]["search_exercises"]["Returns"][number];
+export type MovementPattern = Database["public"]["Enums"]["movement_pattern"];
+export type ExperienceLevel = Database["public"]["Enums"]["experience_level"];
+
+export interface SearchExercisesOptions {
+  // Scope org-custom exercises. Required for service-role callers (RLS bypassed);
+  // authenticated callers can omit it — the SQL defaults to their JWT org.
+  orgId?: string;
+  // ANY-overlap filters (a null/undefined filter is "don't filter on this").
+  equipment?: string[];
+  patterns?: MovementPattern[];
+  muscles?: string[];
+  // Experience ceiling — excludes exercises whose experience_min exceeds this.
+  maxExperience?: ExperienceLevel;
+  limit?: number;
+}
+
+// Resolve a query + filters to ranked, RLS-visible exercises via search_exercises().
+// A blank query is a pure FILTER browse (all rows matching the filters, name
+// order) — that's how the P5.2 pool compiler enumerates "every squat-pattern
+// barbell exercise the client can do"; a non-blank query ranks by match. The
+// pool compiler then subtracts the injury-excluded set (packages/ai
+// filterExercisePool) before anything reaches the model.
+export async function searchExercises(
+  client: AnyDb,
+  query: string,
+  opts: SearchExercisesOptions = {},
+): Promise<ExerciseSearchResult[]> {
+  const { data, error } = await client.rpc("search_exercises", {
+    p_query: query.trim() || undefined,
+    p_org: opts.orgId ?? undefined,
+    p_equipment: opts.equipment ?? undefined,
+    p_patterns: opts.patterns ?? undefined,
+    p_muscles: opts.muscles ?? undefined,
+    p_max_experience: opts.maxExperience ?? undefined,
+    p_limit: opts.limit ?? undefined,
+  });
+  if (error) throw error;
+  return data ?? [];
+}
+
+// ── Injury-exclusion override audit (Phase 5.1) ──────────────────────────────
+// A trainer un-excluding a contraindicated exercise for a client is a safety
+// decision that must leave a trail (ORIGINAL-SPEC injury-aware selection; the
+// override is logged to audit_log). Written with the service role, so — per the
+// service-role tenancy rule — org_id is asserted in code here, never trusted
+// from a caller-supplied value alone: the client row is re-read and its org_id
+// must match the trusted org.
+export interface InjuryOverrideAudit {
+  orgId: string;
+  actorProfileId: string;
+  clientId: string;
+  exerciseId: string;
+  // The resolved injury tags the exercise was excluded for (for the record).
+  injuryTags: string[];
+  reason?: string;
+}
+
+export async function recordInjuryOverride(
+  service: AnyDb,
+  input: InjuryOverrideAudit,
+): Promise<void> {
+  // Re-read the client under the service role and verify tenancy in code (RLS
+  // is bypassed) before writing anything.
+  const { data: client, error: readError } = await service
+    .from("clients")
+    .select("id, org_id")
+    .eq("id", input.clientId)
+    .single();
+  if (readError) throw readError;
+  if (!client || client.org_id !== input.orgId) {
+    throw new Error("recordInjuryOverride: client does not belong to org");
+  }
+
+  const { error } = await service.from("audit_log").insert({
+    org_id: input.orgId,
+    actor_profile_id: input.actorProfileId,
+    action: "injury_exclusion_override",
+    entity_type: "exercise",
+    entity_id: input.exerciseId,
+    payload: {
+      client_id: input.clientId,
+      injury_tags: input.injuryTags,
+      reason: input.reason ?? null,
+    },
+  });
+  if (error) throw error;
+}
+
 // ── Portion resolution (Phase 3.1) ───────────────────────────────────────────
 // Turn "2 rotis" / "1 katori dal" / "200 g chicken" into grams, using the food's
 // serving_units map. This is the bridge between what a client types and the

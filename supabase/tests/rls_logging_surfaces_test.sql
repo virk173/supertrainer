@@ -29,8 +29,11 @@ values ('dddddddd-dddd-dddd-dddd-dddddddddd01', '11111111-1111-1111-1111-1111111
 
 insert into public.weigh_ins (org_id, client_id, tz_date, weight_kg, method) values
   ('11111111-1111-1111-1111-111111111111', 'dddddddd-dddd-dddd-dddd-dddddddddd01', current_date, 72.5, 'manual');
-insert into public.workout_logs (org_id, client_id, tz_date, exercise_id, exercise_name, set_number, weight_kg, reps) values
-  ('11111111-1111-1111-1111-111111111111', 'dddddddd-dddd-dddd-dddd-dddddddddd01', current_date, 'bench', 'Bench Press', 1, 60, 8);
+-- exercise_id now FKs the exercises catalog (P5.3) — use a seeded global exercise.
+insert into public.workout_logs (org_id, client_id, tz_date, exercise_id, exercise_name, set_number, weight_kg, reps)
+select '11111111-1111-1111-1111-111111111111', 'dddddddd-dddd-dddd-dddd-dddddddddd01', current_date,
+       e.id, e.name, 1, 60, 8
+  from public.exercises e where e.source = 'feb' order by e.name limit 1;
 insert into public.wearable_daily (org_id, client_id, tz_date, steps, sleep_min) values
   ('11111111-1111-1111-1111-111111111111', 'dddddddd-dddd-dddd-dddd-dddddddddd01', current_date, 8200, 430);
 
