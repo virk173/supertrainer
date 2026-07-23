@@ -9,6 +9,12 @@ export { calculateTargets } from "./targets";
 export { compileConstraints } from "./constraints";
 export { parseIntake, type ParseIntakeResult } from "./parse";
 export {
+  proposeAdjustment,
+  type AdjustmentContext,
+  type AdjustmentKind,
+  type AdjustmentProposal,
+} from "./adjust";
+export {
   KCAL_TOLERANCE_PCT,
   PROTEIN_TOLERANCE_G,
   macrosForGrams,

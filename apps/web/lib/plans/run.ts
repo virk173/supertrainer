@@ -18,11 +18,15 @@ import {
   calculateTargets,
   compileConstraints,
   parseIntake,
+  proposeAdjustment,
+  type AdjustmentProposal,
   type PlanProtocol,
   type StyleDefaults,
+  type TargetOverride,
 } from "@supertrainer/nutrition-engine";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { compileAdjustmentContext } from "@/lib/plans/adjust-context";
 import type { DietPreference } from "@/lib/preview/diet-filter";
 import { buildSafePool, poolExcludedTags, POOL_FOOD_COLUMNS, type PoolFoodRow } from "@/lib/plans/pool";
 
@@ -107,7 +111,19 @@ export async function runDietPipeline(
     .maybeSingle();
   const styleProfile = (styleRow?.profile as DietProfile | undefined) ?? undefined;
 
-  const targets = calculateTargets(parsed.intake, styleDefaultsFromProfile(styleProfile));
+  // Monthly renewal: the ledger-informed adjustment overrides the formula kcal
+  // (adaptive TDEE) and its plain-English reason rides on the draft.
+  let adjustment: AdjustmentProposal | null = null;
+  let override: TargetOverride = {};
+  if (req.trigger === "monthly") {
+    const compiled = await compileAdjustmentContext(service, client.id, req.org_id, new Date());
+    if (compiled && compiled.context.currentKcal > 0) {
+      adjustment = proposeAdjustment(compiled.context);
+      override = { kcal: adjustment.newKcal };
+    }
+  }
+
+  const targets = calculateTargets(parsed.intake, styleDefaultsFromProfile(styleProfile), override);
   if (targets.status === "rejected") return fail(`targets rejected: ${targets.rejectReason}`);
 
   const constraints = compileConstraints(parsed.intake, {
@@ -162,8 +178,10 @@ export async function runDietPipeline(
         fastWindow: result.fastWindow ?? null,
         needsAttention: result.status === "needs_attention",
         report: result.report,
+        adjustment, // the monthly "proposed changes + why" (null for a first plan)
       } as unknown as Json,
-      rationale: targets.flags.length ? `targets: ${targets.flags.join(", ")}` : null,
+      rationale:
+        adjustment?.reason ?? (targets.flags.length ? `targets: ${targets.flags.join(", ")}` : null),
       source: req.trigger,
     })
     .select("id")
