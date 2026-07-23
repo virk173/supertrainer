@@ -647,6 +647,63 @@ export type Database = {
           },
         ]
       }
+      ledger_days: {
+        Row: {
+          actual: Json
+          client_id: string
+          closed_at: string | null
+          created_at: string
+          expected: Json
+          id: string
+          late: boolean
+          misses: Json
+          org_id: string
+          tz_date: string
+          updated_at: string
+        }
+        Insert: {
+          actual?: Json
+          client_id: string
+          closed_at?: string | null
+          created_at?: string
+          expected?: Json
+          id?: string
+          late?: boolean
+          misses?: Json
+          org_id: string
+          tz_date: string
+          updated_at?: string
+        }
+        Update: {
+          actual?: Json
+          client_id?: string
+          closed_at?: string | null
+          created_at?: string
+          expected?: Json
+          id?: string
+          late?: boolean
+          misses?: Json
+          org_id?: string
+          tz_date?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ledger_days_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ledger_days_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       meal_logs: {
         Row: {
           client_id: string
