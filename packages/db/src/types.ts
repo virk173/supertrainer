@@ -272,6 +272,41 @@ export type Database = {
           },
         ]
       }
+      food_aliases: {
+        Row: {
+          alias: string
+          alias_normalized: string
+          created_at: string
+          food_id: string
+          id: string
+          locale: string | null
+        }
+        Insert: {
+          alias: string
+          alias_normalized: string
+          created_at?: string
+          food_id: string
+          id?: string
+          locale?: string | null
+        }
+        Update: {
+          alias?: string
+          alias_normalized?: string
+          created_at?: string
+          food_id?: string
+          id?: string
+          locale?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "food_aliases_food_id_fkey"
+            columns: ["food_id"]
+            isOneToOne: false
+            referencedRelation: "foods"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       foods: {
         Row: {
           allergen_tags: string[]
@@ -1028,6 +1063,32 @@ export type Database = {
       jwt_user_role: {
         Args: never
         Returns: Database["public"]["Enums"]["org_role"]
+      }
+      search_foods: {
+        Args: {
+          p_limit?: number
+          p_locale?: string
+          p_org?: string
+          p_query: string
+        }
+        Returns: {
+          allergen_tags: string[]
+          carbs_per_100g: number
+          cuisine_tags: string[]
+          fat_per_100g: number
+          fiber_per_100g: number
+          id: string
+          kcal_per_100g: number
+          matched_via: string
+          name: string
+          name_normalized: string
+          org_id: string
+          protein_per_100g: number
+          score: number
+          serving_units: Json
+          source: Database["public"]["Enums"]["food_source"]
+          verified: boolean
+        }[]
       }
     }
     Enums: {

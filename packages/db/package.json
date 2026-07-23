@@ -8,16 +8,21 @@
     "./browser": "./src/browser.ts",
     "./types": "./src/types.ts",
     "./seed": "./src/seed/demo-client.ts",
-    "./queries": "./src/queries.ts"
+    "./queries": "./src/queries.ts",
+    "./allergens": "./src/allergens.ts"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "gen:foods": "tsx scripts/gen-foods-migration.ts",
+    "verify:nutrition": "tsx scripts/verify-nutrition.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.3",
     "@supabase/supabase-js": "^2.110.5"
   },
   "devDependencies": {
+    "papaparse": "^5.4.1",
+    "tsx": "^4.19.0",
     "typescript": "^5"
   }
 }

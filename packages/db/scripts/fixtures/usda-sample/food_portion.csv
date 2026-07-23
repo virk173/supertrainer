@@ -1,0 +1,4 @@
+id,fdc_id,seq_num,amount,portion_description,modifier,gram_weight
+1,9999001,1,1,"1 cup chopped",cup,21
+2,9999001,2,1,"1 leaf",leaf,6
+3,9999002,1,1,"1 handful",handful,28
