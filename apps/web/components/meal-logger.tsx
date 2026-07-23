@@ -170,7 +170,7 @@ export function MealLogger({
             onClick={() => setSlot(s)}
             aria-pressed={slot === s}
             className={`rounded-full border px-3 py-1 text-sm capitalize transition-colors ${
-              slot === s ? "bg-foreground text-background" : "bg-surface-raised hover:bg-surface"
+              slot === s ? "bg-foreground text-background" : "bg-surface-raised text-foreground hover:bg-surface"
             }`}
           >
             {s}
@@ -200,7 +200,7 @@ export function MealLogger({
             }}
             rows={2}
             placeholder='What did you eat? e.g. "2 rotis, dal, salad"'
-            className="w-full resize-none rounded-lg border bg-surface-raised p-3 text-sm outline-none focus:ring-2 focus:ring-ring"
+            className="w-full resize-none rounded-lg border bg-surface-raised p-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring"
           />
           <div className="flex items-center gap-2">
             <button
@@ -354,7 +354,7 @@ function ItemRow({
               }}
               aria-pressed={o.id === item.selectedId}
               className={`rounded-full border px-2 py-1 text-xs ${
-                o.id === item.selectedId ? "bg-foreground text-background" : "bg-surface hover:bg-surface-raised"
+                o.id === item.selectedId ? "bg-foreground text-background" : "bg-surface text-foreground hover:bg-surface-raised"
               }`}
             >
               {o.name}

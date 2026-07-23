@@ -375,6 +375,51 @@ export type Database = {
           },
         ]
       }
+      gym_checkins: {
+        Row: {
+          client_id: string
+          created_at: string
+          id: string
+          org_id: string
+          status: Database["public"]["Enums"]["checkin_status"]
+          tz_date: string
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          id?: string
+          org_id: string
+          status: Database["public"]["Enums"]["checkin_status"]
+          tz_date: string
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          id?: string
+          org_id?: string
+          status?: Database["public"]["Enums"]["checkin_status"]
+          tz_date?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gym_checkins_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gym_checkins_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       import_batches: {
         Row: {
           created_at: string
@@ -933,6 +978,51 @@ export type Database = {
           },
         ]
       }
+      progress_photos: {
+        Row: {
+          client_id: string
+          created_at: string
+          id: string
+          org_id: string
+          path: string
+          pose: Database["public"]["Enums"]["progress_pose"]
+          tz_date: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          id?: string
+          org_id: string
+          path: string
+          pose: Database["public"]["Enums"]["progress_pose"]
+          tz_date: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          id?: string
+          org_id?: string
+          path?: string
+          pose?: Database["public"]["Enums"]["progress_pose"]
+          tz_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "progress_photos_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "progress_photos_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       push_subscriptions: {
         Row: {
           client_id: string
@@ -977,6 +1067,51 @@ export type Database = {
           },
           {
             foreignKeyName: "push_subscriptions_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      splits_active: {
+        Row: {
+          client_id: string
+          created_at: string
+          days: Json
+          org_id: string
+          schedule: Json
+          split_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          days?: Json
+          org_id: string
+          schedule?: Json
+          split_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          days?: Json
+          org_id?: string
+          schedule?: Json
+          split_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "splits_active_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "splits_active_org_id_fkey"
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "orgs"
@@ -1175,6 +1310,165 @@ export type Database = {
           },
         ]
       }
+      wearable_daily: {
+        Row: {
+          client_id: string
+          created_at: string
+          id: string
+          org_id: string
+          sleep_min: number | null
+          source: Database["public"]["Enums"]["wearable_source"]
+          steps: number | null
+          tz_date: string
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          id?: string
+          org_id: string
+          sleep_min?: number | null
+          source?: Database["public"]["Enums"]["wearable_source"]
+          steps?: number | null
+          tz_date: string
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          id?: string
+          org_id?: string
+          sleep_min?: number | null
+          source?: Database["public"]["Enums"]["wearable_source"]
+          steps?: number | null
+          tz_date?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wearable_daily_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wearable_daily_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      weigh_ins: {
+        Row: {
+          client_id: string
+          created_at: string
+          id: string
+          method: Database["public"]["Enums"]["weigh_in_method"]
+          org_id: string
+          tz_date: string
+          updated_at: string
+          weight_kg: number
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          id?: string
+          method?: Database["public"]["Enums"]["weigh_in_method"]
+          org_id: string
+          tz_date: string
+          updated_at?: string
+          weight_kg: number
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          id?: string
+          method?: Database["public"]["Enums"]["weigh_in_method"]
+          org_id?: string
+          tz_date?: string
+          updated_at?: string
+          weight_kg?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "weigh_ins_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "weigh_ins_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workout_logs: {
+        Row: {
+          client_id: string
+          created_at: string
+          exercise_id: string
+          exercise_name: string
+          id: string
+          org_id: string
+          reps: number | null
+          rpe: number | null
+          set_number: number
+          tz_date: string
+          updated_at: string
+          weight_kg: number | null
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          exercise_id: string
+          exercise_name: string
+          id?: string
+          org_id: string
+          reps?: number | null
+          rpe?: number | null
+          set_number: number
+          tz_date: string
+          updated_at?: string
+          weight_kg?: number | null
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          exercise_id?: string
+          exercise_name?: string
+          id?: string
+          org_id?: string
+          reps?: number | null
+          rpe?: number | null
+          set_number?: number
+          tz_date?: string
+          updated_at?: string
+          weight_kg?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workout_logs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workout_logs_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -1215,6 +1509,7 @@ export type Database = {
       }
     }
     Enums: {
+      checkin_status: "trained" | "rest" | "missed"
       client_source: "teaser" | "invite" | "import"
       client_status: "lead" | "onboarding" | "active" | "paused" | "churned"
       food_source: "usda" | "off" | "ifct" | "org_custom" | "seed"
@@ -1245,12 +1540,15 @@ export type Database = {
       plan_kind: "diet" | "split"
       plan_request_status: "queued" | "running" | "drafted" | "failed"
       plan_trigger: "onboarding" | "monthly" | "manual"
+      progress_pose: "front" | "side" | "back"
       style_domain: "diet" | "training" | "voice"
       style_exemplar_source: "upload" | "edit_capture"
       style_profile_status: "draft" | "confirmed"
       tier_cadence: "monthly"
       upload_extraction_status: "pending" | "processing" | "done" | "failed"
       upload_kind: "plan_pdf" | "checkin_screenshot" | "doc"
+      wearable_source: "manual" | "healthkit" | "health_connect"
+      weigh_in_method: "prompt_reply" | "manual"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1381,6 +1679,7 @@ export const Constants = {
   },
   public: {
     Enums: {
+      checkin_status: ["trained", "rest", "missed"],
       client_source: ["teaser", "invite", "import"],
       client_status: ["lead", "onboarding", "active", "paused", "churned"],
       food_source: ["usda", "off", "ifct", "org_custom", "seed"],
@@ -1406,12 +1705,15 @@ export const Constants = {
       plan_kind: ["diet", "split"],
       plan_request_status: ["queued", "running", "drafted", "failed"],
       plan_trigger: ["onboarding", "monthly", "manual"],
+      progress_pose: ["front", "side", "back"],
       style_domain: ["diet", "training", "voice"],
       style_exemplar_source: ["upload", "edit_capture"],
       style_profile_status: ["draft", "confirmed"],
       tier_cadence: ["monthly"],
       upload_extraction_status: ["pending", "processing", "done", "failed"],
       upload_kind: ["plan_pdf", "checkin_screenshot", "doc"],
+      wearable_source: ["manual", "healthkit", "health_connect"],
+      weigh_in_method: ["prompt_reply", "manual"],
     },
   },
 } as const

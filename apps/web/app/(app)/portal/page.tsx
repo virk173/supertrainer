@@ -1,6 +1,8 @@
 import Link from "next/link";
-import { MessageCircle, UtensilsCrossed } from "lucide-react";
+import { Camera, Dumbbell, MessageCircle, UtensilsCrossed } from "lucide-react";
 
+import { DailyLog, type DailyState } from "@/components/daily-log";
+import { getCurrentClientContext, tzDate } from "@/lib/ledger/log";
 import { getSessionClaims } from "@/lib/onboarding/state";
 import { createServiceClient } from "@/lib/supabase/server";
 
@@ -28,15 +30,32 @@ async function interviewPending(): Promise<boolean> {
   return !state || state.status === "in_progress";
 }
 
+// Today's already-logged weigh-in / check-in / steps+sleep, so the quick-log
+// shows saved state instead of blank inputs (Phase 3.3).
+async function todayState(): Promise<DailyState | null> {
+  const ctx = await getCurrentClientContext();
+  if (!ctx) return null;
+  const service = createServiceClient();
+  const day = tzDate(ctx.timezone);
+  const [weigh, checkin, wearable] = await Promise.all([
+    service.from("weigh_ins").select("weight_kg").eq("client_id", ctx.clientId).eq("tz_date", day).maybeSingle(),
+    service.from("gym_checkins").select("status").eq("client_id", ctx.clientId).eq("tz_date", day).maybeSingle(),
+    service.from("wearable_daily").select("steps, sleep_min").eq("client_id", ctx.clientId).eq("tz_date", day).maybeSingle(),
+  ]);
+  return {
+    weightKg: weigh.data ? Number(weigh.data.weight_kg) : null,
+    checkin: (checkin.data?.status as DailyState["checkin"]) ?? null,
+    steps: wearable.data?.steps ?? null,
+    sleepMin: wearable.data?.sleep_min ?? null,
+  };
+}
+
 export default async function PortalHomePage() {
-  const pending = await interviewPending();
+  const [pending, daily] = await Promise.all([interviewPending(), todayState()]);
 
   return (
     <div className="space-y-4">
-      <h1
-        className="text-xl font-semibold tracking-tight"
-        data-testid="portal-home"
-      >
+      <h1 className="text-xl font-semibold tracking-tight" data-testid="portal-home">
         Today
       </h1>
 
@@ -85,6 +104,25 @@ export default async function PortalHomePage() {
           </span>
         </span>
       </Link>
+
+      {daily && <DailyLog initial={daily} />}
+
+      <div className="grid grid-cols-2 gap-2">
+        <Link
+          href="/portal/workout"
+          data-testid="workout-cta"
+          className="flex items-center gap-2 rounded-lg border bg-surface-raised p-3 text-sm font-medium transition-colors hover:bg-surface"
+        >
+          <Dumbbell className="size-4" /> Log a workout
+        </Link>
+        <Link
+          href="/portal/progress"
+          data-testid="progress-cta"
+          className="flex items-center gap-2 rounded-lg border bg-surface-raised p-3 text-sm font-medium transition-colors hover:bg-surface"
+        >
+          <Camera className="size-4" /> Progress photos
+        </Link>
+      </div>
     </div>
   );
 }
