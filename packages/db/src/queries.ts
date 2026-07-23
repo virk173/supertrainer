@@ -203,3 +203,26 @@ export async function createOrgCustomFood(
   if (error) throw error;
   return data;
 }
+
+// ── Ledger series (Phase 3.5) ────────────────────────────────────────────────
+
+export type LedgerDay = Database["public"]["Tables"]["ledger_days"]["Row"];
+
+// A client's closed ledger days over a date range (inclusive), oldest first.
+// The typed series the client-lens score card and P7 dashboard charts read.
+export async function ledgerDaysInRange(
+  client: AnyDb,
+  clientId: string,
+  fromDate: string,
+  toDate: string,
+): Promise<LedgerDay[]> {
+  const { data, error } = await client
+    .from("ledger_days")
+    .select("*")
+    .eq("client_id", clientId)
+    .gte("tz_date", fromDate)
+    .lte("tz_date", toDate)
+    .order("tz_date", { ascending: true });
+  if (error) throw error;
+  return data ?? [];
+}

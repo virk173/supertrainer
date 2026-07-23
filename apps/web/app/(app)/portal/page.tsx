@@ -1,8 +1,12 @@
 import Link from "next/link";
 import { Camera, Dumbbell, MessageCircle, UtensilsCrossed } from "lucide-react";
 
+import { ledgerDaysInRange } from "@supertrainer/db/queries";
+
+import { ClientScoreCard } from "@/components/client-score-card";
 import { DailyLog, type DailyState } from "@/components/daily-log";
 import { getCurrentClientContext, tzDate } from "@/lib/ledger/log";
+import { computeClientLens, type ClientLens, type LedgerDayRow } from "@/lib/ledger/score";
 import { getSessionClaims } from "@/lib/onboarding/state";
 import { createServiceClient } from "@/lib/supabase/server";
 
@@ -50,14 +54,28 @@ async function todayState(): Promise<DailyState | null> {
   };
 }
 
+// The client-lens weekly score over the last ~2 weeks of closed ledger days.
+async function clientLens(): Promise<ClientLens | null> {
+  const ctx = await getCurrentClientContext();
+  if (!ctx) return null;
+  const to = tzDate(ctx.timezone);
+  const fromDate = new Date(`${to}T00:00:00Z`);
+  fromDate.setUTCDate(fromDate.getUTCDate() - 13);
+  const rows = await ledgerDaysInRange(createServiceClient(), ctx.clientId, fromDate.toISOString().slice(0, 10), to);
+  if (rows.length === 0) return null;
+  return computeClientLens(rows as unknown as LedgerDayRow[]);
+}
+
 export default async function PortalHomePage() {
-  const [pending, daily] = await Promise.all([interviewPending(), todayState()]);
+  const [pending, daily, lens] = await Promise.all([interviewPending(), todayState(), clientLens()]);
 
   return (
     <div className="space-y-4">
       <h1 className="text-xl font-semibold tracking-tight" data-testid="portal-home">
         Today
       </h1>
+
+      {lens && <ClientScoreCard lens={lens} />}
 
       {pending && (
         <Link
