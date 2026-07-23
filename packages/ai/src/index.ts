@@ -61,6 +61,21 @@ export {
   allergenLabels,
 } from "./allergens";
 export {
+  type MovementPattern,
+  type InjuryTag,
+  INJURY_TAGS,
+  type ExerciseLike,
+  type ExclusionStatus,
+  type ExclusionReason,
+  type ExclusionVerdict,
+  type AssessedExercise,
+  type FilteredPool,
+  resolveInjuryTags,
+  assessExercise,
+  filterExercisePool,
+  injuryLabels,
+} from "./injury-exclusions";
+export {
   PreviewDraftSchema,
   type PreviewDraft,
   type PreviewCandidate,

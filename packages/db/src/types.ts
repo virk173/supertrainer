@@ -329,6 +329,125 @@ export type Database = {
           },
         ]
       }
+      exercise_videos: {
+        Row: {
+          created_at: string
+          cue_notes: string | null
+          exercise_id: string
+          id: string
+          kind: Database["public"]["Enums"]["exercise_video_kind"]
+          org_id: string | null
+          storage_path: string | null
+          updated_at: string
+          youtube_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          cue_notes?: string | null
+          exercise_id: string
+          id?: string
+          kind: Database["public"]["Enums"]["exercise_video_kind"]
+          org_id?: string | null
+          storage_path?: string | null
+          updated_at?: string
+          youtube_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          cue_notes?: string | null
+          exercise_id?: string
+          id?: string
+          kind?: Database["public"]["Enums"]["exercise_video_kind"]
+          org_id?: string | null
+          storage_path?: string | null
+          updated_at?: string
+          youtube_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "exercise_videos_exercise_id_fkey"
+            columns: ["exercise_id"]
+            isOneToOne: false
+            referencedRelation: "exercises"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "exercise_videos_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      exercises: {
+        Row: {
+          aliases: string[]
+          created_at: string
+          equipment: string[]
+          experience_min: Database["public"]["Enums"]["experience_level"]
+          force: string | null
+          id: string
+          image_paths: string[]
+          instructions: string[]
+          movement_patterns: Database["public"]["Enums"]["movement_pattern"][]
+          name: string
+          name_normalized: string
+          org_id: string | null
+          primary_muscles: string[]
+          secondary_muscles: string[]
+          source: Database["public"]["Enums"]["exercise_source"]
+          source_ref: string | null
+          updated_at: string
+        }
+        Insert: {
+          aliases?: string[]
+          created_at?: string
+          equipment?: string[]
+          experience_min?: Database["public"]["Enums"]["experience_level"]
+          force?: string | null
+          id?: string
+          image_paths?: string[]
+          instructions?: string[]
+          movement_patterns?: Database["public"]["Enums"]["movement_pattern"][]
+          name: string
+          name_normalized: string
+          org_id?: string | null
+          primary_muscles?: string[]
+          secondary_muscles?: string[]
+          source: Database["public"]["Enums"]["exercise_source"]
+          source_ref?: string | null
+          updated_at?: string
+        }
+        Update: {
+          aliases?: string[]
+          created_at?: string
+          equipment?: string[]
+          experience_min?: Database["public"]["Enums"]["experience_level"]
+          force?: string | null
+          id?: string
+          image_paths?: string[]
+          instructions?: string[]
+          movement_patterns?: Database["public"]["Enums"]["movement_pattern"][]
+          name?: string
+          name_normalized?: string
+          org_id?: string | null
+          primary_muscles?: string[]
+          secondary_muscles?: string[]
+          source?: Database["public"]["Enums"]["exercise_source"]
+          source_ref?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "exercises_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       food_aliases: {
         Row: {
           alias: string
@@ -1790,6 +1909,35 @@ export type Database = {
         Args: never
         Returns: Database["public"]["Enums"]["org_role"]
       }
+      search_exercises: {
+        Args: {
+          p_equipment?: string[]
+          p_limit?: number
+          p_max_experience?: Database["public"]["Enums"]["experience_level"]
+          p_muscles?: string[]
+          p_org?: string
+          p_patterns?: Database["public"]["Enums"]["movement_pattern"][]
+          p_query?: string
+        }
+        Returns: {
+          aliases: string[]
+          equipment: string[]
+          experience_min: Database["public"]["Enums"]["experience_level"]
+          force: string
+          id: string
+          image_paths: string[]
+          instructions: string[]
+          matched_via: string
+          movement_patterns: Database["public"]["Enums"]["movement_pattern"][]
+          name: string
+          name_normalized: string
+          org_id: string
+          primary_muscles: string[]
+          score: number
+          secondary_muscles: string[]
+          source: Database["public"]["Enums"]["exercise_source"]
+        }[]
+      }
       search_foods: {
         Args: {
           p_limit?: number
@@ -1829,6 +1977,9 @@ export type Database = {
         | "remove"
         | "structure"
         | "rewrite"
+      exercise_source: "feb" | "org_custom"
+      exercise_video_kind: "upload" | "youtube"
+      experience_level: "beginner" | "intermediate" | "advanced"
       food_source: "usda" | "off" | "ifct" | "org_custom" | "seed"
       interview_section:
         | "logistics"
@@ -1844,6 +1995,17 @@ export type Database = {
       meal_log_method: "text" | "photo" | "voice"
       meal_slot: "breakfast" | "lunch" | "dinner" | "snack" | "other"
       message_sender: "client" | "coach" | "system" | "assistant"
+      movement_pattern:
+        | "squat"
+        | "hinge"
+        | "lunge"
+        | "push_h"
+        | "push_v"
+        | "pull_h"
+        | "pull_v"
+        | "carry"
+        | "core"
+        | "isolation"
       notif_channel: "push" | "email" | "in_app"
       notif_status: "queued" | "sent" | "delivered" | "failed"
       notification_channel: "push" | "email_only"
@@ -2012,6 +2174,9 @@ export const Constants = {
         "structure",
         "rewrite",
       ],
+      exercise_source: ["feb", "org_custom"],
+      exercise_video_kind: ["upload", "youtube"],
+      experience_level: ["beginner", "intermediate", "advanced"],
       food_source: ["usda", "off", "ifct", "org_custom", "seed"],
       interview_section: [
         "logistics",
@@ -2028,6 +2193,18 @@ export const Constants = {
       meal_log_method: ["text", "photo", "voice"],
       meal_slot: ["breakfast", "lunch", "dinner", "snack", "other"],
       message_sender: ["client", "coach", "system", "assistant"],
+      movement_pattern: [
+        "squat",
+        "hinge",
+        "lunge",
+        "push_h",
+        "push_v",
+        "pull_h",
+        "pull_v",
+        "carry",
+        "core",
+        "isolation",
+      ],
       notif_channel: ["push", "email", "in_app"],
       notif_status: ["queued", "sent", "delivered", "failed"],
       notification_channel: ["push", "email_only"],

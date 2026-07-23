@@ -1,0 +1,22 @@
+{
+  "_comment": "Phase 5.1 — manual movement_pattern overrides for ambiguous / multi-pattern lifts the deterministic classifier (packages/db/scripts/classify-movement.ts) can't infer from a single primary muscle. Keyed by free-exercise-db id; the value REPLACES the classifier output entirely. Reviewed by hand. Olympic lifts and thrusters are genuinely multi-pattern; the injury map (packages/ai/injury-exclusions.ts) still name-nets these independently, so an override that under-tags never widens an injured client's pool.",
+  "overrides": {
+    "Push_Press": ["push_v"],
+    "Clean_and_Jerk": ["hinge", "push_v"],
+    "Clean_and_Press": ["hinge", "push_v"],
+    "Power_Clean": ["hinge"],
+    "Hang_Clean": ["hinge"],
+    "Clean": ["hinge"],
+    "Clean_from_Blocks": ["hinge"],
+    "Power_Snatch": ["hinge", "push_v"],
+    "Snatch": ["hinge", "push_v"],
+    "Overhead_Squat": ["squat", "push_v"],
+    "Thrusters": ["squat", "push_v"],
+    "Dumbbell_Clean": ["hinge"],
+    "Muscle_Up": ["pull_v", "push_v"],
+    "Turkish_Get-Up_(Kettlebell)": ["core", "carry"],
+    "Kettlebell_Turkish_Get-Up_(Squat_style)": ["core", "carry"],
+    "Push_Press_-_Behind_the_Neck": ["push_v"],
+    "Barbell_Walking_Lunge": ["lunge"]
+  }
+}
