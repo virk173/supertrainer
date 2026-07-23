@@ -1,16 +1,18 @@
-# Audit baseline — Phases 0–2 hardened
+# Audit baseline — Phases 0–2 + pre-Phase-3 work
 
-**Baseline commit:** `1e63677` (main, 2026-07-21) — "Pre–Phase 3 hardening — 14 audit fixes + review follow-ups (#7)".
+**Baseline commit:** `8748b59` (main, 2026-07-22) — "Audit PROPOSE-ONLY features (PO-1…PO-6) (#8)". (Prior baseline: `1e63677`, the pre–Phase 3 hardening audit #7.)
 
 ## What this baseline means
 
-Phases 0–2 + the Phase 2 backstops were **comprehensively audited** (deep multi-agent, adversarially verified — see `docs/audit/2026-07-21-pre-phase3-audit.md`) and **hardened**: all 14 confirmed defects (8 MUST-FIX + 6 SHOULD-FIX) plus the security-review and max-effort-review follow-ups were fixed, verified (typecheck 4/4 · lint · pgTAP 120 · Playwright 75), merged to main, and the migrations applied to prod.
+Phases 0–2 + the Phase 2 backstops were **comprehensively audited** (deep multi-agent, adversarially verified — see `docs/audit/2026-07-21-pre-phase3-audit.md`) and **hardened**: all 14 confirmed defects (8 MUST-FIX + 6 SHOULD-FIX) plus review follow-ups were fixed, verified, merged (#7, `1e63677`), and migrated to prod.
+
+The baseline then **advanced through the 6 audit PROPOSE-ONLY features (PO-1…PO-6, PR #8, `8748b59`)** — consent re-sign, auto client brief, lead-intent scoring, prospects view, style-strength meter, and the AI resilience layer. That PR shipped green (typecheck 4/4 · lint · pgTAP 124 · Playwright 106) after three review passes (max-effort code-review → 12 fixes; security-review → clean; a second local max-effort pass → 4 more fixes incl. a circuit-breaker probe-leak). So this baseline now covers **everything through PR #8**; future audits diff from here.
 
 ## Rule for future audits (do NOT re-burn tokens)
 
 **Never re-audit Phases 0–2.** Every future hardening audit is **scoped to the NEW work only** — the diff since this baseline (or the phase's own added/changed files). To audit a later phase:
 
-- Establish the diff to review: `git diff <baseline-or-prev-phase-merge>..HEAD` (start from `1e63677` for Phase 3), or the phase's file set. Do NOT read/scan Phases 0–2 code except where the new phase directly touches it.
+- Establish the diff to review: `git diff <baseline-or-prev-phase-merge>..HEAD` (start from `8748b59` for Phase 3), or the phase's file set. Do NOT read/scan Phases 0–2 code except where the new phase directly touches it.
 - Advance this baseline after each phase's audit ships: update the "Baseline commit" above to the phase's merge commit so the next audit starts from there.
 
 ## Reusable phase-scoped audit prompt
