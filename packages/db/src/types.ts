@@ -1502,6 +1502,89 @@ export type Database = {
           },
         ]
       }
+      splits: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          based_on_split_id: string | null
+          client_id: string
+          created_at: string
+          days: Json
+          id: string
+          meta: Json
+          org_id: string
+          rationale: string | null
+          schedule: Json
+          source: Database["public"]["Enums"]["plan_trigger"]
+          status: Database["public"]["Enums"]["split_status"]
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          based_on_split_id?: string | null
+          client_id: string
+          created_at?: string
+          days?: Json
+          id?: string
+          meta?: Json
+          org_id: string
+          rationale?: string | null
+          schedule?: Json
+          source: Database["public"]["Enums"]["plan_trigger"]
+          status?: Database["public"]["Enums"]["split_status"]
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          based_on_split_id?: string | null
+          client_id?: string
+          created_at?: string
+          days?: Json
+          id?: string
+          meta?: Json
+          org_id?: string
+          rationale?: string | null
+          schedule?: Json
+          source?: Database["public"]["Enums"]["plan_trigger"]
+          status?: Database["public"]["Enums"]["split_status"]
+          updated_at?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "splits_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "splits_based_on_split_id_fkey"
+            columns: ["based_on_split_id"]
+            isOneToOne: false
+            referencedRelation: "splits"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "splits_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "splits_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       splits_active: {
         Row: {
           client_id: string
@@ -2024,6 +2107,7 @@ export type Database = {
       plan_trigger: "onboarding" | "monthly" | "manual"
       progress_pose: "front" | "side" | "back"
       reminder_kind: "meal" | "weigh_in" | "checkin" | "custom"
+      split_status: "draft" | "approved" | "superseded" | "archived"
       style_domain: "diet" | "training" | "voice"
       style_exemplar_source: "upload" | "edit_capture"
       style_profile_status: "draft" | "confirmed"
@@ -2217,6 +2301,7 @@ export const Constants = {
       plan_trigger: ["onboarding", "monthly", "manual"],
       progress_pose: ["front", "side", "back"],
       reminder_kind: ["meal", "weigh_in", "checkin", "custom"],
+      split_status: ["draft", "approved", "superseded", "archived"],
       style_domain: ["diet", "training", "voice"],
       style_exemplar_source: ["upload", "edit_capture"],
       style_profile_status: ["draft", "confirmed"],

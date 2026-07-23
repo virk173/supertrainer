@@ -10,11 +10,13 @@
     "typecheck": "tsc --noEmit",
     "eval:style": "tsx evals/style-ingestion/run.ts",
     "eval:interview": "tsx evals/interview/run.ts",
-    "eval:diet": "tsx evals/diet-plan/run.ts"
+    "eval:diet": "tsx evals/diet-plan/run.ts",
+  "eval:split": "tsx evals/split-designer/run.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.111.0",
     "@supertrainer/nutrition-engine": "*",
+    "@supertrainer/training-engine": "*",
     "langfuse": "^3.38.20",
     "zod": "^4.0.0"
   },
