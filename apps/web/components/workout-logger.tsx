@@ -52,6 +52,7 @@ export function WorkoutLogger({
   const [newName, setNewName] = useState("");
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   function patchSet(ei: number, si: number, patch: Partial<SetRow>) {
     setExercises((prev) =>
@@ -84,15 +85,26 @@ export function WorkoutLogger({
   function addExercise() {
     const name = newName.trim();
     if (!name) return;
-    setExercises((prev) => [
-      ...prev,
-      { exerciseId: `custom:${name.toLowerCase().replace(/\s+/g, "-")}`, name, targetReps: null, sets: [{ weight: "", reps: "" }] },
-    ]);
+    const exerciseId = `custom:${name.toLowerCase().replace(/\s+/g, "-")}`;
+    setExercises((prev) => {
+      // Skip a duplicate id — two rows with the same exercise_id collide on the
+      // React key AND on the upsert's (client,tz,exercise_id,set_number) key,
+      // which would overwrite the first exercise's sets.
+      if (prev.some((e) => e.exerciseId === exerciseId)) return prev;
+      return [...prev, { exerciseId, name, targetReps: null, sets: [{ weight: "", reps: "" }] }];
+    });
     setNewName("");
   }
 
   async function save() {
     if (busy) return;
+    // Parse to a finite number or null (a stray "12,5" would otherwise become
+    // NaN, be rejected by the server Zod schema, and fail the whole save).
+    const num = (v: string): number | null => {
+      if (v.trim() === "") return null;
+      const n = Number(v);
+      return Number.isFinite(n) ? n : null;
+    };
     const sets = exercises.flatMap((ex) =>
       ex.sets
         .map((s, idx) => ({ s, idx }))
@@ -101,15 +113,18 @@ export function WorkoutLogger({
           exerciseId: ex.exerciseId,
           exerciseName: ex.name,
           setNumber: idx + 1,
-          weightKg: s.weight !== "" ? Number(s.weight) : null,
-          reps: s.reps !== "" ? Number(s.reps) : null,
+          weightKg: num(s.weight),
+          reps: num(s.reps),
         })),
     );
     if (sets.length === 0) return;
     setBusy(true);
+    setError(null);
     try {
       await runOrQueue("workout", { sets });
       setSaved(true);
+    } catch {
+      setError("Couldn't save your workout — please try again.");
     } finally {
       setBusy(false);
     }
@@ -180,6 +195,8 @@ export function WorkoutLogger({
           <Plus className="size-5" />
         </button>
       </div>
+
+      {error && <p className="text-sm text-[var(--color-danger)]">{error}</p>}
 
       <button
         type="button"

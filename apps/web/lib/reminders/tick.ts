@@ -1,8 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { tzDate, tzTime } from "@/lib/ledger/tz";
+
 import { reminderCopy } from "./copy";
 import { decideReminders, type QuietHours, type ReminderCandidate, type ReminderKind } from "./decide";
-import { ensureDefaultReminderRules } from "./rules";
+import { ensureDefaultReminderRules, toWeekdayNumbers } from "./rules";
 
 // Phase 3.6 — the reminder tick. For each active client, work out which reminders
 // are due now (client-local), apply the decision engine (quiet hours, cap,
@@ -13,22 +15,28 @@ import { ensureDefaultReminderRules } from "./rules";
 const DEFAULT_QUIET: QuietHours = { start: "21:30", end: "07:30" };
 const DAILY_CAP = 3;
 
-function localHM(timezone: string, now: Date): string {
-  return new Intl.DateTimeFormat("en-GB", { timeZone: timezone, hour: "2-digit", minute: "2-digit", hour12: false }).format(now);
-}
-function localDate(timezone: string, now: Date): string {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: timezone }).format(now);
-}
-
 interface Schedule {
   times?: string[];
   time?: string;
-  days?: number[]; // weekday filter (0=Sun); absent = every day
+  days?: Array<number | string>; // weekday filter (0=Sun or names); absent = every day
 }
+
+// Normalize a "HH:MM" to zero-padded 24h so lexicographic compare against the
+// client-local time is chronological ("8:00" from the intake model → "08:00",
+// otherwise "8:00" <= any "HH:MM" is always false and the reminder never fires).
+function padTime(t: string): string {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(t.trim());
+  if (!m) return t.trim();
+  return `${m[1].padStart(2, "0")}:${m[2]}`;
+}
+
 function scheduleTimes(schedule: Schedule): string[] {
-  if (Array.isArray(schedule.times)) return schedule.times;
-  if (typeof schedule.time === "string") return [schedule.time];
-  return [];
+  const raw = Array.isArray(schedule.times)
+    ? schedule.times
+    : typeof schedule.time === "string"
+      ? [schedule.time]
+      : [];
+  return raw.map(padTime);
 }
 
 export interface ReminderTickOptions {
@@ -66,8 +74,8 @@ export async function runReminderTick(
   for (const c of clients ?? []) {
     const timezone = ((c.profiles as { timezone?: string } | null)?.timezone) ?? "UTC";
     const coach = ((c.orgs as { name?: string } | null)?.name) ?? null;
-    const localNow = localHM(timezone, now);
-    const day = localDate(timezone, now);
+    const localNow = tzTime(timezone, now);
+    const day = tzDate(timezone, now);
     const weekday = new Date(`${day}T12:00:00Z`).getUTCDay();
 
     // Seed defaults for a brand-new client so reminders work out of the box.
@@ -86,8 +94,10 @@ export async function runReminderTick(
     const slotByKind = new Map<ReminderKind, string>();
     for (const r of rules) {
       const sched = r.schedule as Schedule;
-      // Day-of-week filter (e.g. weigh-ins Mon/Wed/Sat only).
-      if (Array.isArray(sched.days) && !sched.days.includes(weekday)) continue;
+      // Day-of-week filter (e.g. weigh-ins Mon/Wed/Sat only). Coerce day names
+      // ("Mon") to numbers — intake stores weekday NAMES, so a raw numeric
+      // compare would never match and weigh-in reminders would never fire.
+      if (Array.isArray(sched.days) && !toWeekdayNumbers(sched.days).includes(weekday)) continue;
       for (const t of scheduleTimes(sched)) {
         if (t <= localNow) {
           const existing = slotByKind.get(r.kind as ReminderKind);
@@ -127,21 +137,23 @@ export async function runReminderTick(
       const slot = slotByKind.get(kind)!;
       const copy = reminderCopy(kind, coach);
       const channel = c.notification_channel === "push" ? "push" : "email"; // P2 fallback ladder
-      const { error: notifErr } = await db
-        .from("notifications")
-        .upsert(
-          {
-            org_id: c.org_id,
-            client_id: c.id,
-            kind,
-            channel,
-            status: "queued",
-            dedupe_key: keyFor(kind, slot),
-            payload: { copy, slot } as never,
-          },
-          { onConflict: "dedupe_key", ignoreDuplicates: true },
-        );
-      if (notifErr) throw notifErr;
+      // Plain INSERT (not ignoreDuplicates) so the unique dedupe_key decides
+      // whether THIS run actually enqueued the reminder: a concurrent tick that
+      // already inserted it raises 23505, and we skip the thread mirror + the
+      // sent count. Mirroring unconditionally would double-post the nudge.
+      const { error: notifErr } = await db.from("notifications").insert({
+        org_id: c.org_id,
+        client_id: c.id,
+        kind,
+        channel,
+        status: "queued",
+        dedupe_key: keyFor(kind, slot),
+        payload: { copy, slot } as never,
+      });
+      if (notifErr) {
+        if (notifErr.code === "23505") continue; // already enqueued by another tick
+        throw notifErr;
+      }
 
       // Mirror into the thread so the client can scroll their prompt history.
       await db.from("messages").insert({

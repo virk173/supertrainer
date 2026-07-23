@@ -2,6 +2,8 @@
 
 import { randomUUID } from "node:crypto";
 
+import { z } from "zod";
+
 import {
   parseMealText,
   proposeMealFromPhoto,
@@ -45,10 +47,20 @@ const PHOTO_EXT: Record<string, string> = {
 // Photo path: store the image (own {org}/{client} path, service-role), propose
 // items via vision, resolve to the SAME candidate cards. Returns the stored path
 // so the confirmed log can reference the photo.
+const PhotoInputSchema = z.object({
+  base64Data: z.string().min(1).max(15_000_000), // ~10MB base64
+  mediaType: z.enum(["image/jpeg", "image/png", "image/webp"]),
+});
+
 export async function proposeAndResolvePhoto(
   base64Data: string,
   mediaType: VisionMediaType,
 ): Promise<ResolveResult> {
+  // Server-action inputs are untrusted (TS types are erased at runtime).
+  const validated = PhotoInputSchema.parse({ base64Data, mediaType });
+  base64Data = validated.base64Data;
+  mediaType = validated.mediaType;
+
   const ctx = await getCurrentClientContext();
   if (!ctx) throw new Error("No client for the current session");
   const service = createServiceClient();

@@ -3,7 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ParsedMealItem } from "@supertrainer/ai";
 import { resolveGrams, searchFoods, type FoodSearchResult } from "@supertrainer/db/queries";
 
-import { macrosFor, sumMacros, type ComputedMacros } from "@/lib/preview/macros";
+import { macrosFor, sumMacros, type ComputedMacros, type FoodMacros } from "@/lib/preview/macros";
 
 // Phase 3.2 — resolve parsed meal items ({name, qty, unit}) against the foods DB
 // and compute macros IN CODE. The model only parsed the text; every number here
@@ -203,10 +203,15 @@ export async function computeConfirmedItems(
     }
   }
 
+  // Verified items keep the DB food's raw per-100g so the day's total is summed
+  // from unrounded parts and rounded ONCE (sumMacros' contract) — reconstructing
+  // per-100g from the already-rounded per-item macros drifts the stored total.
+  const rawForTotals: Array<{ food: FoodMacros; grams: number }> = [];
   const stored: StoredMealItem[] = items.map((i) => {
     const food = i.foodId ? foodMap.get(i.foodId) : undefined;
     if (food) {
       const m = macrosFor(food, i.grams);
+      rawForTotals.push({ food, grams: i.grams });
       return { food_id: i.foodId, name: food.name, qty: i.qty, unit: i.unit, grams: i.grams,
         kcal: m.kcal, protein: m.protein, carbs: m.carbs, fat: m.fat, fiber: m.fiber, verified: true };
     }
@@ -214,25 +219,14 @@ export async function computeConfirmedItems(
       kcal: null, protein: null, carbs: null, fat: null, fiber: null, verified: false };
   });
 
-  const totals = sumMacros(
-    stored.filter((i) => i.verified).map((i) => ({
-      food: {
-        kcal_per_100g: (i.kcal! * 100) / i.grams,
-        protein_per_100g: (i.protein! * 100) / i.grams,
-        carbs_per_100g: (i.carbs! * 100) / i.grams,
-        fat_per_100g: (i.fat! * 100) / i.grams,
-        fiber_per_100g: (i.fiber! * 100) / i.grams,
-      },
-      grams: i.grams,
-    })),
-  );
+  const totals = sumMacros(rawForTotals);
   return { items: stored, totals };
 }
 
 // Display total for the confirm card — sums the per-item macros of verified
 // selections (unverified freeform items contribute no numbers, flagged in the
 // trainer lens). The AUTHORITATIVE stored total is recomputed from DB per-100g
-// values in the confirm action (computeLogTotals), never trusting the client.
+// values in computeConfirmedItems above, never trusting the client.
 export function mealTotals(
   items: Array<{ selection: { macros: ComputedMacros } | null }>,
 ): ComputedMacros {

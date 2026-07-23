@@ -1,8 +1,10 @@
 // Phase 3.4 — the day-close engine (pure). Given a client's status/plan/schedule
 // and a day's actual logs, derive what was EXPECTED and record anything
-// expected-but-absent as a MISS (never blank). Kept dependency-free so it's
-// unit-testable and so day-close (the scheduler) and the client/trainer lenses
-// (P3.5/P7) share one source of truth.
+// expected-but-absent as a MISS (never blank). Depends only on the pure ./tz
+// helper, so it stays unit-testable and shares one timezone source of truth with
+// the scheduler and the client/trainer lenses (P3.5/P7).
+
+import { tzDate } from "./tz";
 
 export type MealSlot = "breakfast" | "lunch" | "dinner" | "snack" | "other";
 export type ClientStatus = "lead" | "onboarding" | "active" | "paused" | "churned";
@@ -131,8 +133,8 @@ export function evaluateDay(inputs: DayInputs): LedgerDayEval {
 
 // Has the client's local day (targetDate, YYYY-MM-DD) finished? True once the
 // client's local calendar date has advanced past targetDate. Intl is DST- and
-// travel-aware, so this is correct across spring-forward and timezone changes.
+// travel-aware, so this is correct across spring-forward and timezone changes;
+// tzDate is the shared, guarded implementation (falls back to UTC on a bad zone).
 export function dayHasEnded(targetDate: string, timezone: string, now: Date): boolean {
-  const localDate = new Intl.DateTimeFormat("en-CA", { timeZone: timezone }).format(now);
-  return localDate > targetDate;
+  return tzDate(timezone, now) > targetDate;
 }

@@ -29,14 +29,18 @@ export function DailyLog({ initial, unit = "kg" }: { initial: DailyState; unit?:
   const [sleepH, setSleepH] = useState(initial.sleepMin !== null ? String(Math.round((initial.sleepMin / 60) * 10) / 10) : "");
   const [wearableSaved, setWearableSaved] = useState(initial.steps !== null || initial.sleepMin !== null);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function saveWeight() {
     const value = Number(weight);
     if (!Number.isFinite(value) || value <= 0 || busy) return;
     setBusy(true);
+    setError(null);
     try {
       await runOrQueue("weighIn", { value, unit });
       setWeightSaved(true);
+    } catch {
+      setError("Couldn't save your weigh-in — please try again.");
     } finally {
       setBusy(false);
     }
@@ -44,10 +48,15 @@ export function DailyLog({ initial, unit = "kg" }: { initial: DailyState; unit?:
 
   async function setStatus(status: "trained" | "rest") {
     if (busy) return;
+    const prev = checkin;
     setBusy(true);
+    setError(null);
     setCheckin(status);
     try {
       await runOrQueue("checkin", { status });
+    } catch {
+      setCheckin(prev); // revert the optimistic highlight so it doesn't read as saved
+      setError("Couldn't save your check-in — please try again.");
     } finally {
       setBusy(false);
     }
@@ -55,13 +64,22 @@ export function DailyLog({ initial, unit = "kg" }: { initial: DailyState; unit?:
 
   async function saveWearable() {
     if (busy) return;
-    const s = steps ? Math.round(Number(steps)) : null;
-    const sleepMin = sleepH ? Math.round(Number(sleepH) * 60) : null;
+    const s = steps.trim() ? Math.round(Number(steps)) : null;
+    const sleepMin = sleepH.trim() ? Math.round(Number(sleepH) * 60) : null;
+    // Reject un-parseable numbers up front (e.g. "12,5") instead of failing the
+    // whole save server-side with no feedback.
+    if ((s !== null && !Number.isFinite(s)) || (sleepMin !== null && !Number.isFinite(sleepMin))) {
+      setError("Please enter steps and sleep as plain numbers.");
+      return;
+    }
     if (s === null && sleepMin === null) return;
     setBusy(true);
+    setError(null);
     try {
       await runOrQueue("wearable", { steps: s, sleepMin });
       setWearableSaved(true);
+    } catch {
+      setError("Couldn't save that — please try again.");
     } finally {
       setBusy(false);
     }
@@ -69,6 +87,12 @@ export function DailyLog({ initial, unit = "kg" }: { initial: DailyState; unit?:
 
   return (
     <div className="space-y-2" data-testid="daily-log">
+      {error && (
+        <p className="text-sm text-[var(--color-danger)]" data-testid="daily-log-error">
+          {error}
+        </p>
+      )}
+
       {/* Weigh-in */}
       <div className={cardCls}>
         <div className="mb-2 flex items-center gap-2 text-sm font-medium">

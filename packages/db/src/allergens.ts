@@ -63,13 +63,19 @@ export function isAllergenTag(t: string): t is AllergenTag {
   return (ALL_ALLERGEN_TAGS as string[]).includes(t);
 }
 
-// Whole-word match with optional simple plural (s/es). Word boundaries stop the
-// substring mis-fires; plurals/multi-word keywords ("peanuts", "tree nut") still
-// match. Compounds a boundary would miss (e.g. "buttermilk" via "milk") are
-// listed as their own keywords.
+// Leading-word-boundary PREFIX match. Fail-closed (ORIGINAL-SPEC §10): we must
+// never MISS an allergen, so we match the keyword at a word start and allow it to
+// run into a compound — "soy" tags "soybean"/"soymilk", "milk" tags "milkshake",
+// "almond" tags "almondmilk", "til" tags "tilgul". The leading \b still blocks
+// the two suffix traps this vocabulary had ("til" inside "len·til" → not sesame;
+// there is no boundary before "til" there). The only cost is a few safe
+// OVER-tags (e.g. "egg" prefix-matches "eggplant"), which is the correct
+// direction — over-tagging merely excludes a food from an allergic client, while
+// under-tagging could reach them. (A trailing \b, used earlier, caused exactly
+// that unsafe under-tagging on compounds and was removed.)
 function keywordMatches(hay: string, kw: string): boolean {
   const esc = kw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return new RegExp(`\\b${esc}(s|es)?\\b`).test(hay);
+  return new RegExp(`\\b${esc}`).test(hay);
 }
 
 // Tags implied by free text (a food name and/or ingredient hint).

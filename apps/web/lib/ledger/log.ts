@@ -6,6 +6,7 @@ import type { Json } from "@supertrainer/db/types";
 
 import { trackServer } from "@/lib/analytics/server";
 import { computeConfirmedItems } from "@/lib/ledger/resolve";
+import { tzDate } from "@/lib/ledger/tz";
 import { getSessionClaims } from "@/lib/onboarding/state";
 import { type ComputedMacros } from "@/lib/preview/macros";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -64,16 +65,9 @@ export async function getCurrentClientContext(): Promise<ClientContext | null> {
   };
 }
 
-// The client-local calendar date — the ledger's day bucket. en-CA formats as
-// YYYY-MM-DD, so this is the client's "today" in their own timezone (P3.4's
-// day-close depends on this being correct).
-export function tzDate(timezone: string, at: Date = new Date()): string {
-  try {
-    return new Intl.DateTimeFormat("en-CA", { timeZone: timezone }).format(at);
-  } catch {
-    return new Intl.DateTimeFormat("en-CA", { timeZone: "UTC" }).format(at);
-  }
-}
+// tzDate (client-local calendar date, the ledger's day bucket) is re-exported
+// from ./tz for existing importers; the single guarded impl lives there.
+export { tzDate };
 
 export interface LogMealResult {
   id: string;

@@ -71,6 +71,9 @@ const PIECE_WORDS = new Set([
 ]);
 
 function singularize(u: string): string {
+  // "-es" sibilant plurals ("glasses"->"glass", "boxes"->"box") strip two chars;
+  // everything else strips a trailing "s" ("cups"->"cup", "grapes"->"grape").
+  if (u.length > 4 && /(s|x|z|sh|ch)es$/.test(u)) return u.slice(0, -2);
   return u.length > 3 && u.endsWith("s") ? u.slice(0, -1) : u;
 }
 

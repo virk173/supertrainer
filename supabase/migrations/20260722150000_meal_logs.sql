@@ -137,8 +137,15 @@ create policy "clients upload own meal photos"
   to authenticated
   with check (
     bucket_id = 'meal-photos'
-    and (storage.foldername(name))[2] in (
-      select id::text from public.clients where profile_id = (select auth.uid())
+    -- The WHOLE path must be the caller's own {org_id}/{client_id}: this stops a
+    -- client uploading into another org's namespace AND guarantees the [1]
+    -- segment is a real org uuid (so the staff-read policy's ::uuid cast can't be
+    -- made to throw on a malformed segment).
+    and exists (
+      select 1 from public.clients
+      where profile_id = (select auth.uid())
+        and id::text = (storage.foldername(name))[2]
+        and org_id::text = (storage.foldername(name))[1]
     )
   );
 

@@ -6,6 +6,7 @@ import {
   type LedgerDayEval,
   type MealSlot,
 } from "@/lib/ledger/day-close";
+import { tzDate } from "@/lib/ledger/tz";
 
 // Phase 3.4 — the day-close scheduler wiring. Gathers a client's real logs for a
 // finished local day, runs the pure engine (day-close.ts), and writes the
@@ -21,14 +22,6 @@ function addDays(date: string, n: number): string {
   const d = new Date(`${date}T00:00:00Z`);
   d.setUTCDate(d.getUTCDate() + n);
   return d.toISOString().slice(0, 10);
-}
-
-function localDate(timezone: string, now: Date): string {
-  try {
-    return new Intl.DateTimeFormat("en-CA", { timeZone: timezone }).format(now);
-  } catch {
-    return new Intl.DateTimeFormat("en-CA", { timeZone: "UTC" }).format(now);
-  }
 }
 
 function weekdayOf(date: string): number {
@@ -160,7 +153,7 @@ export async function closeDueDays(
   for (const c of clients ?? []) {
     const timezone = ((c.profiles as { timezone?: string } | null)?.timezone) ?? "UTC";
     const client: ClientRow = { id: c.id, org_id: c.org_id, status: c.status, intake: c.intake, timezone };
-    const today = localDate(timezone, now);
+    const today = tzDate(timezone, now);
 
     const { data: existing } = await db.from("ledger_days").select("tz_date").eq("client_id", c.id);
     const done = new Set((existing ?? []).map((r) => r.tz_date));

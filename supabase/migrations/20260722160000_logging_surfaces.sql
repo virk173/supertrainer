@@ -183,8 +183,12 @@ create policy "clients upload own progress photos"
   on storage.objects for insert to authenticated
   with check (
     bucket_id = 'progress-photos'
-    and (storage.foldername(name))[2] in (
-      select id::text from public.clients where profile_id = (select auth.uid())
+    -- Whole path must be the caller's own {org_id}/{client_id} (see meal-photos).
+    and exists (
+      select 1 from public.clients
+      where profile_id = (select auth.uid())
+        and id::text = (storage.foldername(name))[2]
+        and org_id::text = (storage.foldername(name))[1]
     )
   );
 create policy "staff read own org progress photos"

@@ -53,11 +53,36 @@ test("tick defers during quiet hours (nothing enqueued)", async () => {
   expect(notifs.data?.length).toBe(0);
 });
 
-test("tick is idempotent — a second run does not double-enqueue", async () => {
+test("tick is idempotent — a second run double-enqueues neither the notification nor the thread message", async () => {
   const { service, clientId } = await seedWithRule("rem-idem", ["12:00"]);
   await runReminderTick(service, NOON, { clientIds: [clientId] });
   await runReminderTick(service, NOON, { clientIds: [clientId] });
   const notifs = await service.from("notifications").select("id").eq("client_id", clientId);
+  expect(notifs.data?.length).toBe(1);
+  // The thread mirror must also be de-duped (was posted unconditionally before).
+  const msgs = await service.from("messages").select("id").eq("client_id", clientId).eq("kind", "reminder");
+  expect(msgs.data?.length).toBe(1);
+});
+
+test("regression: a weigh-in scheduled by weekday NAME fires (names were compared to numeric weekday)", async () => {
+  const service = serviceClient();
+  const { userId, orgId } = await seedClient(uniqueEmail("rem-weekday"));
+  const { data: client } = await service.from("clients").select("id").eq("profile_id", userId).single();
+  const names = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const todayName = names[new Date(`${DAY}T12:00:00Z`).getUTCDay()];
+  await service.from("reminder_rules").insert({
+    org_id: orgId, client_id: client!.id, kind: "weigh_in", enabled: true,
+    schedule: { days: [todayName], time: "07:00" },
+  });
+  await runReminderTick(service, NOON, { clientIds: [client!.id] });
+  const notifs = await service.from("notifications").select("kind").eq("client_id", client!.id);
+  expect(notifs.data?.some((n) => n.kind === "weigh_in")).toBe(true);
+});
+
+test("regression: an un-padded schedule time ('8:00') fires (string compare needs HH:MM)", async () => {
+  const { service, clientId } = await seedWithRule("rem-pad", ["8:00"]);
+  await runReminderTick(service, NOON, { clientIds: [clientId] }); // local 12:30
+  const notifs = await service.from("notifications").select("kind").eq("client_id", clientId);
   expect(notifs.data?.length).toBe(1);
 });
 

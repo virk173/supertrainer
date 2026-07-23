@@ -15,7 +15,12 @@ export interface QueuedWrite {
   kind: string; // maps to a registered replay handler
   payload: unknown;
   queuedAt: number;
+  attempts?: number; // failed replay attempts (for retry-then-shed)
 }
+
+// A queued write is only dropped as "poison" after this many failed non-network
+// replays — so a transient server 5xx on reconnect doesn't lose real data.
+const MAX_ATTEMPTS = 5;
 
 type Handler = (payload: unknown) => Promise<unknown>;
 
@@ -108,7 +113,12 @@ export async function flushQueue(): Promise<number> {
       await remove(item.id);
       flushed++;
     } catch (err) {
-      if (!isNetworkError(err)) await remove(item.id); // drop poison items
+      if (isNetworkError(err)) break; // still offline — keep everything for next reconnect
+      // Server/validation error: retry a few times (a transient 5xx shouldn't
+      // lose the write) before shedding it as poison.
+      const attempts = (item.attempts ?? 0) + 1;
+      if (attempts >= MAX_ATTEMPTS) await remove(item.id);
+      else await put({ ...item, attempts });
     }
   }
   return flushed;

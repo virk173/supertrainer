@@ -195,6 +195,11 @@ as $$
       (f.org_id is not null) as is_org_custom
     from public.foods f, q
     where
+      -- An empty/whitespace query must match NOTHING (otherwise `like '' || '%'`
+      -- = `like '%'` would return the whole table). The TS wrapper also guards
+      -- this; belt-and-suspenders for direct RPC callers.
+      q.term <> ''
+      and
       -- Belt-and-suspenders org scope: RLS already narrows authenticated callers
       -- to globals + their own org, but service-role callers bypass RLS, so scope
       -- org-customs to q.org explicitly (globals always visible; unknown org =>

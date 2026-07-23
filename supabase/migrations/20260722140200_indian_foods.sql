@@ -27,7 +27,7 @@ values
   ('ifct', 'IFCT2017 recipe est. matar paneer', 'Matar paneer', 'matar paneer', array['indian']::text[], array['dairy']::text[], '{"katori":150}'::jsonb, 180, 8, 10, 12, 3, false),
   ('ifct', 'IFCT2017 recipe est. aloo gobi', 'Aloo gobi', 'aloo gobi', array['indian']::text[], array[]::text[], '{"katori":150}'::jsonb, 100, 3, 13, 5, 3, false),
   ('ifct', 'IFCT2017 recipe est. bhindi masala', 'Bhindi masala (okra fry)', 'bhindi masala (okra fry)', array['indian']::text[], array[]::text[], '{"katori":150}'::jsonb, 110, 2, 8, 8, 4, false),
-  ('ifct', 'IFCT2017 recipe est. baingan bharta', 'Baingan bharta', 'baingan bharta', array['indian']::text[], array[]::text[], '{"katori":150}'::jsonb, 95, 2, 9, 6, 3.5, false),
+  ('ifct', 'IFCT2017 recipe est. baingan bharta', 'Baingan bharta', 'baingan bharta', array['indian']::text[], array['egg']::text[], '{"katori":150}'::jsonb, 95, 2, 9, 6, 3.5, false),
   ('ifct', 'IFCT2017 recipe est. mixed veg curry', 'Mixed vegetable curry', 'mixed vegetable curry', array['indian']::text[], array[]::text[], '{"katori":150}'::jsonb, 105, 3, 11, 6, 3.5, false),
   ('ifct', 'IFCT2017 recipe est. aloo matar', 'Aloo matar', 'aloo matar', array['indian']::text[], array[]::text[], '{"katori":150}'::jsonb, 110, 3, 15, 5, 3, false),
   ('ifct', 'IFCT2017 recipe est. jeera aloo', 'Jeera aloo', 'jeera aloo', array['indian']::text[], array[]::text[], '{"katori":150}'::jsonb, 130, 2, 20, 5, 2.5, false),
