@@ -224,6 +224,63 @@ export type Database = {
           },
         ]
       }
+      draft_edits: {
+        Row: {
+          after: Json | null
+          before: Json | null
+          created_at: string
+          distilled_at: string | null
+          edit_kind: Database["public"]["Enums"]["draft_edit_kind"]
+          editor_id: string | null
+          entity_id: string
+          entity_type: Database["public"]["Enums"]["draft_edit_entity"]
+          id: string
+          org_id: string
+          path: string
+        }
+        Insert: {
+          after?: Json | null
+          before?: Json | null
+          created_at?: string
+          distilled_at?: string | null
+          edit_kind: Database["public"]["Enums"]["draft_edit_kind"]
+          editor_id?: string | null
+          entity_id: string
+          entity_type: Database["public"]["Enums"]["draft_edit_entity"]
+          id?: string
+          org_id: string
+          path: string
+        }
+        Update: {
+          after?: Json | null
+          before?: Json | null
+          created_at?: string
+          distilled_at?: string | null
+          edit_kind?: Database["public"]["Enums"]["draft_edit_kind"]
+          editor_id?: string | null
+          entity_id?: string
+          entity_type?: Database["public"]["Enums"]["draft_edit_entity"]
+          id?: string
+          org_id?: string
+          path?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "draft_edits_editor_id_fkey"
+            columns: ["editor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "draft_edits_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       events: {
         Row: {
           client_id: string | null
@@ -1126,6 +1183,13 @@ export type Database = {
             referencedRelation: "orgs"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "plans_active_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "plans"
+            referencedColumns: ["id"]
+          },
         ]
       }
       profiles: {
@@ -1757,6 +1821,14 @@ export type Database = {
       checkin_status: "trained" | "rest" | "missed"
       client_source: "teaser" | "invite" | "import"
       client_status: "lead" | "onboarding" | "active" | "paused" | "churned"
+      draft_edit_entity: "plan" | "split" | "reply"
+      draft_edit_kind:
+        | "swap"
+        | "resize"
+        | "add"
+        | "remove"
+        | "structure"
+        | "rewrite"
       food_source: "usda" | "off" | "ifct" | "org_custom" | "seed"
       interview_section:
         | "logistics"
@@ -1931,6 +2003,15 @@ export const Constants = {
       checkin_status: ["trained", "rest", "missed"],
       client_source: ["teaser", "invite", "import"],
       client_status: ["lead", "onboarding", "active", "paused", "churned"],
+      draft_edit_entity: ["plan", "split", "reply"],
+      draft_edit_kind: [
+        "swap",
+        "resize",
+        "add",
+        "remove",
+        "structure",
+        "rewrite",
+      ],
       food_source: ["usda", "off", "ifct", "org_custom", "seed"],
       interview_section: [
         "logistics",
