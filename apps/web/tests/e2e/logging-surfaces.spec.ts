@@ -47,10 +47,15 @@ test("surface writes are idempotent (offline-replay safe) and auto-satisfy the c
   expect(await upsertCheckin(service, ctx, "rest")).toBe("rest");
   expect(await hasWorkoutSets(service, ctx.clientId, DAY)).toBe(false);
 
+  // exercise_id now FKs the exercises catalog (P5.3) — use a seeded exercise.
+  const { data: ex } = await service.from("exercises").select("id, name").eq("source", "feb").limit(1).single();
+  const exerciseId = ex!.id;
+  const exerciseName = ex!.name;
+
   // Logging sets auto-satisfies the check-in to 'trained'...
   await upsertWorkoutSets(service, ctx, [
-    { exerciseId: "bench", exerciseName: "Bench Press", setNumber: 1, weightKg: 60, reps: 8 },
-    { exerciseId: "bench", exerciseName: "Bench Press", setNumber: 2, weightKg: 60, reps: 8 },
+    { exerciseId, exerciseName, setNumber: 1, weightKg: 60, reps: 8 },
+    { exerciseId, exerciseName, setNumber: 2, weightKg: 60, reps: 8 },
   ]);
   expect(await hasWorkoutSets(service, ctx.clientId, DAY)).toBe(true);
   const c1 = await service.from("gym_checkins").select("status").eq("client_id", ctx.clientId).eq("tz_date", DAY).single();
@@ -61,8 +66,8 @@ test("surface writes are idempotent (offline-replay safe) and auto-satisfy the c
 
   // Replaying the same sets -> still 2 rows, not 4.
   await upsertWorkoutSets(service, ctx, [
-    { exerciseId: "bench", exerciseName: "Bench Press", setNumber: 1, weightKg: 60, reps: 8 },
-    { exerciseId: "bench", exerciseName: "Bench Press", setNumber: 2, weightKg: 60, reps: 8 },
+    { exerciseId, exerciseName, setNumber: 1, weightKg: 60, reps: 8 },
+    { exerciseId, exerciseName, setNumber: 2, weightKg: 60, reps: 8 },
   ]);
   const sets = await service.from("workout_logs").select("id").eq("client_id", ctx.clientId).eq("tz_date", DAY);
   expect(sets.data?.length).toBe(2);

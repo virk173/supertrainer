@@ -8,7 +8,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(12);
+select plan(14);
 
 insert into auth.users (id, email, aud, role) values
   ('a0000000-0000-0000-0000-000000000001', 'owner-a@test.local', 'authenticated', 'authenticated'),
@@ -72,6 +72,19 @@ select throws_like(
      values ('11111111-1111-1111-1111-111111111111', 'org_custom', 'x', 'x') $$,
   '%permission denied%',
   'no authenticated INSERT on exercises (service-role only in P5.1)'
+);
+-- P5.3 opens a trainer WRITE path on exercise_videos for the org's own overrides.
+select lives_ok(
+  $$ insert into public.exercise_videos (exercise_id, org_id, kind, youtube_id)
+     select id, '11111111-1111-1111-1111-111111111111', 'youtube', 'ownvid1'
+       from public.exercises where source = 'feb' order by name offset 1 limit 1 $$,
+  'owner A can add a video override for their own org'
+);
+select throws_like(
+  $$ insert into public.exercise_videos (exercise_id, org_id, kind, youtube_id)
+     select id, null, 'youtube', 'platvid1' from public.exercises where source = 'feb' limit 1 $$,
+  '%row-level security%',
+  'owner A cannot add a PLATFORM-default video (service-role only)'
 );
 
 -- ── Client A (non-staff, linked via clients) ─────────────────────────────────
