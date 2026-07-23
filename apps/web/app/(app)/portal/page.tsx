@@ -1,8 +1,13 @@
 import Link from "next/link";
-import { MessageCircle, Sun } from "lucide-react";
+import { Camera, Dumbbell, MessageCircle, UtensilsCrossed } from "lucide-react";
 
-import { EmptyState } from "@supertrainer/ui/components/empty-state";
+import { ledgerDaysInRange } from "@supertrainer/db/queries";
 
+import { ClientScoreCard } from "@/components/client-score-card";
+import { DailyLog, type DailyState } from "@/components/daily-log";
+import { ReminderVacationToggle } from "@/components/reminder-vacation-toggle";
+import { getCurrentClientContext, tzDate } from "@/lib/ledger/log";
+import { computeClientLens, type ClientLens, type LedgerDayRow } from "@/lib/ledger/score";
 import { getSessionClaims } from "@/lib/onboarding/state";
 import { createServiceClient } from "@/lib/supabase/server";
 
@@ -30,17 +35,65 @@ async function interviewPending(): Promise<boolean> {
   return !state || state.status === "in_progress";
 }
 
+// Today's already-logged weigh-in / check-in / steps+sleep, so the quick-log
+// shows saved state instead of blank inputs (Phase 3.3).
+async function todayState(): Promise<DailyState | null> {
+  const ctx = await getCurrentClientContext();
+  if (!ctx) return null;
+  const service = createServiceClient();
+  const day = tzDate(ctx.timezone);
+  const [weigh, checkin, wearable] = await Promise.all([
+    service.from("weigh_ins").select("weight_kg").eq("client_id", ctx.clientId).eq("tz_date", day).maybeSingle(),
+    service.from("gym_checkins").select("status").eq("client_id", ctx.clientId).eq("tz_date", day).maybeSingle(),
+    service.from("wearable_daily").select("steps, sleep_min").eq("client_id", ctx.clientId).eq("tz_date", day).maybeSingle(),
+  ]);
+  return {
+    weightKg: weigh.data ? Number(weigh.data.weight_kg) : null,
+    checkin: (checkin.data?.status as DailyState["checkin"]) ?? null,
+    steps: wearable.data?.steps ?? null,
+    sleepMin: wearable.data?.sleep_min ?? null,
+  };
+}
+
+// The client-lens weekly score over the last ~2 weeks of closed ledger days.
+async function clientLens(): Promise<ClientLens | null> {
+  const ctx = await getCurrentClientContext();
+  if (!ctx) return null;
+  const to = tzDate(ctx.timezone);
+  const fromDate = new Date(`${to}T00:00:00Z`);
+  fromDate.setUTCDate(fromDate.getUTCDate() - 13);
+  const rows = await ledgerDaysInRange(createServiceClient(), ctx.clientId, fromDate.toISOString().slice(0, 10), to);
+  if (rows.length === 0) return null;
+  return computeClientLens(rows as unknown as LedgerDayRow[]);
+}
+
+// Are the client's reminders currently paused (vacation mode)? True only when
+// they have rules and all of them are disabled.
+async function remindersPaused(): Promise<boolean> {
+  const ctx = await getCurrentClientContext();
+  if (!ctx) return false;
+  const { data } = await createServiceClient()
+    .from("reminder_rules")
+    .select("enabled")
+    .eq("client_id", ctx.clientId);
+  return Boolean(data && data.length > 0 && data.every((r) => !r.enabled));
+}
+
 export default async function PortalHomePage() {
-  const pending = await interviewPending();
+  const [pending, daily, lens, paused] = await Promise.all([
+    interviewPending(),
+    todayState(),
+    clientLens(),
+    remindersPaused(),
+  ]);
 
   return (
     <div className="space-y-4">
-      <h1
-        className="text-xl font-semibold tracking-tight"
-        data-testid="portal-home"
-      >
+      <h1 className="text-xl font-semibold tracking-tight" data-testid="portal-home">
         Today
       </h1>
+
+      {lens && <ClientScoreCard lens={lens} />}
 
       {pending && (
         <Link
@@ -66,11 +119,50 @@ export default async function PortalHomePage() {
         </Link>
       )}
 
-      <EmptyState
-        icon={<Sun />}
-        title="Nothing to log yet"
-        description="Your trainer is setting things up. Your plan and daily check-ins will appear here."
-      />
+      <Link
+        href="/portal/log"
+        data-testid="log-meal-cta"
+        className="flex items-center gap-3 rounded-lg border bg-surface-raised p-4 transition-colors hover:bg-surface"
+      >
+        <span
+          className="flex size-9 shrink-0 items-center justify-center rounded-lg"
+          style={{
+            background: "var(--brand-primary, var(--color-primary))",
+            color: "var(--brand-on-primary, var(--color-primary-foreground))",
+          }}
+        >
+          <UtensilsCrossed className="size-4" />
+        </span>
+        <span>
+          <span className="block text-sm font-medium">Log a meal</span>
+          <span className="block text-sm text-muted-foreground">
+            Snap it, say it, or type it — takes about ten seconds.
+          </span>
+        </span>
+      </Link>
+
+      {daily && <DailyLog initial={daily} />}
+
+      <div className="grid grid-cols-2 gap-2">
+        <Link
+          href="/portal/workout"
+          data-testid="workout-cta"
+          className="flex items-center gap-2 rounded-lg border bg-surface-raised p-3 text-sm font-medium transition-colors hover:bg-surface"
+        >
+          <Dumbbell className="size-4" /> Log a workout
+        </Link>
+        <Link
+          href="/portal/progress"
+          data-testid="progress-cta"
+          className="flex items-center gap-2 rounded-lg border bg-surface-raised p-3 text-sm font-medium transition-colors hover:bg-surface"
+        >
+          <Camera className="size-4" /> Progress photos
+        </Link>
+      </div>
+
+      <div className="pt-1">
+        <ReminderVacationToggle initialPaused={paused} />
+      </div>
     </div>
   );
 }

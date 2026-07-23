@@ -38,3 +38,7 @@ next-env.d.ts
 
 # Vercel
 .vercel/
+
+# Phase 3.1 USDA importer resume cursor (never commit)
+packages/db/scripts/fixtures/**/.import-usda-state.json
+.import-usda-state.json
