@@ -988,6 +988,89 @@ export type Database = {
           },
         ]
       }
+      plans: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          based_on_plan_id: string | null
+          client_id: string
+          content: Json
+          created_at: string
+          day_types: Json
+          id: string
+          org_id: string
+          protocol: Json
+          rationale: string | null
+          source: Database["public"]["Enums"]["plan_trigger"]
+          status: Database["public"]["Enums"]["plan_status"]
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          based_on_plan_id?: string | null
+          client_id: string
+          content?: Json
+          created_at?: string
+          day_types?: Json
+          id?: string
+          org_id: string
+          protocol?: Json
+          rationale?: string | null
+          source: Database["public"]["Enums"]["plan_trigger"]
+          status?: Database["public"]["Enums"]["plan_status"]
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          based_on_plan_id?: string | null
+          client_id?: string
+          content?: Json
+          created_at?: string
+          day_types?: Json
+          id?: string
+          org_id?: string
+          protocol?: Json
+          rationale?: string | null
+          source?: Database["public"]["Enums"]["plan_trigger"]
+          status?: Database["public"]["Enums"]["plan_status"]
+          updated_at?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plans_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plans_based_on_plan_id_fkey"
+            columns: ["based_on_plan_id"]
+            isOneToOne: false
+            referencedRelation: "plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plans_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plans_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       plans_active: {
         Row: {
           client_id: string
@@ -1703,6 +1786,7 @@ export type Database = {
       org_role: "owner" | "staff" | "client"
       plan_kind: "diet" | "split"
       plan_request_status: "queued" | "running" | "drafted" | "failed"
+      plan_status: "draft" | "approved" | "superseded" | "archived"
       plan_trigger: "onboarding" | "monthly" | "manual"
       progress_pose: "front" | "side" | "back"
       reminder_kind: "meal" | "weigh_in" | "checkin" | "custom"
@@ -1871,6 +1955,7 @@ export const Constants = {
       org_role: ["owner", "staff", "client"],
       plan_kind: ["diet", "split"],
       plan_request_status: ["queued", "running", "drafted", "failed"],
+      plan_status: ["draft", "approved", "superseded", "archived"],
       plan_trigger: ["onboarding", "monthly", "manual"],
       progress_pose: ["front", "side", "back"],
       reminder_kind: ["meal", "weigh_in", "checkin", "custom"],
