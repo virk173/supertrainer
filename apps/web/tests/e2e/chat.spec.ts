@@ -191,6 +191,38 @@ test("portal shows the push-degraded banner and the chat unread badge", async ({
   await ctx.close();
 });
 
+test("a client can tap-answer a check-in card and it records to the ledger", async ({ browser }) => {
+  const pair = await seedPair();
+  const service = serviceClient();
+
+  await service.from("messages").insert({
+    org_id: pair.orgId,
+    client_id: pair.clientId,
+    sender: "system",
+    kind: "card",
+    body: "How did you sleep last night?",
+    payload: { check_in: true, card_id: "sleep-1", card_version: 1, card_kind: "sleep", answer_type: "scale", options: ["Awful", "Great"] },
+  });
+
+  const ctx = await browser.newContext();
+  const page = await ctx.newPage();
+  await signInTo(page, pair.clientToken, "/portal/chat");
+
+  const card = page.getByTestId("checkin-card");
+  await expect(card).toBeVisible();
+  await card.getByTestId("checkin-scale-4").click();
+  await expect(page.getByTestId("checkin-answered")).toBeVisible();
+
+  await expect
+    .poll(async () => {
+      const { data } = await service.from("check_in_responses").select("answer").eq("client_id", pair.clientId);
+      return data?.length ?? 0;
+    })
+    .toBe(1);
+
+  await ctx.close();
+});
+
 test("a client message that trips the escalation floor gets an automated holding line", async ({ browser }) => {
   const pair = await seedPair();
   const service = serviceClient();

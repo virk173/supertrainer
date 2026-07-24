@@ -85,6 +85,67 @@ export type Database = {
           },
         ]
       }
+      check_in_responses: {
+        Row: {
+          answer: Json
+          answered_at: string
+          card_id: string
+          card_kind: string
+          card_version: number
+          client_id: string
+          created_at: string
+          id: string
+          message_id: string | null
+          org_id: string
+        }
+        Insert: {
+          answer?: Json
+          answered_at?: string
+          card_id: string
+          card_kind: string
+          card_version?: number
+          client_id: string
+          created_at?: string
+          id?: string
+          message_id?: string | null
+          org_id: string
+        }
+        Update: {
+          answer?: Json
+          answered_at?: string
+          card_id?: string
+          card_kind?: string
+          card_version?: number
+          client_id?: string
+          created_at?: string
+          id?: string
+          message_id?: string | null
+          org_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "check_in_responses_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "check_in_responses_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "check_in_responses_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clients: {
         Row: {
           approved_manually: boolean

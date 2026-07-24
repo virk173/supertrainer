@@ -9,6 +9,7 @@ import { Button } from "@supertrainer/ui/components/button";
 import { Input } from "@supertrainer/ui/components/input";
 import { cn } from "@supertrainer/ui/lib/utils";
 
+import type { AnswerCardFn } from "@/components/chat/check-in-card";
 import { MessageItem } from "@/components/chat/message-item";
 import {
   rawFromRow,
@@ -86,6 +87,7 @@ export function ThreadView({
   sendAction,
   markReadAction,
   loadOlderAction,
+  answerCardAction,
   emptyHint,
 }: {
   viewer: Viewer;
@@ -96,6 +98,7 @@ export function ThreadView({
   sendAction: SendAction;
   markReadAction: MarkReadAction;
   loadOlderAction: LoadOlderAction;
+  answerCardAction?: AnswerCardFn;
   emptyHint: string;
 }) {
   const [messages, setMessages] = React.useState<MessageView[]>(initial);
@@ -226,6 +229,7 @@ export function ThreadView({
       replyTo: null,
       readAt: null,
       clientTag,
+      payload: null,
     };
     setMessages((prev) => reconcile(prev, optimistic));
 
@@ -303,7 +307,7 @@ export function ThreadView({
         )}
 
         {messages.map((m) => (
-          <MessageItem key={m.id} view={m} trainerName={trainerName} />
+          <MessageItem key={m.id} view={m} trainerName={trainerName} onAnswer={answerCardAction} />
         ))}
 
         {peerTyping && (

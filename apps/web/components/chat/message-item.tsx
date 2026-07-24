@@ -6,6 +6,7 @@ import { CheckCheck, FileText, Sparkles } from "lucide-react";
 import { Avatar } from "@supertrainer/ui/components/avatar";
 import { cn } from "@supertrainer/ui/lib/utils";
 
+import { CheckInCard, type AnswerCardFn } from "@/components/chat/check-in-card";
 import type { MessageView } from "@/lib/chat/message-view";
 
 // Phase 6.1 — one thread message. The visual identity comes straight from the
@@ -16,10 +17,16 @@ import type { MessageView } from "@/lib/chat/message-view";
 export function MessageItem({
   view,
   trainerName,
+  onAnswer,
 }: {
   view: MessageView;
   trainerName: string;
+  onAnswer?: AnswerCardFn;
 }) {
+  // A deliverable check-in card (P6.5) the client can answer inline.
+  if (view.isStructured && view.payload?.check_in && onAnswer) {
+    return <CheckInCard view={view} onAnswer={onAnswer} />;
+  }
   if (view.isStructured) return <StructuredCard view={view} trainerName={trainerName} />;
 
   const mine = view.align === "mine";

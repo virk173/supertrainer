@@ -5,7 +5,7 @@ import { getOrgTheme } from "@/lib/brand/theme";
 import { loadThreadPage } from "@/lib/chat/thread";
 import { getCurrentClientContext } from "@/lib/ledger/log";
 
-import { loadOlderClientChat, markClientThreadRead, sendClientChat } from "./actions";
+import { answerCardChat, loadOlderClientChat, markClientThreadRead, sendClientChat } from "./actions";
 
 export const metadata = { title: "Chat — supertrainer" };
 
@@ -35,6 +35,7 @@ export default async function PortalChatPage() {
         sendAction={sendClientChat}
         markReadAction={markClientThreadRead}
         loadOlderAction={loadOlderClientChat}
+        answerCardAction={answerCardChat}
         emptyHint={`This is your direct line to ${trainerName}. Say hi!`}
       />
     </div>

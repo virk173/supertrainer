@@ -70,6 +70,8 @@ export interface MessageView {
   readAt: string | null;
   /** The offline-dedupe tag, so an optimistic send can reconcile its realtime echo. */
   clientTag: string | null;
+  /** Structured payload (check-in card options, plan-delivery refs, …). */
+  payload: Record<string, unknown> | null;
 }
 
 export function toMessageView(msg: RawMessage, viewer: Viewer): MessageView {
@@ -95,6 +97,7 @@ export function toMessageView(msg: RawMessage, viewer: Viewer): MessageView {
     replyTo: msg.replyTo ?? null,
     readAt: msg.readAt ?? null,
     clientTag: msg.clientTag ?? null,
+    payload: (msg.payload as Record<string, unknown> | undefined) ?? null,
   };
 }
 
