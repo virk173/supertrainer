@@ -85,6 +85,64 @@ export type Database = {
           },
         ]
       }
+      call_credits: {
+        Row: {
+          client_id: string
+          created_at: string
+          credits_total: number
+          credits_used: number
+          id: string
+          org_id: string
+          period_month: string
+          subscription_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          credits_total?: number
+          credits_used?: number
+          id?: string
+          org_id: string
+          period_month: string
+          subscription_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          credits_total?: number
+          credits_used?: number
+          id?: string
+          org_id?: string
+          period_month?: string
+          subscription_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "call_credits_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "call_credits_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "call_credits_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "subscriptions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       check_in_responses: {
         Row: {
           answer: Json

@@ -32,7 +32,7 @@ export interface InboxTodos {
   lastLogDays: number | null; // days since the last logged day
   onboardingStalled: boolean;
   consentPending: boolean;
-  paymentFailed: boolean; // P8 stub — always false today
+  paymentFailed: boolean; // live (P8.5): the client's subscription is in dunning
 }
 
 export interface ClientInbox {
@@ -98,7 +98,7 @@ export async function getClientInbox(
   const tz = typeof timezone === "string" ? timezone : "UTC";
   const windowStart = dateStr(new Date(now.getTime() - 28 * DAY_MS));
 
-  const [ledgerRes, weighRes, activeRes, splitRes, draftRes] =
+  const [ledgerRes, weighRes, activeRes, splitRes, draftRes, subRes] =
     await Promise.all([
       service
         .from("ledger_days")
@@ -130,6 +130,14 @@ export async function getClientInbox(
         .eq("status", "pending")
         .order("created_at", { ascending: false })
         .limit(1),
+      // Phase 8.5 — the failed-payment flag is now live (P8 stub → real).
+      service
+        .from("subscriptions")
+        .select("status, pause_reason")
+        .eq("client_id", clientId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
     ]);
 
   const ledger = (ledgerRes.data ?? []) as unknown as LedgerDayRow[];
@@ -211,7 +219,11 @@ export async function getClientInbox(
       onboardingStalled:
         status === "onboarding" && Date.parse(client.created_at as string) < now.getTime() - 3 * DAY_MS,
       consentPending: status === "active" && !client.consent_signed_at,
-      paymentFailed: false,
+      paymentFailed:
+        subRes.data != null &&
+        (subRes.data.status === "past_due" ||
+          subRes.data.status === "unpaid" ||
+          subRes.data.pause_reason === "dunning"),
     },
     draft,
   };

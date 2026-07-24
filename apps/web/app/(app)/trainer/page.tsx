@@ -10,6 +10,7 @@ import { OnTrackGrid } from "@/components/home/on-track-grid";
 import { Sparkline } from "@/components/home/sparkline";
 import { getSessionClaims } from "@/lib/onboarding/state";
 import { getHomeData } from "@/lib/trainer/home";
+import { getRevenue } from "@/lib/trainer/revenue";
 
 export const metadata = { title: "Home — supertrainer" };
 
@@ -36,8 +37,19 @@ export default async function TrainerHomePage() {
   if (!orgId || (role !== "owner" && role !== "staff")) notFound();
 
   const now = new Date();
-  const data = await getHomeData(orgId, now);
+  const [data, revenue] = await Promise.all([getHomeData(orgId, now), getRevenue(orgId)]);
   const { kpis, digest, onTrack } = data;
+  const mrr = (() => {
+    try {
+      return new Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency: revenue.currency.toUpperCase(),
+        maximumFractionDigits: 0,
+      }).format(revenue.mrrCents / 100);
+    } catch {
+      return `${Math.round(revenue.mrrCents / 100)} ${revenue.currency.toUpperCase()}`;
+    }
+  })();
 
   return (
     <div className="space-y-6">
@@ -102,9 +114,9 @@ export default async function TrainerHomePage() {
             />
             <KpiCard
               label="MRR"
-              value="—"
+              value={mrr}
               icon={<CircleDollarSign />}
-              sub="Arrives with payments"
+              sub={`${revenue.activeSubscribers} paying`}
             />
           </div>
 
