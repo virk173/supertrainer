@@ -284,6 +284,73 @@ export type Database = {
           },
         ]
       }
+      escalations: {
+        Row: {
+          categories: string[]
+          client_id: string
+          created_at: string
+          excerpt: string | null
+          id: string
+          message_id: string | null
+          org_id: string
+          plan_change: boolean
+          resolved_at: string | null
+          self_harm: boolean
+          source: string
+          status: Database["public"]["Enums"]["escalation_status"]
+        }
+        Insert: {
+          categories?: string[]
+          client_id: string
+          created_at?: string
+          excerpt?: string | null
+          id?: string
+          message_id?: string | null
+          org_id: string
+          plan_change?: boolean
+          resolved_at?: string | null
+          self_harm?: boolean
+          source: string
+          status?: Database["public"]["Enums"]["escalation_status"]
+        }
+        Update: {
+          categories?: string[]
+          client_id?: string
+          created_at?: string
+          excerpt?: string | null
+          id?: string
+          message_id?: string | null
+          org_id?: string
+          plan_change?: boolean
+          resolved_at?: string | null
+          self_harm?: boolean
+          source?: string
+          status?: Database["public"]["Enums"]["escalation_status"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "escalations_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "escalations_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "escalations_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       events: {
         Row: {
           client_id: string | null
@@ -2107,6 +2174,7 @@ export type Database = {
         | "remove"
         | "structure"
         | "rewrite"
+      escalation_status: "open" | "acknowledged" | "resolved"
       exercise_source: "feb" | "org_custom"
       exercise_video_kind: "upload" | "youtube"
       experience_level: "beginner" | "intermediate" | "advanced"
@@ -2314,6 +2382,7 @@ export const Constants = {
         "structure",
         "rewrite",
       ],
+      escalation_status: ["open", "acknowledged", "resolved"],
       exercise_source: ["feb", "org_custom"],
       exercise_video_kind: ["upload", "youtube"],
       experience_level: ["beginner", "intermediate", "advanced"],

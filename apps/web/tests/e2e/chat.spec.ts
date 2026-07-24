@@ -191,6 +191,36 @@ test("portal shows the push-degraded banner and the chat unread badge", async ({
   await ctx.close();
 });
 
+test("a client message that trips the escalation floor gets an automated holding line", async ({ browser }) => {
+  const pair = await seedPair();
+  const service = serviceClient();
+
+  const ctx = await browser.newContext();
+  const page = await ctx.newPage();
+  await signInTo(page, pair.clientToken, "/portal/chat");
+  await expect(page.getByTestId("chat-thread")).toBeVisible();
+
+  // No ANTHROPIC_API_KEY in CI → the classifier is down, but the deterministic
+  // keyword floor still fires on "pain" → escalation → holding line.
+  await page.getByTestId("chat-input").fill("my knee is in a lot of pain after squats");
+  await page.getByTestId("chat-send").click();
+
+  // The automated SYSTEM holding line arrives in the thread.
+  const holdingLine = page.getByTestId("msg-system").filter({ hasText: "flagged" });
+  await expect(holdingLine).toBeVisible({ timeout: 10_000 });
+  await expect(holdingLine.getByTestId("coach-avatar")).toHaveCount(0); // never the coach
+
+  // And the urgent queue item was recorded for the trainer.
+  await expect
+    .poll(async () => {
+      const { data } = await service.from("escalations").select("id").eq("client_id", pair.clientId);
+      return data?.length ?? 0;
+    })
+    .toBe(1);
+
+  await ctx.close();
+});
+
 test("offline send is queued and replays on reconnect without duplicating", async ({ browser }) => {
   const pair = await seedPair();
   const service = serviceClient();

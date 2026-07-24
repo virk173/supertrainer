@@ -5,6 +5,7 @@ import { z } from "zod";
 import type { Json } from "@supertrainer/db/types";
 
 import { trackServer } from "@/lib/analytics/server";
+import { handleClientMessage } from "@/lib/comms/escalate";
 import {
   toMessageView,
   type MessageView,
@@ -143,8 +144,27 @@ export async function sendClientMessage(input: {
     return { ok: false, error: error.message };
   }
 
+  // Route the message through the fail-closed intent gate (P6.3): on escalation
+  // it records the urgent queue item + sends the holding line / crisis card. The
+  // message already landed above (realtime fanout is immediate), so this runs
+  // after; a classifier outage degrades to the keyword floor, never to "safe".
+  const inserted = row as MessageRow;
+  try {
+    await handleClientMessage(service, {
+      orgId: ctx.orgId,
+      clientId: ctx.clientId,
+      messageId: inserted.id,
+      text: parsed.data.text,
+    });
+  } catch (err) {
+    // Never fail a delivered message on a routing error — the keyword floor still
+    // ran inside handleClientMessage; a total failure here just skips the holding
+    // line (logged), it does not lose the client's message.
+    console.error("[chat] escalation routing failed:", err);
+  }
+
   await trackServer({ orgId: ctx.orgId, clientId: ctx.clientId, event: "message_sent", properties: { by: "client" } });
-  return { ok: true, message: toMessageView(toRaw(row as MessageRow), "client") };
+  return { ok: true, message: toMessageView(toRaw(inserted), "client") };
 }
 
 // A trainer replies into a client's thread. org ownership verified in code — the

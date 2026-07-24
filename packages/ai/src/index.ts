@@ -82,13 +82,29 @@ export {
   type PreviewAgentInput,
   generatePreviewDraft,
 } from "./preview";
+// The health gate + the Phase 6.3 comms-router (escalation/routing). escalation.ts
+// re-exports the health bits for P2.5 call sites; new code imports from here.
 export {
   type HealthFlagCategory,
   HEALTH_FLAG_CATEGORIES,
   type HealthFlagResult,
   keywordHealthFlags,
   detectHealthFlags,
-} from "./escalation";
+  keywordEscalation,
+  type EscalationCategory,
+  type EscalationKeywordResult,
+  classifyRoute,
+  ROUTE_CATEGORIES,
+  type RouteCategory,
+  type RoutingClassification,
+  type RouteClassifier,
+  routeMessage,
+  CONFIDENCE_FLOOR,
+  type RouteResult,
+  type RouteDeps,
+  ROUTE_FIXTURES,
+  type RouteFixture,
+} from "./comms-router";
 export {
   ClientBriefSchema,
   type ClientBrief,
