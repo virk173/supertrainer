@@ -284,6 +284,67 @@ export type Database = {
           },
         ]
       }
+      drafts: {
+        Row: {
+          actioned_at: string | null
+          category: string
+          client_id: string
+          context_snapshot: Json
+          created_at: string
+          draft_text: string
+          id: string
+          message_id: string | null
+          org_id: string
+          status: Database["public"]["Enums"]["draft_status"]
+        }
+        Insert: {
+          actioned_at?: string | null
+          category: string
+          client_id: string
+          context_snapshot?: Json
+          created_at?: string
+          draft_text: string
+          id?: string
+          message_id?: string | null
+          org_id: string
+          status?: Database["public"]["Enums"]["draft_status"]
+        }
+        Update: {
+          actioned_at?: string | null
+          category?: string
+          client_id?: string
+          context_snapshot?: Json
+          created_at?: string
+          draft_text?: string
+          id?: string
+          message_id?: string | null
+          org_id?: string
+          status?: Database["public"]["Enums"]["draft_status"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "drafts_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "drafts_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "drafts_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       escalations: {
         Row: {
           categories: string[]
@@ -2174,6 +2235,12 @@ export type Database = {
         | "remove"
         | "structure"
         | "rewrite"
+      draft_status:
+        | "pending"
+        | "approved"
+        | "edited"
+        | "rewritten"
+        | "dismissed"
       escalation_status: "open" | "acknowledged" | "resolved"
       exercise_source: "feb" | "org_custom"
       exercise_video_kind: "upload" | "youtube"
@@ -2382,6 +2449,7 @@ export const Constants = {
         "structure",
         "rewrite",
       ],
+      draft_status: ["pending", "approved", "edited", "rewritten", "dismissed"],
       escalation_status: ["open", "acknowledged", "resolved"],
       exercise_source: ["feb", "org_custom"],
       exercise_video_kind: ["upload", "youtube"],

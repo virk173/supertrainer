@@ -106,6 +106,14 @@ export {
   type RouteFixture,
 } from "./comms-router";
 export {
+  wrapNumbers,
+  draftReply,
+  type WrapNumbersInput,
+  type NumberWrapper,
+  type DraftReplyInput,
+  type ReplyDrafter,
+} from "./reply-engine";
+export {
   ClientBriefSchema,
   type ClientBrief,
   type ClientBriefInput,

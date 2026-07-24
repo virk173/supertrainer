@@ -5,7 +5,7 @@ import { z } from "zod";
 import type { Json } from "@supertrainer/db/types";
 
 import { trackServer } from "@/lib/analytics/server";
-import { handleClientMessage } from "@/lib/comms/escalate";
+import { dispatchClientMessage } from "@/lib/comms/dispatch";
 import {
   toMessageView,
   type MessageView,
@@ -144,23 +144,21 @@ export async function sendClientMessage(input: {
     return { ok: false, error: error.message };
   }
 
-  // Route the message through the fail-closed intent gate (P6.3): on escalation
-  // it records the urgent queue item + sends the holding line / crisis card. The
-  // message already landed above (realtime fanout is immediate), so this runs
-  // after; a classifier outage degrades to the keyword floor, never to "safe".
+  // Route the message through the fail-closed intent gate + lane dispatch (P6.3/
+  // 6.4): escalation → holding line + queue; routine → an instant autonomous
+  // answer with coded numbers; conversational/plan-impact → a drafted reply for
+  // the trainer's queue. The message already landed above (realtime fanout is
+  // immediate), so this runs after; any failure here never loses the message.
   const inserted = row as MessageRow;
   try {
-    await handleClientMessage(service, {
+    await dispatchClientMessage(service, {
       orgId: ctx.orgId,
       clientId: ctx.clientId,
       messageId: inserted.id,
       text: parsed.data.text,
     });
   } catch (err) {
-    // Never fail a delivered message on a routing error — the keyword floor still
-    // ran inside handleClientMessage; a total failure here just skips the holding
-    // line (logged), it does not lose the client's message.
-    console.error("[chat] escalation routing failed:", err);
+    console.error("[chat] message dispatch failed:", err);
   }
 
   await trackServer({ orgId: ctx.orgId, clientId: ctx.clientId, event: "message_sent", properties: { by: "client" } });
