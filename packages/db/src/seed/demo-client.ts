@@ -42,7 +42,72 @@ const seedCore: SeedStage = async () => {};
 const seedLedger: SeedStage = async () => {}; // Phase 3
 const seedPlans: SeedStage = async () => {}; // Phase 4
 const seedSplit: SeedStage = async () => {}; // Phase 5
-const seedThread: SeedStage = async () => {}; // Phase 6
+
+// Phase 6 — a demo thread: a little history, one escalation (pain → holding line +
+// urgent queue item), one pending drafted reply, and one delivered check-in card.
+// Idempotent via the demo check-in card marker so a re-seed doesn't duplicate.
+const seedThread: SeedStage = async (supabase, ctx) => {
+  const { count } = await supabase
+    .from("messages")
+    .select("id", { count: "exact", head: true })
+    .eq("client_id", ctx.clientId)
+    .eq("kind", "card")
+    .contains("payload", { demo: true });
+  if ((count ?? 0) > 0) return;
+
+  await supabase.from("messages").insert([
+    { org_id: ctx.orgId, client_id: ctx.clientId, sender: "client", kind: "text", body: "Hey! Excited to get started 💪" },
+    { org_id: ctx.orgId, client_id: ctx.clientId, sender: "coach", kind: "text", body: "Welcome aboard — let's build something great together." },
+    { org_id: ctx.orgId, client_id: ctx.clientId, sender: "assistant", kind: "text", body: "Logged your breakfast — nice start to the day!", payload: { autonomous: true } },
+  ]);
+
+  // One escalation: the client's pain message + the automated holding line + queue row.
+  const { data: painMsg } = await supabase
+    .from("messages")
+    .insert({ org_id: ctx.orgId, client_id: ctx.clientId, sender: "client", kind: "text", body: "my knee is in a lot of pain after squats" })
+    .select("id")
+    .single();
+  await supabase.from("messages").insert({
+    org_id: ctx.orgId,
+    client_id: ctx.clientId,
+    sender: "system",
+    kind: "text",
+    body: "Thanks for telling your coach — I've flagged this so they can reply to you personally.",
+    payload: { escalation: true },
+  });
+  await supabase.from("escalations").insert({
+    org_id: ctx.orgId,
+    client_id: ctx.clientId,
+    message_id: painMsg?.id ?? null,
+    categories: ["injury"],
+    source: "keyword",
+    excerpt: "my knee is in a lot of pain after squats",
+  });
+
+  // One pending drafted reply awaiting the trainer's approval.
+  const { data: qMsg } = await supabase
+    .from("messages")
+    .insert({ org_id: ctx.orgId, client_id: ctx.clientId, sender: "client", kind: "text", body: "How do you stay motivated on weekends?" })
+    .select("id")
+    .single();
+  await supabase.from("drafts").insert({
+    org_id: ctx.orgId,
+    client_id: ctx.clientId,
+    message_id: qMsg?.id ?? null,
+    category: "conversational",
+    draft_text: "Weekends are where consistency is won — pick one anchor habit (a walk, a solid breakfast) and keep the rest flexible.",
+  });
+
+  // One delivered check-in card (the demo marker).
+  await supabase.from("messages").insert({
+    org_id: ctx.orgId,
+    client_id: ctx.clientId,
+    sender: "system",
+    kind: "card",
+    body: "How did you sleep last night?",
+    payload: { demo: true, check_in: true, card_id: "sleep-1", card_version: 1, card_kind: "sleep", answer_type: "scale", options: ["Awful", "Great"] },
+  });
+};
 
 const STAGES: SeedStage[] = [seedCore, seedLedger, seedPlans, seedSplit, seedThread];
 

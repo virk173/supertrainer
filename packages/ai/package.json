@@ -11,7 +11,8 @@
     "eval:style": "tsx evals/style-ingestion/run.ts",
     "eval:interview": "tsx evals/interview/run.ts",
     "eval:diet": "tsx evals/diet-plan/run.ts",
-  "eval:split": "tsx evals/split-designer/run.ts"
+    "eval:split": "tsx evals/split-designer/run.ts",
+    "eval:comms": "tsx evals/comms-router/run.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.111.0",

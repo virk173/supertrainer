@@ -85,6 +85,67 @@ export type Database = {
           },
         ]
       }
+      check_in_responses: {
+        Row: {
+          answer: Json
+          answered_at: string
+          card_id: string
+          card_kind: string
+          card_version: number
+          client_id: string
+          created_at: string
+          id: string
+          message_id: string | null
+          org_id: string
+        }
+        Insert: {
+          answer?: Json
+          answered_at?: string
+          card_id: string
+          card_kind: string
+          card_version?: number
+          client_id: string
+          created_at?: string
+          id?: string
+          message_id?: string | null
+          org_id: string
+        }
+        Update: {
+          answer?: Json
+          answered_at?: string
+          card_id?: string
+          card_kind?: string
+          card_version?: number
+          client_id?: string
+          created_at?: string
+          id?: string
+          message_id?: string | null
+          org_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "check_in_responses_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "check_in_responses_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "check_in_responses_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clients: {
         Row: {
           approved_manually: boolean
@@ -102,6 +163,7 @@ export type Database = {
           notification_channel: Database["public"]["Enums"]["notification_channel"]
           org_id: string
           profile_id: string | null
+          push_degraded_at: string | null
           source: Database["public"]["Enums"]["client_source"]
           status: Database["public"]["Enums"]["client_status"]
           updated_at: string
@@ -122,6 +184,7 @@ export type Database = {
           notification_channel?: Database["public"]["Enums"]["notification_channel"]
           org_id: string
           profile_id?: string | null
+          push_degraded_at?: string | null
           source: Database["public"]["Enums"]["client_source"]
           status?: Database["public"]["Enums"]["client_status"]
           updated_at?: string
@@ -142,6 +205,7 @@ export type Database = {
           notification_channel?: Database["public"]["Enums"]["notification_channel"]
           org_id?: string
           profile_id?: string | null
+          push_degraded_at?: string | null
           source?: Database["public"]["Enums"]["client_source"]
           status?: Database["public"]["Enums"]["client_status"]
           updated_at?: string
@@ -274,6 +338,134 @@ export type Database = {
           },
           {
             foreignKeyName: "draft_edits_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      drafts: {
+        Row: {
+          actioned_at: string | null
+          category: string
+          client_id: string
+          context_snapshot: Json
+          created_at: string
+          draft_text: string
+          id: string
+          message_id: string | null
+          org_id: string
+          status: Database["public"]["Enums"]["draft_status"]
+        }
+        Insert: {
+          actioned_at?: string | null
+          category: string
+          client_id: string
+          context_snapshot?: Json
+          created_at?: string
+          draft_text: string
+          id?: string
+          message_id?: string | null
+          org_id: string
+          status?: Database["public"]["Enums"]["draft_status"]
+        }
+        Update: {
+          actioned_at?: string | null
+          category?: string
+          client_id?: string
+          context_snapshot?: Json
+          created_at?: string
+          draft_text?: string
+          id?: string
+          message_id?: string | null
+          org_id?: string
+          status?: Database["public"]["Enums"]["draft_status"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "drafts_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "drafts_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "drafts_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      escalations: {
+        Row: {
+          categories: string[]
+          client_id: string
+          created_at: string
+          excerpt: string | null
+          id: string
+          message_id: string | null
+          org_id: string
+          plan_change: boolean
+          resolved_at: string | null
+          self_harm: boolean
+          source: string
+          status: Database["public"]["Enums"]["escalation_status"]
+        }
+        Insert: {
+          categories?: string[]
+          client_id: string
+          created_at?: string
+          excerpt?: string | null
+          id?: string
+          message_id?: string | null
+          org_id: string
+          plan_change?: boolean
+          resolved_at?: string | null
+          self_harm?: boolean
+          source: string
+          status?: Database["public"]["Enums"]["escalation_status"]
+        }
+        Update: {
+          categories?: string[]
+          client_id?: string
+          created_at?: string
+          excerpt?: string | null
+          id?: string
+          message_id?: string | null
+          org_id?: string
+          plan_change?: boolean
+          resolved_at?: string | null
+          self_harm?: boolean
+          source?: string
+          status?: Database["public"]["Enums"]["escalation_status"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "escalations_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "escalations_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "escalations_org_id_fkey"
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "orgs"
@@ -949,32 +1141,47 @@ export type Database = {
       messages: {
         Row: {
           body: string | null
+          body_tsv: unknown
           client_id: string
+          client_tag: string | null
           created_at: string
+          delivered_at: string | null
           id: string
-          kind: string
+          kind: Database["public"]["Enums"]["message_kind"]
           org_id: string
           payload: Json
+          read_at: string | null
+          reply_to: string | null
           sender: Database["public"]["Enums"]["message_sender"]
         }
         Insert: {
           body?: string | null
+          body_tsv?: unknown
           client_id: string
+          client_tag?: string | null
           created_at?: string
+          delivered_at?: string | null
           id?: string
-          kind?: string
+          kind?: Database["public"]["Enums"]["message_kind"]
           org_id: string
           payload?: Json
+          read_at?: string | null
+          reply_to?: string | null
           sender: Database["public"]["Enums"]["message_sender"]
         }
         Update: {
           body?: string | null
+          body_tsv?: unknown
           client_id?: string
+          client_tag?: string | null
           created_at?: string
+          delivered_at?: string | null
           id?: string
-          kind?: string
+          kind?: Database["public"]["Enums"]["message_kind"]
           org_id?: string
           payload?: Json
+          read_at?: string | null
+          reply_to?: string | null
           sender?: Database["public"]["Enums"]["message_sender"]
         }
         Relationships: [
@@ -992,42 +1199,64 @@ export type Database = {
             referencedRelation: "orgs"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "messages_reply_to_fkey"
+            columns: ["reply_to"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
         ]
       }
       notifications: {
         Row: {
+          attempts: number
           channel: Database["public"]["Enums"]["notif_channel"]
           client_id: string
           created_at: string
           dedupe_key: string
           id: string
           kind: string
+          last_attempt_at: string | null
           org_id: string
           payload: Json
+          seen_at: string | null
+          sent_at: string | null
+          stage: string
           status: Database["public"]["Enums"]["notif_status"]
           updated_at: string
         }
         Insert: {
+          attempts?: number
           channel: Database["public"]["Enums"]["notif_channel"]
           client_id: string
           created_at?: string
           dedupe_key: string
           id?: string
           kind: string
+          last_attempt_at?: string | null
           org_id: string
           payload?: Json
+          seen_at?: string | null
+          sent_at?: string | null
+          stage?: string
           status?: Database["public"]["Enums"]["notif_status"]
           updated_at?: string
         }
         Update: {
+          attempts?: number
           channel?: Database["public"]["Enums"]["notif_channel"]
           client_id?: string
           created_at?: string
           dedupe_key?: string
           id?: string
           kind?: string
+          last_attempt_at?: string | null
           org_id?: string
           payload?: Json
+          seen_at?: string | null
+          sent_at?: string | null
+          stage?: string
           status?: Database["public"]["Enums"]["notif_status"]
           updated_at?: string
         }
@@ -2067,6 +2296,13 @@ export type Database = {
         | "remove"
         | "structure"
         | "rewrite"
+      draft_status:
+        | "pending"
+        | "approved"
+        | "edited"
+        | "rewritten"
+        | "dismissed"
+      escalation_status: "open" | "acknowledged" | "resolved"
       exercise_source: "feb" | "org_custom"
       exercise_video_kind: "upload" | "youtube"
       experience_level: "beginner" | "intermediate" | "advanced"
@@ -2084,6 +2320,15 @@ export type Database = {
       lead_status: "started" | "preview_shown" | "converted" | "expired"
       meal_log_method: "text" | "photo" | "voice"
       meal_slot: "breakfast" | "lunch" | "dinner" | "snack" | "other"
+      message_kind:
+        | "text"
+        | "voice"
+        | "photo"
+        | "card"
+        | "plan_delivery"
+        | "log_confirmation"
+        | "reminder"
+        | "interview"
       message_sender: "client" | "coach" | "system" | "assistant"
       movement_pattern:
         | "squat"
@@ -2265,6 +2510,8 @@ export const Constants = {
         "structure",
         "rewrite",
       ],
+      draft_status: ["pending", "approved", "edited", "rewritten", "dismissed"],
+      escalation_status: ["open", "acknowledged", "resolved"],
       exercise_source: ["feb", "org_custom"],
       exercise_video_kind: ["upload", "youtube"],
       experience_level: ["beginner", "intermediate", "advanced"],
@@ -2283,6 +2530,16 @@ export const Constants = {
       lead_status: ["started", "preview_shown", "converted", "expired"],
       meal_log_method: ["text", "photo", "voice"],
       meal_slot: ["breakfast", "lunch", "dinner", "snack", "other"],
+      message_kind: [
+        "text",
+        "voice",
+        "photo",
+        "card",
+        "plan_delivery",
+        "log_confirmation",
+        "reminder",
+        "interview",
+      ],
       message_sender: ["client", "coach", "system", "assistant"],
       movement_pattern: [
         "squat",
