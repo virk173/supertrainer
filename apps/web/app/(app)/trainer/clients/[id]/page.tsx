@@ -1,15 +1,14 @@
 import { notFound } from "next/navigation";
-import { CircleUser } from "lucide-react";
 
-import { TrainerPlaceholder } from "@/components/trainer-placeholder";
+import { ClientProfile } from "@/components/profile/client-profile";
 import { getSessionClaims } from "@/lib/onboarding/state";
+import { getClientProfile } from "@/lib/trainer/profile";
 import { createServiceClient } from "@/lib/supabase/server";
 
 export const metadata = { title: "Client — supertrainer" };
 
-// Placeholder client profile — the forensic ledger lands in 7.5. Kept real
-// enough that the ⌘K client search resolves to a named page today. Service-role
-// read is org-scoped in code (standing rule: service-role tenancy).
+// Phase 7.5 — the forensic client profile (trainer lens): the day-by-day
+// adherence grid + weight trend. Org ownership is verified before render.
 export default async function TrainerClientPage({
   params,
 }: {
@@ -22,26 +21,13 @@ export default async function TrainerClientPage({
   const service = createServiceClient();
   const { data: client } = await service
     .from("clients")
-    .select("id, intake, profiles:profile_id (display_name)")
-    .eq("org_id", orgId)
+    .select("id, org_id")
     .eq("id", id)
     .maybeSingle();
+  if (!client || client.org_id !== orgId) notFound();
 
-  if (!client) notFound();
+  const profile = await getClientProfile(id, new Date());
+  if (!profile) notFound();
 
-  const profile =
-    (client.profiles as { display_name?: string | null } | null) ?? null;
-  const intakeName = (client.intake as { name?: unknown } | null)?.name;
-  const name =
-    profile?.display_name ??
-    (typeof intakeName === "string" ? intakeName : "Client");
-
-  return (
-    <TrainerPlaceholder
-      title={name}
-      icon={<CircleUser />}
-      emptyTitle="Client profile coming soon"
-      description="The forensic adherence ledger — the calendar grid, weight trend, progression charts, notes, and files — arrives in Phase 7.5. The per-client inbox arrives in 7.4."
-    />
-  );
+  return <ClientProfile profile={profile} />;
 }
