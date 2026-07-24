@@ -84,19 +84,21 @@ export async function getAnalytics(orgId: string, now: Date): Promise<Analytics>
   const weekAgo = dateStr(new Date(now.getTime() - 7 * DAY_MS));
   const today = Date.parse(`${dateStr(now)}T00:00:00Z`);
 
-  const [clientsRes, draftsRes, plansRes] = await Promise.all([
+  const [clientsRes, approvedRes, editedRes, activeRes] = await Promise.all([
     service
       .from("clients")
       .select("id, status, intake, profiles:profile_id (display_name)")
       .eq("org_id", orgId)
       .eq("status", "active"),
-    service.from("drafts").select("status").eq("org_id", orgId),
+    // Zero-edit rate from two head counts — no need to pull every draft row.
+    service.from("drafts").select("id", { count: "exact", head: true }).eq("org_id", orgId).eq("status", "approved"),
+    service.from("drafts").select("id", { count: "exact", head: true }).eq("org_id", orgId).eq("status", "edited"),
+    // Renewal counts from when the plan went live (plans_active.effective_from).
     service
-      .from("plans")
-      .select("client_id, created_at")
+      .from("plans_active")
+      .select("client_id, effective_from")
       .eq("org_id", orgId)
-      .eq("status", "approved")
-      .order("created_at", { ascending: false }),
+      .not("effective_from", "is", null),
   ]);
 
   const active = clientsRes.data ?? [];
@@ -117,10 +119,9 @@ export async function getAnalytics(orgId: string, now: Date): Promise<Analytics>
     }
   }
 
-  const latestPlan = new Map<string, string>();
-  for (const p of plansRes.data ?? []) {
-    const cid = p.client_id as string;
-    if (!latestPlan.has(cid)) latestPlan.set(cid, p.created_at as string);
+  const effectiveFrom = new Map<string, string>();
+  for (const p of activeRes.data ?? []) {
+    if (p.effective_from) effectiveFrom.set(p.client_id as string, p.effective_from as string);
   }
 
   const scores: number[] = [];
@@ -140,9 +141,9 @@ export async function getAnalytics(orgId: string, now: Date): Promise<Analytics>
     const gapDays = Math.round(
       (today - Date.parse(`${rows[rows.length - 1]!.tz_date}T00:00:00Z`)) / DAY_MS,
     );
-    const planCreated = latestPlan.get(id);
-    const renewalDays = planCreated
-      ? 28 - Math.round((now.getTime() - Date.parse(planCreated)) / DAY_MS)
+    const liveSince = effectiveFrom.get(id);
+    const renewalDays = liveSince
+      ? 28 - Math.round((now.getTime() - Date.parse(liveSince)) / DAY_MS)
       : null;
 
     const { risk, driver } = churnFor({ gapDays, thisWeek, lastWeek, score: lens.score, renewalDays });
@@ -159,9 +160,8 @@ export async function getAnalytics(orgId: string, now: Date): Promise<Analytics>
     histogram[idx]!.count++;
   }
 
-  const drafts = draftsRes.data ?? [];
-  const approved = drafts.filter((d) => d.status === "approved").length;
-  const edited = drafts.filter((d) => d.status === "edited").length;
+  const approved = approvedRes.count ?? 0;
+  const edited = editedRes.count ?? 0;
   const handled = approved + edited;
   const zeroEditRate = handled > 0 ? Math.round((approved / handled) * 100) : null;
 

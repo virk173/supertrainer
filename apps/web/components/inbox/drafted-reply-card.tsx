@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
 import { Sparkles } from "lucide-react";
 
 import { Button } from "@supertrainer/ui/components/button";
@@ -19,6 +20,7 @@ import type { InboxDraft } from "@/lib/trainer/inbox";
 // the thread via realtime); Edit captures the diff for voice learning; Rewrite
 // regenerates; Dismiss drops it. Wired to the P6.4 mutations.
 export function DraftedReplyCard({ draft }: { draft: InboxDraft }) {
+  const router = useRouter();
   const [text, setText] = React.useState(draft.text);
   const [busy, setBusy] = React.useState(false);
   const [gone, setGone] = React.useState(false);
@@ -38,6 +40,9 @@ export function DraftedReplyCard({ draft }: { draft: InboxDraft }) {
     setGone(true); // optimistic — the sent reply arrives in the thread via realtime
     try {
       await fn();
+      // Re-pull the inbox: approve/edit/dismiss leave no draft (card stays gone);
+      // rewrite produced a fresh draft that re-mounts this card with new text.
+      router.refresh();
     } catch {
       setGone(false);
     } finally {

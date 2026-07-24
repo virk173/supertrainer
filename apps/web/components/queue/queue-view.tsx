@@ -152,31 +152,58 @@ export function QueueView({
     [visible],
   );
 
+  // On a failed mutation, re-pull the queue so an optimistically-removed item
+  // that didn't actually change is restored (approve/edit have no undo).
+  const resync = React.useCallback(async () => {
+    const next = await refreshQueueAction();
+    if (next) {
+      setItems(next.items);
+      setCounts(next.counts);
+    }
+  }, []);
+
   const onApprove = React.useCallback(
     async (item: QueueItem, text?: string) => {
       removeItem(item.key);
-      if (text !== undefined) await editDraftJson(item.id, text);
-      else await approveDraftJson(item.id);
+      try {
+        const result =
+          text !== undefined
+            ? await editDraftJson(item.id, text)
+            : await approveDraftJson(item.id);
+        if (!result.ok) await resync();
+      } catch {
+        await resync();
+      }
     },
-    [removeItem],
+    [removeItem, resync],
   );
 
   const onDismiss = React.useCallback(
     async (item: QueueItem) => {
       removeItem(item.key);
       scheduleUndo({ item, kind: "dismiss" });
-      await dismissDraftJson(item.id);
+      try {
+        const result = await dismissDraftJson(item.id);
+        if (!result.ok) await resync();
+      } catch {
+        await resync();
+      }
     },
-    [removeItem, scheduleUndo],
+    [removeItem, scheduleUndo, resync],
   );
 
   const onResolve = React.useCallback(
     async (item: QueueItem) => {
       removeItem(item.key);
       scheduleUndo({ item, kind: "resolve" });
-      await resolveEscalationJson(item.id);
+      try {
+        const result = await resolveEscalationJson(item.id);
+        if (!result.ok) await resync();
+      } catch {
+        await resync();
+      }
     },
-    [removeItem, scheduleUndo],
+    [removeItem, scheduleUndo, resync],
   );
 
   const onRewrite = React.useCallback(async (item: QueueItem) => {

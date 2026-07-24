@@ -52,19 +52,21 @@ export async function getRoster(orgId: string, now: Date): Promise<RosterRow[]> 
   const ids = rows.map((c) => c.id as string);
   if (ids.length === 0) return [];
 
-  const [ledgerRes, plansRes] = await Promise.all([
+  const [ledgerRes, activeRes] = await Promise.all([
     service
       .from("ledger_days")
       .select("client_id, tz_date, expected, misses")
       .in("client_id", ids)
       .gte("tz_date", windowStart)
       .order("tz_date", { ascending: true }),
+    // The renewal cycle runs from when the plan went LIVE (plans_active.
+    // effective_from) — the same field lib/plans/renewals.ts enqueues from — not
+    // when the draft was created.
     service
-      .from("plans")
-      .select("client_id, created_at")
+      .from("plans_active")
+      .select("client_id, effective_from")
       .in("client_id", ids)
-      .eq("status", "approved")
-      .order("created_at", { ascending: false }),
+      .not("effective_from", "is", null),
   ]);
 
   const ledgerByClient = new Map<string, LedgerDayRow[]>();
@@ -74,11 +76,9 @@ export async function getRoster(orgId: string, now: Date): Promise<RosterRow[]> 
     ledgerByClient.set(r.client_id as string, list);
   }
 
-  // Latest approved plan per client (rows already sorted newest-first).
-  const latestPlan = new Map<string, string>();
-  for (const p of plansRes.data ?? []) {
-    const cid = p.client_id as string;
-    if (!latestPlan.has(cid)) latestPlan.set(cid, p.created_at as string);
+  const effectiveFrom = new Map<string, string>();
+  for (const p of activeRes.data ?? []) {
+    if (p.effective_from) effectiveFrom.set(p.client_id as string, p.effective_from as string);
   }
 
   return rows.map((client) => {
@@ -88,9 +88,9 @@ export async function getRoster(orgId: string, now: Date): Promise<RosterRow[]> 
     const lastActivityDays = ledger.length
       ? Math.round((today - Date.parse(`${ledger[ledger.length - 1]!.tz_date}T00:00:00Z`)) / DAY_MS)
       : null;
-    const planCreated = latestPlan.get(id);
-    const renewalDays = planCreated
-      ? 28 - Math.round((now.getTime() - Date.parse(planCreated)) / DAY_MS)
+    const liveSince = effectiveFrom.get(id);
+    const renewalDays = liveSince
+      ? 28 - Math.round((now.getTime() - Date.parse(liveSince)) / DAY_MS)
       : null;
     const status = client.status as string;
     const slipping = lens !== null && lens.score < 60;

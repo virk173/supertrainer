@@ -98,7 +98,7 @@ export async function getClientInbox(
   const tz = typeof timezone === "string" ? timezone : "UTC";
   const windowStart = dateStr(new Date(now.getTime() - 28 * DAY_MS));
 
-  const [ledgerRes, weighRes, activeRes, planRes, splitRes, draftRes] =
+  const [ledgerRes, weighRes, activeRes, splitRes, draftRes] =
     await Promise.all([
       service
         .from("ledger_days")
@@ -114,16 +114,9 @@ export async function getClientInbox(
         .limit(40),
       service
         .from("plans_active")
-        .select("schedule, day_types, fast_window")
+        .select("schedule, day_types, fast_window, effective_from")
         .eq("client_id", clientId)
         .maybeSingle(),
-      service
-        .from("plans")
-        .select("id, created_at")
-        .eq("client_id", clientId)
-        .eq("status", "approved")
-        .order("approved_at", { ascending: false })
-        .limit(1),
       service
         .from("splits")
         .select("id")
@@ -178,9 +171,11 @@ export async function getClientInbox(
         )
       : null;
 
-  const planCreated = planRes.data?.[0]?.created_at as string | undefined;
-  const renewalDays = planCreated
-    ? 28 - Math.round((now.getTime() - Date.parse(planCreated)) / DAY_MS)
+  // Renewal counts from when the plan went live (plans_active.effective_from),
+  // matching the renewal cron — not the draft creation date.
+  const liveSince = active?.effective_from as string | null | undefined;
+  const renewalDays = liveSince
+    ? 28 - Math.round((now.getTime() - Date.parse(liveSince)) / DAY_MS)
     : null;
 
   const draftRow = draftRes.data?.[0];
@@ -206,7 +201,7 @@ export async function getClientInbox(
       weightDeltaKg,
       todayLabel,
       fast,
-      hasPlan: (planRes.data?.length ?? 0) > 0,
+      hasPlan: active != null,
       hasSplit: (splitRes.data?.length ?? 0) > 0,
     },
     todos: {

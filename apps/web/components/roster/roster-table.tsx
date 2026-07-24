@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import {
   type ColumnDef,
@@ -73,7 +73,6 @@ export function RosterTable({
   initialSearch: string;
   initialStatus: string;
 }) {
-  const router = useRouter();
   const pathname = usePathname();
 
   const [search, setSearch] = React.useState(initialSearch);
@@ -84,13 +83,16 @@ export function RosterTable({
   const [rowSelection, setRowSelection] = React.useState<Record<string, boolean>>({});
 
   // Reflect the primary filters in the URL (shareable / back-button correct).
+  // Uses history.replaceState, NOT router.replace: filtering is entirely
+  // client-side, so a Next navigation here would needlessly re-run the server
+  // page (getRoster re-queries the whole org) on every keystroke.
   React.useEffect(() => {
     const params = new URLSearchParams();
     if (search) params.set("q", search);
     if (status !== "all") params.set("status", status);
     const qs = params.toString();
-    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
-  }, [search, status, router, pathname]);
+    window.history.replaceState(null, "", qs ? `${pathname}?${qs}` : pathname);
+  }, [search, status, pathname]);
 
   const filtered = React.useMemo(() => {
     const needle = search.trim().toLowerCase();
@@ -206,9 +208,12 @@ export function RosterTable({
 
   function exportSelected() {
     const chosen = data.filter((d) => selectedIds.includes(d.id));
+    // RFC-4180: quote every field and double embedded quotes so a name with a
+    // comma or quote can't shift the columns.
+    const cell = (v: string | number) => `"${String(v).replace(/"/g, '""')}"`;
     const header = "name,status,adherence,last_activity_days,renewal_days\n";
     const body = chosen
-      .map((c) => [c.name, c.status, c.adherence ?? "", c.lastActivityDays ?? "", c.renewalDays ?? ""].join(","))
+      .map((c) => [c.name, c.status, c.adherence ?? "", c.lastActivityDays ?? "", c.renewalDays ?? ""].map(cell).join(","))
       .join("\n");
     const blob = new Blob([header + body], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
