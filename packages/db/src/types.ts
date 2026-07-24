@@ -1395,6 +1395,73 @@ export type Database = {
         }
         Relationships: []
       }
+      payment_records: {
+        Row: {
+          amount_cents: number
+          application_fee_cents: number
+          client_id: string
+          created_at: string
+          currency: string
+          id: string
+          org_id: string
+          period_end: string | null
+          period_start: string | null
+          status: Database["public"]["Enums"]["payment_status"]
+          stripe_invoice_id: string | null
+          subscription_id: string | null
+        }
+        Insert: {
+          amount_cents?: number
+          application_fee_cents?: number
+          client_id: string
+          created_at?: string
+          currency?: string
+          id?: string
+          org_id: string
+          period_end?: string | null
+          period_start?: string | null
+          status: Database["public"]["Enums"]["payment_status"]
+          stripe_invoice_id?: string | null
+          subscription_id?: string | null
+        }
+        Update: {
+          amount_cents?: number
+          application_fee_cents?: number
+          client_id?: string
+          created_at?: string
+          currency?: string
+          id?: string
+          org_id?: string
+          period_end?: string | null
+          period_start?: string | null
+          status?: Database["public"]["Enums"]["payment_status"]
+          stripe_invoice_id?: string | null
+          subscription_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_records_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_records_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_records_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "subscriptions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       plan_requests: {
         Row: {
           client_id: string
@@ -2050,6 +2117,85 @@ export type Database = {
           },
         ]
       }
+      subscriptions: {
+        Row: {
+          cancel_at_period_end: boolean
+          canceled_at: string | null
+          client_id: string
+          created_at: string
+          current_period_end: string | null
+          dunning_stage: number
+          grace_until: string | null
+          id: string
+          last_event_at: string | null
+          org_id: string
+          pause_reason: Database["public"]["Enums"]["subscription_pause_reason"]
+          status: Database["public"]["Enums"]["subscription_status"]
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          tier_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          cancel_at_period_end?: boolean
+          canceled_at?: string | null
+          client_id: string
+          created_at?: string
+          current_period_end?: string | null
+          dunning_stage?: number
+          grace_until?: string | null
+          id?: string
+          last_event_at?: string | null
+          org_id: string
+          pause_reason?: Database["public"]["Enums"]["subscription_pause_reason"]
+          status?: Database["public"]["Enums"]["subscription_status"]
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          tier_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          cancel_at_period_end?: boolean
+          canceled_at?: string | null
+          client_id?: string
+          created_at?: string
+          current_period_end?: string | null
+          dunning_stage?: number
+          grace_until?: string | null
+          id?: string
+          last_event_at?: string | null
+          org_id?: string
+          pause_reason?: Database["public"]["Enums"]["subscription_pause_reason"]
+          status?: Database["public"]["Enums"]["subscription_status"]
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          tier_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscriptions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscriptions_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscriptions_tier_id_fkey"
+            columns: ["tier_id"]
+            isOneToOne: false
+            referencedRelation: "tiers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tiers: {
         Row: {
           cadence: Database["public"]["Enums"]["tier_cadence"]
@@ -2454,6 +2600,7 @@ export type Database = {
         | "payments"
       onboarding_step_status: "todo" | "done" | "skipped"
       org_role: "owner" | "staff" | "client"
+      payment_status: "paid" | "failed" | "refunded" | "uncollectible"
       plan_kind: "diet" | "split"
       plan_request_status: "queued" | "running" | "drafted" | "failed"
       plan_status: "draft" | "approved" | "superseded" | "archived"
@@ -2472,6 +2619,15 @@ export type Database = {
       style_domain: "diet" | "training" | "voice"
       style_exemplar_source: "upload" | "edit_capture"
       style_profile_status: "draft" | "confirmed"
+      subscription_pause_reason: "none" | "dunning" | "vacation"
+      subscription_status:
+        | "incomplete"
+        | "trialing"
+        | "active"
+        | "past_due"
+        | "paused"
+        | "canceled"
+        | "unpaid"
       tier_cadence: "monthly"
       upload_extraction_status: "pending" | "processing" | "done" | "failed"
       upload_kind: "plan_pdf" | "checkin_screenshot" | "doc"
@@ -2676,6 +2832,7 @@ export const Constants = {
       ],
       onboarding_step_status: ["todo", "done", "skipped"],
       org_role: ["owner", "staff", "client"],
+      payment_status: ["paid", "failed", "refunded", "uncollectible"],
       plan_kind: ["diet", "split"],
       plan_request_status: ["queued", "running", "drafted", "failed"],
       plan_status: ["draft", "approved", "superseded", "archived"],
@@ -2695,6 +2852,16 @@ export const Constants = {
       style_domain: ["diet", "training", "voice"],
       style_exemplar_source: ["upload", "edit_capture"],
       style_profile_status: ["draft", "confirmed"],
+      subscription_pause_reason: ["none", "dunning", "vacation"],
+      subscription_status: [
+        "incomplete",
+        "trialing",
+        "active",
+        "past_due",
+        "paused",
+        "canceled",
+        "unpaid",
+      ],
       tier_cadence: ["monthly"],
       upload_extraction_status: ["pending", "processing", "done", "failed"],
       upload_kind: ["plan_pdf", "checkin_screenshot", "doc"],
