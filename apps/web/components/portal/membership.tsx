@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
 import { CheckCircle2, CreditCard, Loader2, Receipt } from "lucide-react";
 
 import { Badge } from "@supertrainer/ui/components/badge";
@@ -8,9 +9,12 @@ import { Button } from "@supertrainer/ui/components/button";
 import { EmptyState } from "@supertrainer/ui/components/empty-state";
 
 import {
+  cancelMembership,
   confirmChange,
   openBillingPortal,
+  pauseMembership,
   previewChange,
+  resumeMembership,
   startTierCheckout,
 } from "@/app/(app)/portal/membership/actions";
 import type { MembershipView } from "@/lib/payments/checkout";
@@ -59,6 +63,7 @@ export function Membership({
   tiers: TierOption[];
   configured: boolean;
 }) {
+  const router = useRouter();
   const [pending, setPending] = React.useState<string | null>(null);
   const [notice, setNotice] = React.useState<string | null>(null);
   const [previewFor, setPreviewFor] = React.useState<{ tierId: string; sentence: string } | null>(
@@ -67,6 +72,8 @@ export function Membership({
 
   const sub = membership.subscription;
   const active = sub && (sub.status === "active" || sub.status === "trialing");
+  const restricted = sub && (sub.pauseReason === "dunning" || sub.status === "past_due" || sub.status === "unpaid");
+  const onVacation = sub && sub.pauseReason === "vacation";
 
   async function go(fn: () => Promise<{ ok: boolean; url?: string; message?: string }>, key: string) {
     setPending(key);
@@ -77,7 +84,11 @@ export function Membership({
       return;
     }
     setPending(null);
-    if (!res.ok) setNotice(res.message ?? "Something went wrong.");
+    if (res.ok) {
+      router.refresh();
+    } else {
+      setNotice(res.message ?? "Something went wrong.");
+    }
   }
 
   async function preview(tierId: string) {
@@ -102,6 +113,26 @@ export function Membership({
 
   return (
     <div className="space-y-4" data-testid="membership">
+      {/* ── restricted (dunning) banner — system voice, never the coach ────── */}
+      {restricted ? (
+        <div
+          className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-warning bg-warning/10 p-4"
+          role="status"
+          data-testid="membership-restricted"
+        >
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-warning-text">Your plan is paused</p>
+            <p className="text-sm text-muted-foreground">
+              A payment didn’t go through. Update your card to pick up right where you left off — your history is safe.
+            </p>
+          </div>
+          <Button onClick={() => go(openBillingPortal, "portal")} disabled={!!pending}>
+            {pending === "portal" ? <Loader2 className="animate-spin" /> : <CreditCard />}
+            Update payment to resume
+          </Button>
+        </div>
+      ) : null}
+
       {/* ── current plan ──────────────────────────────────────────────────── */}
       <Panel title="Your membership">
         {sub && membership.tier ? (
@@ -129,10 +160,29 @@ export function Membership({
                 })}
               </p>
             ) : null}
-            <Button variant="outline" onClick={() => go(openBillingPortal, "portal")} disabled={!!pending}>
-              {pending === "portal" ? <Loader2 className="animate-spin" /> : <CreditCard />}
-              Update payment method
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" onClick={() => go(openBillingPortal, "portal")} disabled={!!pending}>
+                {pending === "portal" ? <Loader2 className="animate-spin" /> : <CreditCard />}
+                Update payment method
+              </Button>
+              {onVacation ? (
+                <Button variant="ghost" onClick={() => go(resumeMembership, "resume")} disabled={!!pending}>
+                  {pending === "resume" ? <Loader2 className="animate-spin" /> : null}
+                  Resume membership
+                </Button>
+              ) : active ? (
+                <Button variant="ghost" onClick={() => go(pauseMembership, "pause")} disabled={!!pending}>
+                  {pending === "pause" ? <Loader2 className="animate-spin" /> : null}
+                  Pause membership
+                </Button>
+              ) : null}
+              {active && !sub.cancelAtPeriodEnd ? (
+                <Button variant="ghost" onClick={() => go(cancelMembership, "cancel")} disabled={!!pending}>
+                  {pending === "cancel" ? <Loader2 className="animate-spin" /> : null}
+                  Cancel membership
+                </Button>
+              ) : null}
+            </div>
           </div>
         ) : (
           <EmptyState

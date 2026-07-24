@@ -10,7 +10,9 @@ import {
   refreshAccountStatus,
   runTierSync,
 } from "@/lib/payments/connect";
+import { extendGrace } from "@/lib/payments/lifecycle";
 import { setStepStatus } from "@/lib/onboarding/state";
+import { createServiceClient } from "@/lib/supabase/server";
 
 // Phase 8.1 — trainer-facing Connect + sync actions. Every action re-checks the
 // staff role server-side (never trusts the client) and gates on the platform
@@ -111,4 +113,31 @@ export async function syncTiers(): Promise<SyncActionResult> {
     console.error("[payments] tier sync failed:", err);
     return { ok: false, message: "Couldn’t sync your tiers to Stripe. Try again." };
   }
+}
+
+/** Trainer override: extend a client's grace window before the dunning pause
+ *  bites. Staff-only; the client must belong to the trainer's org. */
+export async function extendClientGrace(
+  clientId: string,
+  days = 7,
+): Promise<{ ok: boolean; message?: string }> {
+  const { orgId, role } = await getSessionClaims();
+  if (!orgId) return { ok: false, message: "Your session expired — sign in again." };
+  if (role !== "owner" && role !== "staff") {
+    return { ok: false, message: "Only trainers can extend grace." };
+  }
+  // Verify the client belongs to this org (service-role tenancy).
+  const service = createServiceClient();
+  const { data: client } = await service
+    .from("clients")
+    .select("id")
+    .eq("id", clientId)
+    .eq("org_id", orgId)
+    .maybeSingle();
+  if (!client) return { ok: false, message: "Client not found." };
+
+  const res = await extendGrace(orgId, clientId, days);
+  if (!res.ok) return { ok: false, message: "Couldn’t extend grace right now." };
+  revalidatePath("/trainer/queue");
+  return { ok: true };
 }

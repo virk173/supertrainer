@@ -53,13 +53,16 @@ async function gatherDayInputs(
 ): Promise<DayInputs> {
   const weekday = weekdayOf(date);
 
-  const [plan, split, meals, weigh, checkin, sets] = await Promise.all([
+  const [plan, split, meals, weigh, checkin, sets, sub] = await Promise.all([
     db.from("plans_active").select("meal_slots").eq("client_id", client.id).maybeSingle(),
     db.from("splits_active").select("days, schedule").eq("client_id", client.id).maybeSingle(),
     db.from("meal_logs").select("meal_slot").eq("client_id", client.id).eq("tz_date", date),
     db.from("weigh_ins").select("id", { count: "exact", head: true }).eq("client_id", client.id).eq("tz_date", date),
     db.from("gym_checkins").select("id", { count: "exact", head: true }).eq("client_id", client.id).eq("tz_date", date),
     db.from("workout_logs").select("id", { count: "exact", head: true }).eq("client_id", client.id).eq("tz_date", date),
+    // Phase 8.4 gap-fairness: a billing interruption (dunning/uncaptured or
+    // vacation pause) suppresses the day's expectations.
+    db.from("subscriptions").select("status, pause_reason").eq("client_id", client.id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
   ]);
 
   const planRow = plan.data as { meal_slots?: MealSlot[] } | null;
@@ -75,11 +78,21 @@ async function gatherDayInputs(
 
   const mealSlots = [...new Set((meals.data ?? []).map((m) => m.meal_slot as MealSlot))];
 
+  const subRow = sub.data as { status?: string; pause_reason?: string } | null;
+  const paymentGap =
+    subRow != null &&
+    (subRow.status === "past_due" ||
+      subRow.status === "unpaid" ||
+      subRow.status === "paused" ||
+      subRow.pause_reason === "dunning" ||
+      subRow.pause_reason === "vacation");
+
   return {
     status: client.status,
     plan: planExpectation,
     isTrainingDay,
     isWeighInDay: weighInWeekdays(client.intake).includes(weekday),
+    paymentGap,
     actual: {
       mealSlots,
       mealCount: meals.data?.length ?? 0,

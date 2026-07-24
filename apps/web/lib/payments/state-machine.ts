@@ -144,26 +144,36 @@ export function transition(state: SubState, event: WebhookEvent): Transition {
       next.status = "past_due";
       next.pauseReason = "dunning";
       next.dunningStage = Math.min(MAX_DUNNING_STAGE, state.dunningStage + 1);
-      return {
-        newState: next,
-        effects: [
-          upsert(next, event),
-          {
-            kind: "record_payment",
-            invoiceId: event.invoiceId,
-            amountCents: event.amountCents ?? 0,
-            applicationFeeCents: 0,
-            currency: event.currency ?? "usd",
-            status: "failed",
-            periodStart: event.periodStart ?? null,
-            periodEnd: event.periodEnd ?? null,
-          },
-          // System voice (P6) — the trainer never personally chases money (§9).
-          { kind: "notify_client", template: "payment_failed" },
-          { kind: "flag_trainer", flag: "payment_failed" },
-          { kind: "audit", action: "webhook.payment_failed" },
-        ],
-      };
+      const effects: Effect[] = [
+        upsert(next, event),
+        {
+          kind: "record_payment",
+          invoiceId: event.invoiceId,
+          amountCents: event.amountCents ?? 0,
+          applicationFeeCents: 0,
+          currency: event.currency ?? "usd",
+          status: "failed",
+          periodStart: event.periodStart ?? null,
+          periodEnd: event.periodEnd ?? null,
+        },
+      ];
+      // The dunning ladder rides Stripe Smart Retries (each retry → one failed
+      // invoice → one stage). All comms are system-voiced — the trainer never
+      // personally chases money (§9). At the final stage the plan is paused
+      // (portal restricted); the trainer only gets a flag with an extend-grace
+      // override. Access restriction here = client status 'paused', which also
+      // switches P3 expectations off (gap-fairness).
+      if (next.dunningStage >= MAX_DUNNING_STAGE) {
+        effects.push({ kind: "set_client_status", status: "paused" });
+        effects.push({ kind: "notify_client", template: "plan_paused" });
+        effects.push({ kind: "flag_trainer", flag: "payment_failed" });
+        effects.push({ kind: "audit", action: "webhook.dunning_paused" });
+      } else {
+        effects.push({ kind: "notify_client", template: "payment_failed" });
+        effects.push({ kind: "flag_trainer", flag: "payment_failed" });
+        effects.push({ kind: "audit", action: "webhook.payment_failed" });
+      }
+      return { newState: next, effects };
     }
 
     case "customer.subscription.updated": {

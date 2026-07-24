@@ -12,6 +12,11 @@ import {
   previewTierChange,
   type TierChangePreview,
 } from "@/lib/payments/checkout";
+import {
+  pauseSubscription,
+  requestCancellation,
+  resumeSubscription,
+} from "@/lib/payments/lifecycle";
 import { createServiceClient } from "@/lib/supabase/server";
 
 // Phase 8.2 — client-side membership actions. Each resolves the caller's OWN
@@ -104,6 +109,41 @@ export async function confirmChange(tierId: string): Promise<RedirectResult> {
   if (!who) return { ok: false, message: "Sign in to continue." };
   const res = await applyTierChange(who.orgId, who.clientId, tierId);
   if (!res.ok) return { ok: false, message: "Couldn’t change your plan. Try again." };
+  revalidatePath("/portal/membership");
+  return { ok: true };
+}
+
+/** Pause the membership (vacation). Billing stops; the plan pauses; expectations
+ *  switch off (gap-fairness) until resumed. */
+export async function pauseMembership(): Promise<RedirectResult> {
+  if (!isStripeConfigured()) return { ok: false, message: "Payments aren’t available yet." };
+  const who = await currentClient();
+  if (!who) return { ok: false, message: "Sign in to continue." };
+  const res = await pauseSubscription(who.orgId, who.clientId);
+  if (!res.ok) return { ok: false, message: "Couldn’t pause your membership right now." };
+  revalidatePath("/portal/membership");
+  return { ok: true };
+}
+
+/** Resume a paused membership. */
+export async function resumeMembership(): Promise<RedirectResult> {
+  if (!isStripeConfigured()) return { ok: false, message: "Payments aren’t available yet." };
+  const who = await currentClient();
+  if (!who) return { ok: false, message: "Sign in to continue." };
+  const res = await resumeSubscription(who.orgId, who.clientId);
+  if (!res.ok) return { ok: false, message: "Couldn’t resume your membership right now." };
+  revalidatePath("/portal/membership");
+  return { ok: true };
+}
+
+/** Request cancellation (ends at period end). The trainer is flagged privately
+ *  for a save offer; the client keeps access until the period ends. */
+export async function cancelMembership(): Promise<RedirectResult> {
+  if (!isStripeConfigured()) return { ok: false, message: "Payments aren’t available yet." };
+  const who = await currentClient();
+  if (!who) return { ok: false, message: "Sign in to continue." };
+  const res = await requestCancellation(who.orgId, who.clientId);
+  if (!res.ok) return { ok: false, message: "Couldn’t cancel right now. Try again." };
   revalidatePath("/portal/membership");
   return { ok: true };
 }

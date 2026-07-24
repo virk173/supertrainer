@@ -29,6 +29,10 @@ export interface DayInputs {
   actual: DayActual;
   // set when this day is being recomputed from a back-dated (late) log
   late?: boolean;
+  // Phase 8.4 gap-fairness: true while the client's billing is interrupted (a
+  // dunning/uncaptured payment gap OR a vacation pause). The system paused their
+  // plan — a payment gap is NEVER a "missed" day, so expectations go to none.
+  paymentGap?: boolean;
 }
 
 export interface Expectations {
@@ -73,6 +77,9 @@ export function computeExpectations(inputs: DayInputs): Expectations {
   // Only active clients accrue expectations; paused/onboarding/lead/churned owe
   // nothing (paused clients explicitly, per the spec).
   if (inputs.status !== "active") return NO_EXPECTATIONS;
+  // Gap-fairness (Phase 8.4): a payment gap is never a missed day. While billing
+  // is interrupted the system has paused the plan, so we expect nothing.
+  if (inputs.paymentGap) return NO_EXPECTATIONS;
 
   if (inputs.plan === null) {
     // Generic mode: >=2 meals + intake-chosen weigh-in days, nothing else (no

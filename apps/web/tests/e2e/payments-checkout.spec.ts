@@ -40,6 +40,41 @@ test("membership: gated state + a11y (desktop, mobile, dark)", async ({ page }) 
   await expectAxeAAClean(page);
 });
 
+test("membership: a dunning subscription shows the restricted banner (system voice)", async ({ page }) => {
+  const { orgId, userId, tokenHash } = await seedClient(uniqueEmail("dunned"));
+  await consentClient(userId);
+  const service = serviceClient();
+  const { data: client } = await service
+    .from("clients")
+    .select("id")
+    .eq("profile_id", userId)
+    .single();
+  const { data: tier } = await service
+    .from("tiers")
+    .insert({ org_id: orgId, name: "Pro", price_cents: 10000, currency: "usd" })
+    .select("id")
+    .single();
+  await service.from("subscriptions").insert({
+    org_id: orgId,
+    client_id: client!.id,
+    tier_id: tier!.id,
+    status: "past_due",
+    pause_reason: "dunning",
+    dunning_stage: 3,
+  });
+
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto(`/auth/confirm?token_hash=${tokenHash}&type=email&next=/portal/membership`);
+
+  await expect(page.getByTestId("membership-restricted")).toBeVisible();
+  await expect(page.getByText("Your plan is paused")).toBeVisible();
+  await expect(page.getByText("Update payment to resume")).toBeVisible();
+
+  await settlePaint(page);
+  await expectNoHorizontalOverflow(page);
+  await expectAxeAAClean(page);
+});
+
 test("pay page: shows the tier + gated checkout, a11y", async ({ page }) => {
   const { orgId, userId, tokenHash } = await seedClient(uniqueEmail("payer"));
   const service = serviceClient();

@@ -4,12 +4,10 @@ import { isStripeConfigured } from "@supertrainer/payments";
 
 import { Membership } from "@/components/portal/membership";
 import { getSessionClaims } from "@/lib/onboarding/state";
-import { getMembership, type MembershipView } from "@/lib/payments/checkout";
+import { getMembership } from "@/lib/payments/checkout";
 import { createServiceClient } from "@/lib/supabase/server";
 
 export const metadata = { title: "Membership — supertrainer" };
-
-const EMPTY: MembershipView = { subscription: null, tier: null, history: [] };
 
 function priceLabel(cents: number, currency: string): string {
   const amount = (() => {
@@ -38,8 +36,12 @@ export default async function MembershipPage() {
     .maybeSingle();
   if (!client) notFound();
 
+  // The membership state lives in our DB (populated by the 8.3 webhook), so we
+  // ALWAYS read it — a client sees their plan + any restricted/paused state even
+  // if this server lacks the platform Stripe secret. `configured` only gates the
+  // live-Stripe ACTIONS (checkout, card update, tier change).
   const configured = isStripeConfigured();
-  const membership = configured ? await getMembership(client.id) : EMPTY;
+  const membership = await getMembership(client.id);
 
   // Client-facing tier display reads through the service role (tiers are staff-
   // RLS), scoped to this client's org in code.
