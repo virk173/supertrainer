@@ -61,13 +61,13 @@ export async function startTierCheckout(tierId: string): Promise<RedirectResult>
     cancelUrl: `${base}/portal/membership?checkout=canceled`,
   });
   if (!res.ok) {
-    return {
-      ok: false,
-      message:
-        res.reason === "payments_not_ready"
-          ? "Your coach is still finishing payment setup — check back shortly."
-          : "Couldn’t start checkout. Try again in a moment.",
-    };
+    const message =
+      res.reason === "payments_not_ready"
+        ? "Your coach is still finishing payment setup — check back shortly."
+        : res.reason === "already_subscribed"
+          ? "You already have an active membership. Use “Change plan” to switch tiers."
+          : "Couldn’t start checkout. Try again in a moment.";
+    return { ok: false, message };
   }
   return { ok: true, url: res.url };
 }

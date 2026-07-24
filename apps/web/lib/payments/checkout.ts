@@ -46,6 +46,18 @@ export async function createCheckoutSession(
   if (!client || client.org_id !== input.orgId) return { ok: false, reason: "client_not_found" };
   if (client.is_demo) return { ok: false, reason: "demo_client" };
 
+  // Never start a SECOND live subscription for a client who already has one — a
+  // change of plan goes through applyTierChange, not a fresh checkout. Prevents a
+  // stale tab / retry from creating a duplicate Stripe subscription (double MRR).
+  const { data: live } = await service
+    .from("subscriptions")
+    .select("id")
+    .eq("client_id", input.clientId)
+    .in("status", ["active", "trialing", "past_due"])
+    .limit(1)
+    .maybeSingle();
+  if (live) return { ok: false, reason: "already_subscribed" };
+
   const { data: acct } = await service
     .from("connect_accounts")
     .select("stripe_account_id, charges_enabled")

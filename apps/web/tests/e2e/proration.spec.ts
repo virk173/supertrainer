@@ -46,7 +46,7 @@ test("downgrade → no charge today, applies at period end", () => {
   });
   expect(s.appliesImmediately).toBe(false);
   expect(s.chargedTodayLabel).toBe("$0.00");
-  expect(s.sentence).toContain("end of this cycle");
+  expect(s.sentence).toContain("next renewal");
   expect(s.sentence).toContain("$80.00");
 });
 

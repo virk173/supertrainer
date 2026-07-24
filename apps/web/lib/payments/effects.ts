@@ -14,6 +14,14 @@ type Service = SupabaseClient<Database>;
 // is IDEMPOTENT (upsert by natural key, insert-or-skip on unique constraints), so
 // a Stripe redelivery after a mid-processing failure re-runs safely — the route
 // only stamps webhook_events.processed_at once all effects succeed.
+//
+// A DB error is THROWN, never swallowed: the route then leaves processed_at null,
+// returns 5xx, and Stripe redelivers → the idempotent effects re-run. Money code
+// must fail loud, not mark a failed write as done.
+function ok<T extends { error: unknown }>(res: T): T {
+  if (res.error) throw res.error;
+  return res;
+}
 
 function iso(unixSeconds: number | null): string | null {
   return unixSeconds != null ? new Date(unixSeconds * 1000).toISOString() : null;
@@ -56,14 +64,16 @@ export async function executeEffects(
         if (effect.tierId) patch.tier_id = effect.tierId;
 
         if (rowId) {
-          await service.from("subscriptions").update(patch).eq("id", rowId);
+          ok(await service.from("subscriptions").update(patch).eq("id", rowId));
         } else if (ctx.orgId && ctx.clientId) {
-          const { data } = await service
+          const { data, error } = await service
             .from("subscriptions")
             .insert({ org_id: ctx.orgId, client_id: ctx.clientId, ...patch })
             .select("id")
             .single();
+          if (error) throw error;
           rowId = data?.id ?? null;
+          if (!rowId) throw new Error("effects: subscription insert returned no id");
         }
         break;
       }
@@ -76,11 +86,13 @@ export async function executeEffects(
             status: effect.status,
           };
           if (effect.status === "active") patch.approved_manually = false;
-          await service
-            .from("clients")
-            .update(patch)
-            .eq("id", ctx.clientId)
-            .eq("org_id", ctx.orgId);
+          ok(
+            await service
+              .from("clients")
+              .update(patch)
+              .eq("id", ctx.clientId)
+              .eq("org_id", ctx.orgId),
+          );
         }
         break;
       }
@@ -88,7 +100,7 @@ export async function executeEffects(
       case "record_payment": {
         if (ctx.orgId && ctx.clientId) {
           // insert-or-skip on the unique stripe_invoice_id → replay-safe.
-          await service.from("payment_records").upsert(
+          ok(await service.from("payment_records").upsert(
             {
               org_id: ctx.orgId,
               client_id: ctx.clientId,
@@ -102,7 +114,7 @@ export async function executeEffects(
               period_end: iso(effect.periodEnd),
             },
             { onConflict: "stripe_invoice_id", ignoreDuplicates: true },
-          );
+          ));
         }
         break;
       }
@@ -112,7 +124,7 @@ export async function executeEffects(
           // System voice (P6) — queued for the delivery ladder (8.4). Deduped so
           // a redelivered event never double-nudges.
           const key = `pay:${ctx.clientId}:${effect.template}:${event.invoiceId ?? event.created}`;
-          await service.from("notifications").upsert(
+          ok(await service.from("notifications").upsert(
             {
               org_id: ctx.orgId,
               client_id: ctx.clientId,
@@ -123,20 +135,22 @@ export async function executeEffects(
               dedupe_key: key,
             },
             { onConflict: "dedupe_key", ignoreDuplicates: true },
-          );
+          ));
         }
         break;
       }
 
       case "set_connect_status": {
         if (ctx.stripeAccountId) {
-          await service
-            .from("connect_accounts")
-            .update({
-              charges_enabled: effect.chargesEnabled,
-              payouts_enabled: effect.payoutsEnabled,
-            })
-            .eq("stripe_account_id", ctx.stripeAccountId);
+          ok(
+            await service
+              .from("connect_accounts")
+              .update({
+                charges_enabled: effect.chargesEnabled,
+                payouts_enabled: effect.payoutsEnabled,
+              })
+              .eq("stripe_account_id", ctx.stripeAccountId),
+          );
         }
         break;
       }

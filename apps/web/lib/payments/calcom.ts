@@ -55,21 +55,32 @@ export async function grantMonthlyCredits(
   return { granted };
 }
 
-/** Record a booking → increment credits_used for this client's current month.
- *  Called by the Cal.com booking webhook. Returns remaining after the booking. */
+/** Record a booking → increment credits_used for the BOOKING month (not the
+ *  webhook-processing month — a delivery that crosses a UTC month boundary still
+ *  decrements the right period). Verifies the client belongs to the org named in
+ *  the webhook metadata (defense-in-depth on the HMAC-gated endpoint). Called by
+ *  the Cal.com booking webhook. Returns remaining after the booking. */
 export async function recordBooking(
+  orgId: string,
   clientId: string,
-  now = new Date(),
-): Promise<{ ok: boolean; remaining?: number }> {
+  bookingAt = new Date(),
+): Promise<{ ok: boolean; remaining?: number; reason?: string }> {
   const service = createServiceClient();
-  const month = periodMonth(now);
+  const { data: client } = await service
+    .from("clients")
+    .select("id, org_id")
+    .eq("id", clientId)
+    .maybeSingle();
+  if (!client || client.org_id !== orgId) return { ok: false, reason: "client_not_in_org" };
+
+  const month = periodMonth(bookingAt);
   const { data: row } = await service
     .from("call_credits")
     .select("id, credits_total, credits_used")
     .eq("client_id", clientId)
     .eq("period_month", month)
     .maybeSingle();
-  if (!row) return { ok: false };
+  if (!row) return { ok: false, reason: "no_credits_for_month" };
 
   const used = row.credits_used + 1;
   await service.from("call_credits").update({ credits_used: used }).eq("id", row.id);

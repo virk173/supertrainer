@@ -26,6 +26,27 @@ const s = (v: unknown): string | undefined => (typeof v === "string" ? v : undef
 const n = (v: unknown): number | undefined => (typeof v === "number" ? v : undefined);
 const b = (v: unknown): boolean | undefined => (typeof v === "boolean" ? v : undefined);
 
+// Map Stripe's subscription status set onto our narrower public.subscription_status
+// enum. Anything not in the enum (notably incomplete_expired — a dead sub whose
+// first payment never landed) is folded to the nearest safe value so a write can
+// never fail an enum cast. Unknown → undefined (the machine leaves status as-is).
+function toSubStatus(raw: string | undefined): SubStatus | undefined {
+  switch (raw) {
+    case "incomplete":
+    case "trialing":
+    case "active":
+    case "past_due":
+    case "paused":
+    case "canceled":
+    case "unpaid":
+      return raw;
+    case "incomplete_expired":
+      return "canceled";
+    default:
+      return undefined;
+  }
+}
+
 function meta(obj: Bag): Bag {
   const m = obj.metadata;
   return m && typeof m === "object" ? (m as Bag) : {};
@@ -89,6 +110,7 @@ export function normalizeEvent(event: Stripe.Event): WebhookEvent | null {
         currency: s(obj.currency) ?? "usd",
         periodStart: n(period?.start) ?? n(obj.period_start) ?? null,
         periodEnd: n(period?.end) ?? n(obj.period_end) ?? null,
+        attemptCount: n(obj.attempt_count),
       };
     }
 
@@ -107,7 +129,7 @@ export function normalizeEvent(event: Stripe.Event): WebhookEvent | null {
         tierId: s(m.tier_id),
         stripeSubscriptionId: s(obj.id),
         stripeCustomerId: s(obj.customer),
-        subscriptionStatus: s(obj.status) as SubStatus | undefined,
+        subscriptionStatus: toSubStatus(s(obj.status)),
         cancelAtPeriodEnd: b(obj.cancel_at_period_end),
         currentPeriodEnd: n(item?.current_period_end) ?? n(obj.current_period_end) ?? null,
       };

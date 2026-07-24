@@ -65,13 +65,17 @@ export function summarizeProration(input: ProrationInput): ProrationSummary {
   const nextRenewalLabel = `${formatMoney(nextRenewalCents, currency)} on ${renewalDate}`;
 
   if (direction === "downgrade") {
+    // proration_behavior:'none' means no charge or credit today; the lower price
+    // takes over from your next renewal. (Deferring the feature change itself to
+    // the period boundary needs a Stripe subscription schedule — a follow-up; the
+    // copy stays honest about billing and doesn't promise feature retention.)
     return {
       chargedTodayLabel: formatMoney(0, currency),
       nextRenewalLabel,
-      sentence: `Your plan changes at the end of this cycle — you’ll be charged ${formatMoney(
+      sentence: `No charge today — your plan moves to the new price of ${formatMoney(
         nextRenewalCents,
         currency,
-      )} on ${renewalDate}, and keep your current features until then.`,
+      )} starting at your next renewal on ${renewalDate}.`,
       appliesImmediately: false,
     };
   }

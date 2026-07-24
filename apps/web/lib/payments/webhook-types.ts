@@ -60,6 +60,9 @@ export interface WebhookEvent {
   currency?: string;
   periodStart?: number | null;
   periodEnd?: number | null;
+  // Stripe's own retry counter — the authoritative dunning stage, so the ladder
+  // is independent of invoice.* vs subscription.updated delivery order.
+  attemptCount?: number;
   // connect
   chargesEnabled?: boolean;
   payoutsEnabled?: boolean;

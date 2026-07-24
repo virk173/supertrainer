@@ -143,7 +143,14 @@ export function transition(state: SubState, event: WebhookEvent): Transition {
     case "invoice.payment_failed": {
       next.status = "past_due";
       next.pauseReason = "dunning";
-      next.dunningStage = Math.min(MAX_DUNNING_STAGE, state.dunningStage + 1);
+      // Prefer Stripe's own retry counter (attempt_count) so the stage is a
+      // function of the invoice's real attempt number, not of how many events
+      // we've counted — a paired customer.subscription.updated can't double-advance
+      // it. Fall back to an increment when the count is absent (fixtures).
+      next.dunningStage = Math.min(
+        MAX_DUNNING_STAGE,
+        event.attemptCount ?? state.dunningStage + 1,
+      );
       const effects: Effect[] = [
         upsert(next, event),
         {
@@ -177,10 +184,18 @@ export function transition(state: SubState, event: WebhookEvent): Transition {
     }
 
     case "customer.subscription.updated": {
+      const wasDunning =
+        state.status === "past_due" ||
+        state.status === "unpaid" ||
+        state.pauseReason === "dunning" ||
+        state.dunningStage > 0;
       if (event.subscriptionStatus) next.status = event.subscriptionStatus;
       if (event.cancelAtPeriodEnd !== undefined) next.cancelAtPeriodEnd = event.cancelAtPeriodEnd;
       if (next.status === "past_due" || next.status === "unpaid") {
         next.pauseReason = "dunning";
+        // Only floor to stage 1 — never advance here. invoice.payment_failed
+        // (attempt_count) is the sole stage-advancer, so a paired updated event
+        // can't push the ladder forward regardless of delivery order.
         next.dunningStage = Math.max(1, state.dunningStage);
       } else if (next.status === "active") {
         next.pauseReason = "none";
@@ -191,6 +206,13 @@ export function transition(state: SubState, event: WebhookEvent): Transition {
       const effects: Effect[] = [upsert(next, event)];
       if (next.status === "active" && state.status !== "active") {
         effects.push({ kind: "set_client_status", status: "active" });
+        // Recovery can arrive via updated OR invoice.paid, in either order. Fire
+        // the recovery effects on whichever wins the transition out of dunning;
+        // the loser sees already-clean state and won't re-fire (notify dedupes).
+        if (wasDunning) {
+          effects.push({ kind: "notify_client", template: "payment_recovered" });
+          effects.push({ kind: "ledger_mark_gap_not_expected" });
+        }
       }
       effects.push({ kind: "audit", action: "webhook.subscription_updated" });
       return { newState: next, effects };

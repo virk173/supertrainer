@@ -27,7 +27,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "invalid signature" }, { status: 400 });
   }
 
-  let payload: { triggerEvent?: string; payload?: { metadata?: { client_id?: string } } };
+  let payload: {
+    triggerEvent?: string;
+    payload?: { startTime?: string; metadata?: { client_id?: string; org_id?: string } };
+  };
   try {
     payload = JSON.parse(body);
   } catch {
@@ -39,8 +42,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ received: true, ignored: payload.triggerEvent });
   }
   const clientId = payload.payload?.metadata?.client_id;
-  if (!clientId) return NextResponse.json({ received: true, no_client: true });
+  const orgId = payload.payload?.metadata?.org_id;
+  if (!clientId || !orgId) return NextResponse.json({ received: true, no_client: true });
 
-  const res = await recordBooking(clientId);
+  // Decrement against the BOOKING's month, not the webhook-processing month.
+  const bookingAt = payload.payload?.startTime ? new Date(payload.payload.startTime) : new Date();
+  const res = await recordBooking(orgId, clientId, bookingAt);
   return NextResponse.json({ received: true, remaining: res.remaining ?? null });
 }

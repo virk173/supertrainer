@@ -60,9 +60,9 @@ async function gatherDayInputs(
     db.from("weigh_ins").select("id", { count: "exact", head: true }).eq("client_id", client.id).eq("tz_date", date),
     db.from("gym_checkins").select("id", { count: "exact", head: true }).eq("client_id", client.id).eq("tz_date", date),
     db.from("workout_logs").select("id", { count: "exact", head: true }).eq("client_id", client.id).eq("tz_date", date),
-    // Phase 8.4 gap-fairness: a billing interruption (dunning/uncaptured or
-    // vacation pause) suppresses the day's expectations.
-    db.from("subscriptions").select("status, pause_reason").eq("client_id", client.id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+    // Phase 8.4 gap-fairness: a billing interruption that actually RESTRICTS
+    // access suppresses the day's expectations.
+    db.from("subscriptions").select("status, pause_reason, dunning_stage").eq("client_id", client.id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
   ]);
 
   const planRow = plan.data as { meal_slots?: MealSlot[] } | null;
@@ -78,14 +78,19 @@ async function gatherDayInputs(
 
   const mealSlots = [...new Set((meals.data ?? []).map((m) => m.meal_slot as MealSlot))];
 
-  const subRow = sub.data as { status?: string; pause_reason?: string } | null;
+  // Only suppress once access is genuinely restricted — a vacation pause, the
+  // terminal 'unpaid'/'paused' Stripe state, or the day-7 dunning FINAL stage.
+  // During the early Smart-Retry window (past_due, stage 1–2) the client still
+  // has full portal access, so they still accrue expectations (spec §9: "day 7 …
+  // reminders stop"). A paused/churned client is already covered by the
+  // status!=='active' short-circuit in computeExpectations.
+  const subRow = sub.data as { status?: string; pause_reason?: string; dunning_stage?: number } | null;
   const paymentGap =
     subRow != null &&
-    (subRow.status === "past_due" ||
-      subRow.status === "unpaid" ||
+    (subRow.status === "unpaid" ||
       subRow.status === "paused" ||
-      subRow.pause_reason === "dunning" ||
-      subRow.pause_reason === "vacation");
+      subRow.pause_reason === "vacation" ||
+      (subRow.pause_reason === "dunning" && (subRow.dunning_stage ?? 0) >= 3));
 
   return {
     status: client.status,

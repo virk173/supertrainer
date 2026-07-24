@@ -28,10 +28,18 @@ export function isWebhookConfigured(): boolean {
   return Boolean(process.env.STRIPE_WEBHOOK_SECRET);
 }
 
-/** Reject live-mode keys outright: dev/preview/CI is test-mode only (spec §②).
- *  A key that doesn't start with the test prefix is treated as unconfigured so
- *  a stray sk_live_ never drives a real charge from a non-prod environment. */
+/** True in the Vercel/Node production environment (where live Stripe keys are
+ *  expected). Everywhere else — dev, preview, CI — must stay test-mode. */
+export function isProductionEnv(): boolean {
+  return process.env.VERCEL_ENV === "production" || process.env.NODE_ENV === "production";
+}
+
+/** Reject live-mode keys OUTSIDE production (spec §②: dev/preview/CI is test-mode
+ *  only). In production a live sk_live_ key is expected and allowed — that's the
+ *  go-live switch. A stray live key in a non-prod env throws so it can never
+ *  drive a real charge from dev/preview/CI. */
 export function assertTestModeKey(key: string): void {
+  if (isProductionEnv()) return;
   if (key.startsWith("sk_live_") || key.startsWith("rk_live_")) {
     throw new Error(
       "payments: live-mode Stripe key detected outside production. Test mode only — use sk_test_.",

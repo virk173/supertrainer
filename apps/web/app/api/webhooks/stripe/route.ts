@@ -61,16 +61,25 @@ async function resolveContext(
     }
   }
 
-  // Idempotent re-checkout: an existing row for this client (no sub id match yet).
+  // Idempotent re-checkout: reuse an existing row for this client ONLY when it's
+  // a cutover row awaiting checkout (no stripe_subscription_id) or the very same
+  // subscription. A different/old sub id (e.g. a churned client winning back)
+  // gets a FRESH row instead — so the welcome fires and a new subscription never
+  // repoints an old row (which would orphan the old one's late retry events onto
+  // the new subscription's state).
   if (!rowId && clientId) {
     const { data: row } = await service
       .from("subscriptions")
-      .select("id, org_id, client_id, status, pause_reason, dunning_stage, cancel_at_period_end, last_event_at")
+      .select("id, org_id, client_id, status, pause_reason, dunning_stage, cancel_at_period_end, last_event_at, stripe_subscription_id")
       .eq("client_id", clientId)
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
-    if (row) {
+    const reusable =
+      row &&
+      (row.stripe_subscription_id == null ||
+        row.stripe_subscription_id === event.stripeSubscriptionId);
+    if (row && reusable) {
       rowId = row.id;
       orgId = row.org_id;
       clientId = row.client_id;

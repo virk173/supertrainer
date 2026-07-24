@@ -83,6 +83,43 @@ test("dunning copy is system-voiced — about the plan/payment, never the coach"
   expect(systemMessage("payment_failed").body).not.toMatch(/you owe/i);
 });
 
+// ── order-independence (review fix M3) ───────────────────────────────────────
+test("dunning stage follows Stripe's attempt_count, not our event count", () => {
+  // A single failed retry #2 lands stage 2 directly, even from stage 0.
+  const { newState } = transition(
+    S(),
+    E("invoice.payment_failed", { attemptCount: 2, amountCents: 10000, currency: "usd" }),
+  );
+  expect(newState.dunningStage).toBe(2);
+});
+
+test("a paired subscription.updated(past_due) does NOT double-advance the ladder", () => {
+  // updated arrives first (floors to stage 1)...
+  const t1 = transition(S(), E("customer.subscription.updated", { created: 3000, subscriptionStatus: "past_due" }));
+  expect(t1.newState.dunningStage).toBe(1);
+  // ...then the paired payment_failed with attempt_count 1 keeps it at 1, not 2.
+  const t2 = transition(t1.newState, E("invoice.payment_failed", { created: 3001, attemptCount: 1, amountCents: 10000, currency: "usd" }));
+  expect(t2.newState.dunningStage).toBe(1);
+});
+
+test("recovery via subscription.updated(active) still fires recovered + gap-fairness", () => {
+  const { newState, effects } = transition(
+    S({ status: "past_due", pauseReason: "dunning", dunningStage: 2 }),
+    E("customer.subscription.updated", { subscriptionStatus: "active" }),
+  );
+  expect(newState.status).toBe("active");
+  expect(find(effects, "notify_client")?.template).toBe("payment_recovered");
+  expect(kinds(effects)).toContain("ledger_mark_gap_not_expected");
+});
+
+test("gap-fairness only suppresses at the FINAL dunning stage, not the early window", () => {
+  // Stage 1 (day-0 retry) → client still has access → still accrues expectations.
+  // (day-close-job passes paymentGap only for stage>=3/unpaid/paused; this asserts
+  // the pure computeExpectations honors the flag exactly.)
+  expect(computeExpectations(dayInputs({ paymentGap: false })).mode).toBe("plan");
+  expect(computeExpectations(dayInputs({ paymentGap: true })).mode).toBe("none");
+});
+
 // ── grace helpers ─────────────────────────────────────────────────────────────
 test("grace window helpers compute + expire correctly", () => {
   const now = new Date("2026-08-01T00:00:00.000Z");

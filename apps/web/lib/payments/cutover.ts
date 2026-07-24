@@ -101,11 +101,17 @@ export async function startClientCutover(
   // Reuse the subscriptions row: incomplete + a grace window = full access.
   const { data: existing } = await service
     .from("subscriptions")
-    .select("id")
+    .select("id, status")
     .eq("client_id", clientId)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
+
+  // Never downgrade a client who already has a live subscription (a stale tab or
+  // double-submit racing a completed checkout) back to 'incomplete'.
+  if (existing && (existing.status === "active" || existing.status === "trialing")) {
+    return { ok: false, reason: "already_subscribed" };
+  }
 
   const patch = {
     org_id: orgId,
@@ -176,25 +182,34 @@ export async function enrollPlatformSubscription(
 }
 
 /** Hand uncaptured (grace-expired) cutover clients to the 8.4 dunning restricted
- *  state — never a hard cut. Called by the cutover cron. Returns the count moved. */
+ *  state — never a hard cut. Idempotent + non-clobbering: it targets ONLY rows
+ *  still 'incomplete' with an elapsed grace window, so a client already handed to
+ *  dunning is not re-processed (no unbounded audit rows), and a trainer's
+ *  extend-grace (which resets the row to 'incomplete' with a future window) is not
+ *  reverted the next day. Called by the cutover cron. Returns the count moved. */
 export async function expireCutoverGrace(orgId: string, now = new Date()): Promise<number> {
-  const { clients } = await getCutoverList(orgId, now);
   const service = createServiceClient();
+  const nowIso = now.toISOString();
+  const { data: rows } = await service
+    .from("subscriptions")
+    .select("id, client_id, grace_until")
+    .eq("org_id", orgId)
+    .eq("status", "incomplete")
+    .not("grace_until", "is", null)
+    .lt("grace_until", nowIso);
+
   let moved = 0;
-  for (const c of clients) {
-    if (c.state !== "expired") continue;
-    // Move the incomplete cutover subscription into dunning (restricted) + pause
-    // the client (P3 expectations off — gap-fairness). Recovery on real checkout.
+  for (const row of rows ?? []) {
     await service
       .from("subscriptions")
       .update({ status: "past_due", pause_reason: "dunning", dunning_stage: 3 })
-      .eq("client_id", c.clientId);
-    await service.from("clients").update({ status: "paused" }).eq("id", c.clientId).eq("org_id", orgId);
+      .eq("id", row.id);
+    await service.from("clients").update({ status: "paused" }).eq("id", row.client_id).eq("org_id", orgId);
     await recordAudit(service, {
       orgId,
       action: "cutover.grace_expired",
       entityType: "client",
-      entityId: c.clientId,
+      entityId: row.client_id,
     });
     moved += 1;
   }

@@ -123,17 +123,28 @@ export async function extendGrace(
   const service = createServiceClient();
   const { data: sub } = await service
     .from("subscriptions")
-    .select("id, org_id")
+    .select("id, org_id, stripe_subscription_id")
     .eq("client_id", clientId)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
   if (!sub || sub.org_id !== orgId) return { ok: false, reason: "no_subscription" };
 
-  await service
-    .from("subscriptions")
-    .update({ grace_until: graceUntil(now, days), dunning_stage: 1 })
-    .eq("id", sub.id);
+  // A cutover client (no real Stripe subscription yet) goes back to 'incomplete'
+  // so it reads as in_grace again and the cutover cron re-manages it at the new
+  // window. A real dunning client keeps its Stripe-driven status; grace just
+  // reopens access until the next failed retry.
+  const patch: {
+    grace_until: string;
+    dunning_stage: number;
+    status?: "incomplete";
+    pause_reason?: "none";
+  } = { grace_until: graceUntil(now, days), dunning_stage: 1 };
+  if (!sub.stripe_subscription_id) {
+    patch.status = "incomplete";
+    patch.pause_reason = "none";
+  }
+  await service.from("subscriptions").update(patch).eq("id", sub.id);
   // Re-open access during grace (the ladder re-pauses if still unpaid at expiry).
   await service.from("clients").update({ status: "active" }).eq("id", clientId).eq("org_id", orgId);
   await recordAudit(service, {
