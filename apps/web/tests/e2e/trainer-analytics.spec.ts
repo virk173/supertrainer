@@ -69,12 +69,10 @@ test("trainer analytics: churn radar, histogram, zero-edit, a11y", async ({ page
   await expect(page.getByText("Logging stopped", { exact: false })).toBeVisible();
   await expect(page.getByText("75%")).toBeVisible();
 
-  // The histogram bars actually painted.
-  const barsOk = await page.evaluate(() => {
-    const bars = document.querySelectorAll('[data-testid="adherence-histogram"] .recharts-bar-rectangle');
-    return bars.length > 0;
-  });
-  expect(barsOk).toBe(true);
+  // The histogram bars actually painted — wait for Recharts's async render.
+  await expect(
+    page.locator('[data-testid="adherence-histogram"] .recharts-bar-rectangle').first(),
+  ).toBeAttached({ timeout: 15_000 });
 
   await settlePaint(page);
   await expectNoHorizontalOverflow(page);

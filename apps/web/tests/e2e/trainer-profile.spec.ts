@@ -70,13 +70,14 @@ test("trainer profile: forensic grid + weight chart, a11y", async ({ page }) => 
   await expect(page.getByTestId("forensic-grid")).toBeVisible();
   await expect(page.getByTestId("weight-chart")).toBeVisible();
 
-  // The Recharts weight line actually painted (CSS-var stroke resolved).
-  const strokeOk = await page.evaluate(() => {
-    const path = document.querySelector(
-      '[data-testid="weight-chart"] path.recharts-line-curve',
-    ) as SVGPathElement | null;
-    if (!path) return false;
-    const stroke = getComputedStyle(path).stroke;
+  // The Recharts weight line actually painted (CSS-var stroke resolved). Wait for
+  // its async render (ResponsiveContainer measures on mount) before reading.
+  const line = page
+    .locator('[data-testid="weight-chart"] path.recharts-line-curve')
+    .first();
+  await expect(line).toBeAttached({ timeout: 15_000 });
+  const strokeOk = await line.evaluate((el) => {
+    const stroke = getComputedStyle(el as SVGElement).stroke;
     return stroke !== "" && stroke !== "none" && !stroke.includes("rgba(0, 0, 0, 0)");
   });
   expect(strokeOk).toBe(true);
