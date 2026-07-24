@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowLeft, MessageSquare } from "lucide-react";
+import { ArrowLeft, FileText, MessageSquare } from "lucide-react";
 
 import { Avatar } from "@supertrainer/ui/components/avatar";
 import { Badge } from "@supertrainer/ui/components/badge";
@@ -54,6 +54,12 @@ export function ClientProfile({ profile }: { profile: ClientProfileData }) {
           </p>
         </div>
         <div className="ml-auto flex flex-wrap gap-2">
+          <Button asChild variant="outline">
+            <a href={`/trainer/clients/${profile.id}/report`} target="_blank" rel="noopener">
+              <FileText aria-hidden="true" className="size-4" />
+              Progress report
+            </a>
+          </Button>
           <Button asChild>
             <Link href={`/trainer/clients/${profile.id}/inbox`}>
               <MessageSquare aria-hidden="true" className="size-4" />
