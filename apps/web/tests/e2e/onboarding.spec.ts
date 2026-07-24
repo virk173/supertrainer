@@ -20,8 +20,8 @@ test("activation checklist: out-of-order progress persists across reloads", asyn
   const { orgId } = await signInAsTrainer(page);
   const service = serviceClient();
 
-  // All six steps start unresolved.
-  await expect(page.getByTestId("onboarding-progress-count")).toHaveText("0 / 6");
+  // All seven steps start unresolved (Phase 8.1 added the 'payments' step).
+  await expect(page.getByTestId("onboarding-progress-count")).toHaveText("0 / 7");
   await expect(page.getByTestId("step-status-brand")).toHaveText("To do");
 
   // Skip an earlier, skippable step through the UI (brand is open by default).
@@ -40,7 +40,7 @@ test("activation checklist: out-of-order progress persists across reloads", asyn
 
   // Reload mid-flow: both the completion and the skip survive.
   await page.reload();
-  await expect(page.getByTestId("onboarding-progress-count")).toHaveText("2 / 6");
+  await expect(page.getByTestId("onboarding-progress-count")).toHaveText("2 / 7");
   await expect(page.getByTestId("step-status-invite")).toHaveText("Done");
   await expect(page.getByTestId("step-status-brand")).toHaveText("Skipped");
 });
@@ -60,7 +60,7 @@ test("resume banner shows while steps remain, clears on completion", async ({
   await serviceClient()
     .from("org_onboarding_state")
     .upsert(
-      (["brand", "style", "tiers", "import", "demo", "invite"] as const).map(
+      (["brand", "style", "tiers", "import", "demo", "invite", "payments"] as const).map(
         (step) => ({
           org_id: orgId,
           step,
@@ -74,7 +74,7 @@ test("resume banner shows while steps remain, clears on completion", async ({
 
   // Everything resolved → celebratory completion state.
   await page.goto("/onboarding");
-  await expect(page.getByTestId("onboarding-progress-count")).toHaveText("6 / 6");
+  await expect(page.getByTestId("onboarding-progress-count")).toHaveText("7 / 7");
   await expect(page.getByTestId("onboarding-complete")).toBeVisible();
 
   // With onboarding complete the server stops rendering the banner.

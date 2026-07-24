@@ -41,6 +41,24 @@ npx supabase db reset       # re-apply all migrations from scratch
 | `npm run lint`      | ESLint across every workspace                 |
 | `npm run test`      | Test suites across every workspace            |
 
+## Payments (Stripe Connect — Phase 8)
+
+Test mode only in dev. Add the `STRIPE_*` keys from `.env.example` to
+`apps/web/.env.local`. To exercise the webhook state machine locally, forward
+Stripe events to the local route:
+
+```bash
+stripe listen --forward-to localhost:3000/api/webhooks/stripe
+# paste the printed whsec_… into STRIPE_WEBHOOK_SECRET, then trigger events:
+stripe trigger checkout.session.completed
+stripe trigger invoice.payment_failed
+```
+
+The endpoint fails closed without `STRIPE_WEBHOOK_SECRET`, dedupes by
+`stripe_event_id` (replay-safe), and runs the pure `transition()` machine
+(`apps/web/lib/payments/state-machine.ts`, 25 fixtures). CI signs fixture
+payloads with a test secret — no live Stripe on the merge gate.
+
 ## CI / Deploy
 
 - **Production:** https://supertrainer-web.vercel.app (Vercel, auto-deploys on merge to `main`; preview deployment per PR).

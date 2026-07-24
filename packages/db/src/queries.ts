@@ -143,6 +143,43 @@ export async function recordInjuryOverride(
   if (error) throw error;
 }
 
+// ── Generic audit trail (Phase 8) ────────────────────────────────────────────
+// Every money mutation must leave a trail (Phase 8 DoD: "every money mutation
+// audited"). audit_log is append-only (no UPDATE/DELETE policy; API-role grants
+// revoked), so this is written with the service role. Per the service-role
+// tenancy rule the CALLER verifies org ownership before calling — the orgId here
+// must be a trusted value the caller has already checked against the entity, not
+// a raw request field. Kept generic (mirrors recordInjuryOverride's insert shape)
+// so every Phase 8 effect — subscription state change, charge, payout, dunning
+// step, cutover — records the same way.
+export interface AuditEntry {
+  orgId: string;
+  action: string;
+  entityType: string;
+  entityId?: string | null;
+  // The system voice writes many money mutations (webhooks, crons) — actor is
+  // null for those; a trainer-initiated action passes their profile id.
+  actorProfileId?: string | null;
+  // A JSON-serializable detail bag. Typed loosely so call sites pass their own
+  // shapes; the column is jsonb so it round-trips as-is.
+  payload?: Record<string, unknown>;
+}
+
+export async function recordAudit(
+  service: AnyDb,
+  entry: AuditEntry,
+): Promise<void> {
+  const { error } = await service.from("audit_log").insert({
+    org_id: entry.orgId,
+    actor_profile_id: entry.actorProfileId ?? null,
+    action: entry.action,
+    entity_type: entry.entityType,
+    entity_id: entry.entityId ?? null,
+    payload: (entry.payload ?? {}) as Database["public"]["Tables"]["audit_log"]["Insert"]["payload"],
+  });
+  if (error) throw error;
+}
+
 // ── Portion resolution (Phase 3.1) ───────────────────────────────────────────
 // Turn "2 rotis" / "1 katori dal" / "200 g chicken" into grams, using the food's
 // serving_units map. This is the bridge between what a client types and the

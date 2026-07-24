@@ -53,13 +53,16 @@ async function gatherDayInputs(
 ): Promise<DayInputs> {
   const weekday = weekdayOf(date);
 
-  const [plan, split, meals, weigh, checkin, sets] = await Promise.all([
+  const [plan, split, meals, weigh, checkin, sets, sub] = await Promise.all([
     db.from("plans_active").select("meal_slots").eq("client_id", client.id).maybeSingle(),
     db.from("splits_active").select("days, schedule").eq("client_id", client.id).maybeSingle(),
     db.from("meal_logs").select("meal_slot").eq("client_id", client.id).eq("tz_date", date),
     db.from("weigh_ins").select("id", { count: "exact", head: true }).eq("client_id", client.id).eq("tz_date", date),
     db.from("gym_checkins").select("id", { count: "exact", head: true }).eq("client_id", client.id).eq("tz_date", date),
     db.from("workout_logs").select("id", { count: "exact", head: true }).eq("client_id", client.id).eq("tz_date", date),
+    // Phase 8.4 gap-fairness: a billing interruption that actually RESTRICTS
+    // access suppresses the day's expectations.
+    db.from("subscriptions").select("status, pause_reason, dunning_stage").eq("client_id", client.id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
   ]);
 
   const planRow = plan.data as { meal_slots?: MealSlot[] } | null;
@@ -75,11 +78,26 @@ async function gatherDayInputs(
 
   const mealSlots = [...new Set((meals.data ?? []).map((m) => m.meal_slot as MealSlot))];
 
+  // Only suppress once access is genuinely restricted — a vacation pause, the
+  // terminal 'unpaid'/'paused' Stripe state, or the day-7 dunning FINAL stage.
+  // During the early Smart-Retry window (past_due, stage 1–2) the client still
+  // has full portal access, so they still accrue expectations (spec §9: "day 7 …
+  // reminders stop"). A paused/churned client is already covered by the
+  // status!=='active' short-circuit in computeExpectations.
+  const subRow = sub.data as { status?: string; pause_reason?: string; dunning_stage?: number } | null;
+  const paymentGap =
+    subRow != null &&
+    (subRow.status === "unpaid" ||
+      subRow.status === "paused" ||
+      subRow.pause_reason === "vacation" ||
+      (subRow.pause_reason === "dunning" && (subRow.dunning_stage ?? 0) >= 3));
+
   return {
     status: client.status,
     plan: planExpectation,
     isTrainingDay,
     isWeighInDay: weighInWeekdays(client.intake).includes(weekday),
+    paymentGap,
     actual: {
       mealSlots,
       mealCount: meals.data?.length ?? 0,

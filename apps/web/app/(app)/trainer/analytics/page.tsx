@@ -1,13 +1,27 @@
 import { notFound } from "next/navigation";
-import { Activity, CircleDollarSign, Clock, PieChart, Sparkles, TrendingDown, Users } from "lucide-react";
+import { Activity, CircleDollarSign, Clock, Sparkles, TrendingDown, Users } from "lucide-react";
 
 import { AdherenceHistogram } from "@/components/analytics/adherence-histogram";
 import { ChurnRadar } from "@/components/analytics/churn-radar";
+import { RevenueDonut } from "@/components/analytics/revenue-donut";
 import { KpiCard } from "@/components/home/kpi-card";
 import { getSessionClaims } from "@/lib/onboarding/state";
 import { getAnalytics } from "@/lib/trainer/analytics";
+import { getRevenue } from "@/lib/trainer/revenue";
 
 export const metadata = { title: "Analytics — supertrainer" };
+
+function money(cents: number, currency: string): string {
+  try {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: currency.toUpperCase(),
+      maximumFractionDigits: 0,
+    }).format(cents / 100);
+  } catch {
+    return `${Math.round(cents / 100)} ${currency.toUpperCase()}`;
+  }
+}
 
 function timeSaved(min: number): string {
   if (min < 60) return `${min} min`;
@@ -22,7 +36,7 @@ export default async function TrainerAnalyticsPage() {
   const { orgId, role } = await getSessionClaims();
   if (!orgId || (role !== "owner" && role !== "staff")) notFound();
 
-  const a = await getAnalytics(orgId, new Date());
+  const [a, revenue] = await Promise.all([getAnalytics(orgId, new Date()), getRevenue(orgId)]);
 
   return (
     <div className="space-y-6" data-testid="analytics">
@@ -39,7 +53,14 @@ export default async function TrainerAnalyticsPage() {
           sub="risk score ≥ 40"
         />
         <KpiCard label="Avg adherence" value={a.avgAdherence ?? "—"} icon={<Activity />} />
-        <KpiCard label="MRR" value="—" icon={<CircleDollarSign />} sub="Arrives with payments" />
+        <KpiCard
+          label="MRR"
+          value={money(revenue.mrrCents, revenue.currency)}
+          icon={<CircleDollarSign />}
+          sub={`${revenue.activeSubscribers} paying${
+            revenue.atRiskSubscribers > 0 ? ` · ${revenue.atRiskSubscribers} at risk` : ""
+          }`}
+        />
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -47,7 +68,17 @@ export default async function TrainerAnalyticsPage() {
         <AdherenceHistogram data={a.histogram} />
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <RevenueDonut byTier={revenue.byTier} mrrCents={revenue.mrrCents} currency={revenue.currency} />
+        <KpiCard
+          label="Platform fees (recent)"
+          value={money(revenue.totalFeesCents, revenue.currency)}
+          icon={<CircleDollarSign />}
+          sub={`over ${revenue.history.length} payment${revenue.history.length === 1 ? "" : "s"}`}
+        />
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <KpiCard
           label="Zero-edit rate"
           value={a.zeroEditRate !== null ? `${a.zeroEditRate}%` : "—"}
@@ -59,12 +90,6 @@ export default async function TrainerAnalyticsPage() {
           value={timeSaved(a.timeSavedMinutes)}
           icon={<Clock />}
           sub="from approved AI drafts"
-        />
-        <KpiCard
-          label="Revenue by tier"
-          value="—"
-          icon={<PieChart />}
-          sub="Arrives with payments"
         />
       </div>
     </div>

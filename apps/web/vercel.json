@@ -8,6 +8,9 @@
     { "path": "/api/cron/notifications", "schedule": "0 6 * * *" },
     { "path": "/api/cron/check-in-cards", "schedule": "0 7 * * *" },
     { "path": "/api/cron/weekly-recap", "schedule": "0 8 * * *" },
-    { "path": "/api/cron/morning-digest", "schedule": "0 9 * * *" }
+    { "path": "/api/cron/morning-digest", "schedule": "0 9 * * *" },
+    { "path": "/api/cron/stripe-reconcile", "schedule": "0 10 * * *" },
+    { "path": "/api/cron/grant-credits", "schedule": "0 11 1 * *" },
+    { "path": "/api/cron/cutover-expiry", "schedule": "0 12 * * *" }
   ]
 }
