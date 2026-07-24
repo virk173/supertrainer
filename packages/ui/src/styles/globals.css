@@ -66,9 +66,13 @@
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
   --ring: oklch(0.708 0 0);
-  --radius-input: 0.375rem; /* 6px */
-  --radius-card: 0.625rem; /* 10px */
-  --radius: var(--radius-card);
+  /* Phase 7 DESIGN.md — ONE radius (8px) for every box: cards, inputs,
+   * buttons, wells, popovers, menus. The legacy input/card aliases are kept
+   * (some components reference them by name) but now both resolve to the single
+   * radius. `rounded-full` (pills, avatars, status dots) is the only exception. */
+  --radius: 0.5rem; /* 8px — the one radius */
+  --radius-input: var(--radius);
+  --radius-card: var(--radius);
 }
 
 .dark {
@@ -142,10 +146,13 @@
   --color-ring: var(--ring);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: var(--radius-input);
+  /* One radius: sm/md/lg/xl all collapse to 8px so `rounded-*` utilities can
+   * never reintroduce radius soup across 8 build sessions. `rounded-full`
+   * (pills/avatars/dots) is a Tailwind built-in and unaffected. */
+  --radius-sm: var(--radius);
+  --radius-md: var(--radius);
   --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  --radius-xl: var(--radius);
   --animate-accordion-down: accordion-down 0.2s ease-out;
   --animate-accordion-up: accordion-up 0.2s ease-out;
 }
