@@ -83,6 +83,16 @@ export const ONBOARDING_STEPS: readonly StepConfig[] = [
     href: "/onboarding/invite",
     skippable: false,
   },
+  {
+    step: "payments",
+    title: "Get paid",
+    summary: "Connect Stripe and sync your tiers.",
+    detail:
+      "Connect a Stripe account to take client payments and get paid out — Stripe handles identity, tax, and cross-border payouts. You can skip this and run in free mode until your first paying client.",
+    cta: "Set up payments",
+    href: "/trainer/settings/payments",
+    skippable: true,
+  },
 ] as const;
 
 export const ONBOARDING_STEP_ORDER: readonly OnboardingStep[] =

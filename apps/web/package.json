@@ -19,6 +19,7 @@
     "@supertrainer/ai": "*",
     "@supertrainer/db": "*",
     "@supertrainer/nutrition-engine": "*",
+    "@supertrainer/payments": "*",
     "@supertrainer/scoring": "*",
     "@supertrainer/ui": "*",
     "@tanstack/react-table": "^8.21.3",

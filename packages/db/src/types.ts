@@ -234,6 +234,56 @@ export type Database = {
           },
         ]
       }
+      connect_accounts: {
+        Row: {
+          charges_enabled: boolean
+          country: string | null
+          created_at: string
+          default_currency: string | null
+          details_submitted: boolean
+          locked_currency: string | null
+          org_id: string
+          payouts_enabled: boolean
+          requirements: Json
+          stripe_account_id: string
+          updated_at: string
+        }
+        Insert: {
+          charges_enabled?: boolean
+          country?: string | null
+          created_at?: string
+          default_currency?: string | null
+          details_submitted?: boolean
+          locked_currency?: string | null
+          org_id: string
+          payouts_enabled?: boolean
+          requirements?: Json
+          stripe_account_id: string
+          updated_at?: string
+        }
+        Update: {
+          charges_enabled?: boolean
+          country?: string | null
+          created_at?: string
+          default_currency?: string | null
+          details_submitted?: boolean
+          locked_currency?: string | null
+          org_id?: string
+          payouts_enabled?: boolean
+          requirements?: Json
+          stripe_account_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "connect_accounts_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: true
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       consents: {
         Row: {
           client_id: string
@@ -1540,6 +1590,53 @@ export type Database = {
           },
         ]
       }
+      platform_subscriptions: {
+        Row: {
+          created_at: string
+          current_period_end: string | null
+          founder_pricing: boolean
+          org_id: string
+          seat_band: Database["public"]["Enums"]["seat_band"]
+          status: Database["public"]["Enums"]["platform_sub_status"]
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          trial_end: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          current_period_end?: string | null
+          founder_pricing?: boolean
+          org_id: string
+          seat_band?: Database["public"]["Enums"]["seat_band"]
+          status?: Database["public"]["Enums"]["platform_sub_status"]
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          trial_end?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          current_period_end?: string | null
+          founder_pricing?: boolean
+          org_id?: string
+          seat_band?: Database["public"]["Enums"]["seat_band"]
+          status?: Database["public"]["Enums"]["platform_sub_status"]
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          trial_end?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "platform_subscriptions_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: true
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -1965,6 +2062,7 @@ export type Database = {
           org_id: string
           position: number
           price_cents: number
+          stripe_price_id: string | null
           stripe_product_id: string | null
           updated_at: string
         }
@@ -1979,6 +2077,7 @@ export type Database = {
           org_id: string
           position?: number
           price_cents?: number
+          stripe_price_id?: string | null
           stripe_product_id?: string | null
           updated_at?: string
         }
@@ -1993,6 +2092,7 @@ export type Database = {
           org_id?: string
           position?: number
           price_cents?: number
+          stripe_price_id?: string | null
           stripe_product_id?: string | null
           updated_at?: string
         }
@@ -2351,14 +2451,23 @@ export type Database = {
         | "import"
         | "demo"
         | "invite"
+        | "payments"
       onboarding_step_status: "todo" | "done" | "skipped"
       org_role: "owner" | "staff" | "client"
       plan_kind: "diet" | "split"
       plan_request_status: "queued" | "running" | "drafted" | "failed"
       plan_status: "draft" | "approved" | "superseded" | "archived"
       plan_trigger: "onboarding" | "monthly" | "manual"
+      platform_sub_status:
+        | "trialing"
+        | "active"
+        | "past_due"
+        | "canceled"
+        | "incomplete"
+        | "paused"
       progress_pose: "front" | "side" | "back"
       reminder_kind: "meal" | "weigh_in" | "checkin" | "custom"
+      seat_band: "20" | "50" | "100" | "unlimited"
       split_status: "draft" | "approved" | "superseded" | "archived"
       style_domain: "diet" | "training" | "voice"
       style_exemplar_source: "upload" | "edit_capture"
@@ -2556,15 +2665,32 @@ export const Constants = {
       notif_channel: ["push", "email", "in_app"],
       notif_status: ["queued", "sent", "delivered", "failed"],
       notification_channel: ["push", "email_only"],
-      onboarding_step: ["brand", "style", "tiers", "import", "demo", "invite"],
+      onboarding_step: [
+        "brand",
+        "style",
+        "tiers",
+        "import",
+        "demo",
+        "invite",
+        "payments",
+      ],
       onboarding_step_status: ["todo", "done", "skipped"],
       org_role: ["owner", "staff", "client"],
       plan_kind: ["diet", "split"],
       plan_request_status: ["queued", "running", "drafted", "failed"],
       plan_status: ["draft", "approved", "superseded", "archived"],
       plan_trigger: ["onboarding", "monthly", "manual"],
+      platform_sub_status: [
+        "trialing",
+        "active",
+        "past_due",
+        "canceled",
+        "incomplete",
+        "paused",
+      ],
       progress_pose: ["front", "side", "back"],
       reminder_kind: ["meal", "weigh_in", "checkin", "custom"],
+      seat_band: ["20", "50", "100", "unlimited"],
       split_status: ["draft", "approved", "superseded", "archived"],
       style_domain: ["diet", "training", "voice"],
       style_exemplar_source: ["upload", "edit_capture"],
