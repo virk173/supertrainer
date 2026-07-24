@@ -48,7 +48,9 @@ export async function computeMorningDigest(
   const [clients, drafts, renewals, escalations] = await Promise.all([
     db.from("clients").select("id").eq("org_id", orgId).eq("status", "active"),
     db.from("drafts").select("id", { count: "exact", head: true }).eq("org_id", orgId).eq("status", "pending"),
-    db.from("plan_requests").select("id", { count: "exact", head: true }).eq("org_id", orgId).eq("trigger", "monthly").eq("status", "queued"),
+    // Client_ids (not row count) — a client due for renewal has BOTH a diet and a
+    // split request queued, so counting rows would report 2 renewals per client.
+    db.from("plan_requests").select("client_id").eq("org_id", orgId).eq("trigger", "monthly").eq("status", "queued"),
     db.from("escalations").select("id", { count: "exact", head: true }).eq("org_id", orgId).eq("status", "open").gte("created_at", dayAgo),
   ]);
 
@@ -67,11 +69,13 @@ export async function computeMorningDigest(
     else slipping++;
   }
 
+  const renewalClients = new Set((renewals.data ?? []).map((r) => r.client_id as string));
+
   return assembleMorningDigest({
     onTrack,
     slipping,
     pendingDrafts: drafts.count ?? 0,
-    renewalsDue: renewals.count ?? 0,
+    renewalsDue: renewalClients.size,
     escalationsOvernight: escalations.count ?? 0,
   });
 }

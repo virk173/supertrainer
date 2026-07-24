@@ -127,11 +127,19 @@ export function ThreadView({
     let channel: ReturnType<typeof supabase.channel> | null = null;
     let cancelled = false;
 
+    // Debounce read receipts: a burst of inbound messages (a batch of reminders,
+    // several coach lines) should collapse into one markThreadRead round-trip.
+    let markReadTimer: ReturnType<typeof setTimeout> | null = null;
+    const scheduleMarkRead = () => {
+      if (markReadTimer) clearTimeout(markReadTimer);
+      markReadTimer = setTimeout(() => void markReadRef.current(), 400);
+    };
+
     const onRow = (payload: { new: Record<string, unknown> }) => {
       const view = toMessageView(rawFromRow(payload.new), viewer);
       setMessages((prev) => reconcile(prev, view));
-      // A new inbound message → mark the thread read (best-effort).
-      if (view.align === "theirs") void markReadRef.current();
+      // A new inbound message → mark the thread read (debounced, best-effort).
+      if (view.align === "theirs") scheduleMarkRead();
     };
 
     void (async () => {
@@ -171,6 +179,7 @@ export function ThreadView({
 
     return () => {
       cancelled = true;
+      if (markReadTimer) clearTimeout(markReadTimer);
       if (channel) void supabase.removeChannel(channel);
       channelRef.current = null;
     };

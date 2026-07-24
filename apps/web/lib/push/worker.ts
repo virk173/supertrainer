@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { tzTime } from "@/lib/ledger/tz";
 import { decideLadder, type LadderStage } from "@/lib/push/ladder";
-import { sendDigestEmail, type DigestItem } from "@/lib/push/digest";
+import { sendDigestEmail } from "@/lib/push/digest";
 import { sendWebPush, type PushFn } from "@/lib/push/send";
 import { type QuietHours } from "@/lib/reminders/decide";
 
@@ -129,7 +129,10 @@ export async function runDeliveryLadder(
 
   const nowIso = now.toISOString();
   const revokedEndpoints = new Set<string>(); // subscription ids pruned this run
-  const digestByClient = new Map<string, DigestItem[]>();
+  // Per client: the notifications selected for tonight's digest (id + snippet). The
+  // stage is only advanced to 'digested' AFTER the email actually sends, so a Resend
+  // outage leaves them 'badged' to retry, not silently dropped.
+  const digestByClient = new Map<string, { id: string; firstLine: string }[]>();
 
   for (const n of notifs as NotifRow[]) {
     const client = clientById.get(n.client_id);
@@ -187,11 +190,11 @@ export async function runDeliveryLadder(
       await db.from("notifications").update({ stage: "badged", last_attempt_at: nowIso }).eq("id", n.id);
       res.badged++;
     } else if (action === "email_digest") {
-      await db.from("notifications").update({ stage: "digested", last_attempt_at: nowIso }).eq("id", n.id);
+      // Select it for the digest but DON'T terminalize yet — that happens only if
+      // the email sends (below). Until then it stays 'badged' and retries.
       const items = digestByClient.get(n.client_id) ?? [];
-      items.push({ firstLine: notifText(n) });
+      items.push({ id: n.id, firstLine: notifText(n) });
       digestByClient.set(n.client_id, items);
-      res.digested++;
     }
   }
 
@@ -215,8 +218,20 @@ export async function runDeliveryLadder(
       if (email) {
         const trainerName = (client.orgs as { name?: string } | null)?.name ?? "Your coach";
         const base = process.env.NEXT_PUBLIC_APP_URL ?? "https://supertrainer-web.vercel.app";
-        const { sent } = await sendDigest(email, { trainerName, items, portalUrl: `${base}/portal` });
-        if (sent) res.emailed++;
+        const { sent } = await sendDigest(email, {
+          trainerName,
+          items: items.map((i) => ({ firstLine: i.firstLine })),
+          portalUrl: `${base}/portal`,
+        });
+        if (sent) {
+          // Terminalize ONLY the items that actually went out.
+          await db.from("notifications").update({ stage: "digested", last_attempt_at: nowIso }).in(
+            "id",
+            items.map((i) => i.id),
+          );
+          res.emailed++;
+          res.digested += items.length;
+        }
       }
     }
   }

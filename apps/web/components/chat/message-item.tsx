@@ -102,7 +102,9 @@ function StructuredCard({ view, trainerName }: { view: MessageView; trainerName:
       ? "Plan delivered"
       : view.kind === "log_confirmation"
         ? "Logged"
-        : "Check-in";
+        : view.payload?.recap
+          ? "Weekly recap"
+          : "Check-in";
   return (
     <div className="flex flex-col items-start gap-1" data-testid={`msg-${view.voice}`} data-voice={view.voice}>
       {view.label && (

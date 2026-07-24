@@ -73,12 +73,14 @@ export async function runCardTick(
     const { data: rules } = await db.from("reminder_rules").select("quiet_hours").eq("client_id", clientId).limit(1);
     const quiet = ((rules ?? [])[0]?.quiet_hours as QuietHours) ?? DEFAULT_QUIET;
 
-    // Frequency counts from delivered card messages.
+    // Frequency counts from delivered CHECK-IN cards only — weekly recaps and the
+    // demo card are also kind='card' but must not consume the check-in budget
+    // (they have their own cadence), or the "1/day, 3/week" cap would be wrong.
     const weekAgoIso = new Date(now.getTime() - 7 * DAY_MS).toISOString();
     const dayAgoIso = new Date(now.getTime() - DAY_MS).toISOString();
     const [{ count: sentToday }, { count: sentThisWeek }] = await Promise.all([
-      db.from("messages").select("id", { count: "exact", head: true }).eq("client_id", clientId).eq("kind", "card").gte("created_at", dayAgoIso),
-      db.from("messages").select("id", { count: "exact", head: true }).eq("client_id", clientId).eq("kind", "card").gte("created_at", weekAgoIso),
+      db.from("messages").select("id", { count: "exact", head: true }).eq("client_id", clientId).eq("kind", "card").contains("payload", { check_in: true }).gte("created_at", dayAgoIso),
+      db.from("messages").select("id", { count: "exact", head: true }).eq("client_id", clientId).eq("kind", "card").contains("payload", { check_in: true }).gte("created_at", weekAgoIso),
     ]);
 
     const gaps = await computeGaps(db, clientId, today, now);

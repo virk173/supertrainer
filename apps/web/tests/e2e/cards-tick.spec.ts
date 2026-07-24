@@ -73,6 +73,12 @@ test("a card answer is recorded to check_in_responses (verified against the mess
   expect(resp![0]!.card_kind).toBe("sleep");
   expect((resp![0]!.answer as { value?: number }).value).toBe(4);
 
+  // Re-answering the same card UPDATES rather than duplicating (no double-count).
+  await recordCardAnswer(service, { clientId, messageId: card!.id, answer: { value: 2 } });
+  const { data: after } = await service.from("check_in_responses").select("answer").eq("client_id", clientId);
+  expect(after).toHaveLength(1);
+  expect((after![0]!.answer as { value?: number }).value).toBe(2);
+
   // A message that isn't this client's card is rejected (tenancy).
   const other = await seedClient();
   const rej = await recordCardAnswer(service, { clientId: other.clientId, messageId: card!.id, answer: { value: 1 } });
