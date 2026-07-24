@@ -1,9 +1,21 @@
 "use server";
 
 import { getSessionClaims } from "@/lib/onboarding/state";
+import { getHomeDigest, type HomeDigest } from "@/lib/trainer/home";
 import { createServiceClient } from "@/lib/supabase/server";
 
 export type ClientHit = { id: string; name: string };
+
+type LiveDigest = Pick<HomeDigest, "pending" | "escalations" | "estimatedMinutes">;
+
+// Realtime refresh for the Home "Needs you today" panel — the fast-changing
+// slice (pending counts + escalations) recomputed when a draft lands or an
+// escalation resolves. Slow-moving signals (adherence, at-risk) refresh on nav.
+export async function refreshHomeDigestAction(): Promise<LiveDigest | null> {
+  const { orgId, role } = await getSessionClaims();
+  if (!orgId || (role !== "owner" && role !== "staff")) return null;
+  return getHomeDigest(orgId, new Date());
+}
 
 // Client lookup for the ⌘K palette. Service-role → org-scoped in code (standing
 // rule: service-role tenancy). An empty query returns the most-recent clients (a

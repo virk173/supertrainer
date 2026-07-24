@@ -100,17 +100,36 @@ export function TrainerShell({
     let debounce: ReturnType<typeof setTimeout> | null = null;
 
     async function recount() {
-      const [drafts, escalations] = await Promise.all([
+      // RLS scopes each count to the trainer's org (staff read policies). Plans
+      // and splits aren't in the realtime publication yet (they land in 7.3), so
+      // their counts refresh whenever a drafts/escalations event triggers a
+      // recount, or on the next navigation — accurate on load either way.
+      const [drafts, plans, splits, escalations] = await Promise.all([
         supabase
           .from("drafts")
           .select("id", { count: "exact", head: true })
           .eq("status", "pending"),
         supabase
+          .from("plans")
+          .select("id", { count: "exact", head: true })
+          .eq("status", "draft"),
+        supabase
+          .from("splits")
+          .select("id", { count: "exact", head: true })
+          .eq("status", "draft"),
+        supabase
           .from("escalations")
           .select("id", { count: "exact", head: true })
           .neq("status", "resolved"),
       ]);
-      if (!cancelled) setPending((drafts.count ?? 0) + (escalations.count ?? 0));
+      if (!cancelled) {
+        setPending(
+          (drafts.count ?? 0) +
+            (plans.count ?? 0) +
+            (splits.count ?? 0) +
+            (escalations.count ?? 0),
+        );
+      }
     }
 
     const scheduleRecount = () => {
