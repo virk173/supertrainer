@@ -102,6 +102,7 @@ export type Database = {
           notification_channel: Database["public"]["Enums"]["notification_channel"]
           org_id: string
           profile_id: string | null
+          push_degraded_at: string | null
           source: Database["public"]["Enums"]["client_source"]
           status: Database["public"]["Enums"]["client_status"]
           updated_at: string
@@ -122,6 +123,7 @@ export type Database = {
           notification_channel?: Database["public"]["Enums"]["notification_channel"]
           org_id: string
           profile_id?: string | null
+          push_degraded_at?: string | null
           source: Database["public"]["Enums"]["client_source"]
           status?: Database["public"]["Enums"]["client_status"]
           updated_at?: string
@@ -142,6 +144,7 @@ export type Database = {
           notification_channel?: Database["public"]["Enums"]["notification_channel"]
           org_id?: string
           profile_id?: string | null
+          push_degraded_at?: string | null
           source?: Database["public"]["Enums"]["client_source"]
           status?: Database["public"]["Enums"]["client_status"]
           updated_at?: string
@@ -1018,38 +1021,53 @@ export type Database = {
       }
       notifications: {
         Row: {
+          attempts: number
           channel: Database["public"]["Enums"]["notif_channel"]
           client_id: string
           created_at: string
           dedupe_key: string
           id: string
           kind: string
+          last_attempt_at: string | null
           org_id: string
           payload: Json
+          seen_at: string | null
+          sent_at: string | null
+          stage: string
           status: Database["public"]["Enums"]["notif_status"]
           updated_at: string
         }
         Insert: {
+          attempts?: number
           channel: Database["public"]["Enums"]["notif_channel"]
           client_id: string
           created_at?: string
           dedupe_key: string
           id?: string
           kind: string
+          last_attempt_at?: string | null
           org_id: string
           payload?: Json
+          seen_at?: string | null
+          sent_at?: string | null
+          stage?: string
           status?: Database["public"]["Enums"]["notif_status"]
           updated_at?: string
         }
         Update: {
+          attempts?: number
           channel?: Database["public"]["Enums"]["notif_channel"]
           client_id?: string
           created_at?: string
           dedupe_key?: string
           id?: string
           kind?: string
+          last_attempt_at?: string | null
           org_id?: string
           payload?: Json
+          seen_at?: string | null
+          sent_at?: string | null
+          stage?: string
           status?: Database["public"]["Enums"]["notif_status"]
           updated_at?: string
         }

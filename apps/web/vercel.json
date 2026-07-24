@@ -4,6 +4,7 @@
     { "path": "/api/cron/day-close", "schedule": "0 1 * * *" },
     { "path": "/api/cron/reminders", "schedule": "0 2 * * *" },
     { "path": "/api/cron/plan-renewals", "schedule": "0 3 * * *" },
-    { "path": "/api/cron/distill-edits", "schedule": "0 5 * * *" }
+    { "path": "/api/cron/distill-edits", "schedule": "0 5 * * *" },
+    { "path": "/api/cron/notifications", "schedule": "0 6 * * *" }
   ]
 }

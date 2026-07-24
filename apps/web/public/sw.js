@@ -44,5 +44,43 @@ self.addEventListener("fetch", (event) => {
   );
 });
 
-// Phase 6 adds the push/notificationclick handlers that deliver coach messages;
-// the subscription captured in Phase 2.4 is what makes that possible.
+// Phase 6.2 — push delivery. The worker (lib/push/worker.ts) sends a JSON payload
+// { title, body, url, tag }; show it as the trainer-branded notification and, on
+// click, focus an existing tab or deep-link to the relevant surface.
+self.addEventListener("push", (event) => {
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch {
+    data = { body: event.data ? event.data.text() : "" };
+  }
+  const title = data.title || "Your coach";
+  const url = data.url || "/portal";
+  const options = {
+    body: data.body || "",
+    icon: "/api/icon",
+    badge: "/api/icon",
+    tag: data.tag || "supertrainer",
+    data: { url },
+    // A "Log meal" quick action where the platform supports it.
+    actions: data.url === "/portal/log" ? [{ action: "log", title: "Log meal" }] : undefined,
+  };
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const target = (event.notification.data && event.notification.data.url) || "/portal";
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
+      for (const client of clientList) {
+        // Reuse an open app tab if we have one.
+        if ("focus" in client) {
+          client.navigate(target);
+          return client.focus();
+        }
+      }
+      return self.clients.openWindow(target);
+    }),
+  );
+});

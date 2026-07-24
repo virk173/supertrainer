@@ -4,6 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  BellOff,
   Camera,
   ClipboardList,
   Globe,
@@ -51,6 +52,8 @@ export function PortalShell({
   embedded = false,
   brandName,
   socials = [],
+  chatBadge = 0,
+  pushDegraded = false,
 }: {
   children: React.ReactNode;
   className?: string;
@@ -60,6 +63,10 @@ export function PortalShell({
   brandName?: string;
   /** Trainer social links rendered in the footer. */
   socials?: { platform: SocialPlatform; href: string }[];
+  /** Unread inbound message count — rendered as the Chat-tab badge (P6.2). */
+  chatBadge?: number;
+  /** Push endpoints all died — show the "re-enable notifications" banner (P6.2). */
+  pushDegraded?: boolean;
 }) {
   const pathname = usePathname();
   const Content = embedded ? "div" : "main";
@@ -82,6 +89,26 @@ export function PortalShell({
       </header>
 
       <Content className="flex-1 overflow-y-auto">
+        {pushDegraded && (
+          <div className="mx-auto w-full max-w-lg px-4 pt-4">
+            <Link
+              href="/welcome/notifications"
+              data-testid="push-degraded-banner"
+              className={cn(
+                "flex items-center gap-3 rounded-lg border border-warning/40 bg-warning/10 p-3 text-sm",
+                focusRing,
+              )}
+            >
+              <BellOff className="size-4 shrink-0 text-warning" aria-hidden="true" />
+              <span>
+                <span className="block font-medium">Notifications are off</span>
+                <span className="block text-muted-foreground">
+                  We couldn&apos;t reach your device. Tap to re-enable so you don&apos;t miss your coach.
+                </span>
+              </span>
+            </Link>
+          </div>
+        )}
         <div className="mx-auto w-full max-w-lg p-4">{children}</div>
         {(brandName || socials.length > 0) && (
           <footer
@@ -143,11 +170,20 @@ export function PortalShell({
               >
                 <span
                   className={cn(
-                    "flex h-6 w-10 items-center justify-center rounded-full",
+                    "relative flex h-6 w-10 items-center justify-center rounded-full",
                     active && "bg-primary text-primary-foreground",
                   )}
                 >
                   <Icon aria-hidden="true" className="size-4" />
+                  {href === "/portal/chat" && chatBadge > 0 && (
+                    <span
+                      data-testid="chat-badge"
+                      aria-label={`${chatBadge} unread`}
+                      className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[9px] font-semibold text-danger-foreground"
+                    >
+                      {chatBadge > 9 ? "9+" : chatBadge}
+                    </span>
+                  )}
                 </span>
                 {label}
               </Link>

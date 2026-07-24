@@ -166,7 +166,7 @@ export async function sendCoachMessage(input: {
   const service = createServiceClient();
   const { data: client } = await service
     .from("clients")
-    .select("id, org_id")
+    .select("id, org_id, notification_channel")
     .eq("id", input.clientId)
     .maybeSingle();
   if (!client || client.org_id !== orgId) {
@@ -187,6 +187,19 @@ export async function sendCoachMessage(input: {
     .select(SelectCols)
     .single();
   if (error) return { ok: false, error: error.message };
+
+  // Enqueue a delivery notification (P6.2 push ladder drains it). dedupe_key on
+  // the message id makes it idempotent; the client's channel picks push vs email.
+  await service.from("notifications").insert({
+    org_id: orgId,
+    client_id: client.id,
+    kind: "message",
+    channel: client.notification_channel === "push" ? "push" : "email",
+    status: "queued",
+    dedupe_key: `msg:${(row as MessageRow).id}`,
+    payload: { snippet: parsed.data.text.slice(0, 200), message_id: (row as MessageRow).id } as unknown as Json,
+  });
+
   await trackServer({ orgId, clientId: client.id, event: "message_sent", properties: { by: "coach" } });
   return { ok: true, message: toMessageView(toRaw(row as MessageRow), "coach") };
 }
@@ -212,13 +225,27 @@ export async function markThreadRead(clientId: string, viewer: Viewer): Promise<
   }
 
   // The client reads coach/assistant/system lines; the coach reads client lines.
+  const nowIso = new Date().toISOString();
   const query = service
     .from("messages")
-    .update({ read_at: new Date().toISOString() })
+    .update({ read_at: nowIso })
     .eq("client_id", clientId)
     .is("read_at", null);
   const scoped = viewer === "client" ? query.neq("sender", "client") : query.eq("sender", "client");
   const { data } = await scoped.select("id");
+
+  // When the CLIENT catches up on their thread, they've seen the pending
+  // reminders/messages — stop the delivery ladder for their active notifications
+  // (P6.2). The coach reading the client's lines doesn't affect the client's ladder.
+  if (viewer === "client") {
+    await service
+      .from("notifications")
+      .update({ seen_at: nowIso })
+      .eq("client_id", clientId)
+      .is("seen_at", null)
+      .in("stage", ["queued", "pushed", "badged"]);
+  }
+
   return (data ?? []).length;
 }
 

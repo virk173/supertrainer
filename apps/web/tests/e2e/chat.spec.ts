@@ -165,6 +165,32 @@ test("transparency: assistant and system messages never render as the coach", as
   await ctx.close();
 });
 
+test("portal shows the push-degraded banner and the chat unread badge", async ({ browser }) => {
+  const pair = await seedPair();
+  const service = serviceClient();
+
+  // All push endpoints died → degraded; plus one unread coach line → badge count.
+  await service.from("clients").update({ push_degraded_at: new Date().toISOString() }).eq("id", pair.clientId);
+  await service.from("messages").insert({
+    org_id: pair.orgId,
+    client_id: pair.clientId,
+    sender: "coach",
+    kind: "text",
+    body: "unread coach line",
+  });
+
+  const ctx = await browser.newContext();
+  const page = await ctx.newPage();
+  await signInTo(page, pair.clientToken, "/portal");
+
+  await expect(page.getByTestId("push-degraded-banner")).toBeVisible();
+  const badge = page.getByTestId("chat-badge");
+  await expect(badge).toBeVisible();
+  await expect(badge).toHaveText("1");
+
+  await ctx.close();
+});
+
 test("offline send is queued and replays on reconnect without duplicating", async ({ browser }) => {
   const pair = await seedPair();
   const service = serviceClient();
