@@ -59,6 +59,12 @@ jobs:
             --override-name auth.service_role_key=SUPABASE_SERVICE_ROLE_KEY \
             > apps/web/.env.local
           echo "NEXT_PUBLIC_APP_URL=http://localhost:3000" >> apps/web/.env.local
+          # A TEST-ONLY Stripe webhook signing secret (not a real credential):
+          # lets the webhook-route e2e sign fixture payloads and exercise the real
+          # signature-verification path deterministically, with NO live Stripe.
+          # STRIPE_SECRET_KEY stays unset, so every other payment surface renders
+          # its gated state (mirror of the ANTHROPIC_API_KEY live-AI gating).
+          echo "STRIPE_WEBHOOK_SECRET=whsec_test_supertrainer_ci" >> apps/web/.env.local
 
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium

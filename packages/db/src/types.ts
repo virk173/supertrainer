@@ -2347,6 +2347,36 @@ export type Database = {
           },
         ]
       }
+      webhook_events: {
+        Row: {
+          event_created: number | null
+          id: string
+          payload: Json
+          processed_at: string | null
+          received_at: string
+          stripe_event_id: string
+          type: string
+        }
+        Insert: {
+          event_created?: number | null
+          id?: string
+          payload?: Json
+          processed_at?: string | null
+          received_at?: string
+          stripe_event_id: string
+          type: string
+        }
+        Update: {
+          event_created?: number | null
+          id?: string
+          payload?: Json
+          processed_at?: string | null
+          received_at?: string
+          stripe_event_id?: string
+          type?: string
+        }
+        Relationships: []
+      }
       weigh_ins: {
         Row: {
           client_id: string
