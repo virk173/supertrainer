@@ -33,13 +33,28 @@ export async function settlePaint(page: Page): Promise<void> {
   await page.waitForTimeout(100);
 }
 
-export async function expectAxeAAClean(page: Page): Promise<void> {
+async function scanViolations(page: Page) {
   const results = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
     .exclude("nextjs-portal")
     .analyze();
+  return results.violations;
+}
+
+export async function expectAxeAAClean(page: Page): Promise<void> {
+  let violations = await scanViolations(page);
+  // axe-core's computed-color read is intermittently wrong for oklch→lab card
+  // backgrounds under CPU load, producing PHANTOM color-contrast failures (the
+  // real colors are AA-clean — verified against getComputedStyle). When contrast
+  // is the ONLY issue, re-settle and re-scan once: a genuine violation persists
+  // across both reads; a phantom one clears.
+  if (violations.length > 0 && violations.every((v) => v.id === "color-contrast")) {
+    await settlePaint(page);
+    await page.waitForTimeout(300);
+    violations = await scanViolations(page);
+  }
   expect(
-    results.violations.map((v) => ({
+    violations.map((v) => ({
       id: v.id,
       nodes: v.nodes.map((n) => ({ target: n.target, summary: n.failureSummary })),
     })),

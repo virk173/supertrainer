@@ -35,13 +35,14 @@ test("trainer report: the monthly progress PDF generates for a client", async ({
   // A real catalog exercise so the workout_logs FK holds + the PR name resolves.
   const { data: exercise } = await service
     .from("exercises")
-    .select("id")
+    .select("id, name")
     .is("org_id", null)
     .limit(1)
     .single();
+  const ex = { exercise_id: exercise!.id, exercise_name: exercise!.name };
   await service.from("workout_logs").insert([
-    { org_id: orgId, client_id: id, tz_date: dayStr(20), exercise_id: exercise!.id, set_number: 1, weight_kg: 80, reps: 5 },
-    { org_id: orgId, client_id: id, tz_date: dayStr(6), exercise_id: exercise!.id, set_number: 1, weight_kg: 90, reps: 5 },
+    { org_id: orgId, client_id: id, tz_date: dayStr(20), ...ex, set_number: 1, weight_kg: 80, reps: 5 },
+    { org_id: orgId, client_id: id, tz_date: dayStr(6), ...ex, set_number: 1, weight_kg: 90, reps: 5 },
   ]);
 
   await page.goto(`/auth/confirm?token_hash=${tokenHash}&type=email&next=/trainer/clients/${id}`);

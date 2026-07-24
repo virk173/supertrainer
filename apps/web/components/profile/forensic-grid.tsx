@@ -66,7 +66,7 @@ export function ForensicGrid({ rows }: { rows: GridRow[] }) {
                 <span className="w-16 shrink-0 text-xs font-medium text-muted-foreground">
                   {row.label}
                 </span>
-                <div className="flex gap-[2px]" aria-hidden="true">
+                <div className="flex gap-0.5" aria-hidden="true">
                   {row.cells.map((cell) => (
                     <span
                       key={cell.date}
