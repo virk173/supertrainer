@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, ChevronRight, Users } from "lucide-react";
+
+import { cn, focusRing } from "@supertrainer/ui/lib/utils";
 
 import { isStripeConfigured } from "@supertrainer/payments";
 
@@ -64,6 +66,28 @@ export default async function TrainerPaymentsPage({
       </div>
 
       <PaymentsSettings overview={overview} configured={configured} />
+
+      <Link
+        href="/trainer/settings/payments/cutover"
+        className={cn(
+          "group flex items-center gap-3 rounded-md border bg-surface-raised p-4 transition-colors hover:bg-foreground/5",
+          focusRing,
+        )}
+      >
+        <span
+          aria-hidden="true"
+          className="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground [&_svg]:size-4"
+        >
+          <Users />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="text-sm font-medium">Move clients to billing</span>
+          <span className="mt-0.5 block text-sm text-muted-foreground">
+            Migrate clients you’ve been running manually onto real subscriptions.
+          </span>
+        </span>
+        <ChevronRight aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
+      </Link>
     </div>
   );
 }

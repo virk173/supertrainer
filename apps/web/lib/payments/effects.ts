@@ -70,9 +70,15 @@ export async function executeEffects(
 
       case "set_client_status": {
         if (ctx.orgId && ctx.clientId) {
+          // Becoming active via a real subscription retires the P2/8.6
+          // approved_manually stopgap — the client is now a paying member.
+          const patch: { status: typeof effect.status; approved_manually?: boolean } = {
+            status: effect.status,
+          };
+          if (effect.status === "active") patch.approved_manually = false;
           await service
             .from("clients")
-            .update({ status: effect.status })
+            .update(patch)
             .eq("id", ctx.clientId)
             .eq("org_id", ctx.orgId);
         }
