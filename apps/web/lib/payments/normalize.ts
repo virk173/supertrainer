@@ -105,7 +105,14 @@ export function normalizeEvent(event: Stripe.Event): WebhookEvent | null {
         stripeSubscriptionId: invoiceSubId(obj),
         stripeCustomerId: s(obj.customer),
         invoiceId: s(obj.id),
-        amountCents: n(obj.amount_paid) ?? n(obj.amount_due) ?? 0,
+        // Pick the amount by EVENT, not by `??`: a FAILED invoice always has
+        // amount_paid = 0, and `0 ?? x` short-circuits to 0 — which would record
+        // every failed payment as $0 instead of what the client owed. Verified
+        // against a real Stripe invoice (amount_due 2000 / amount_paid 0).
+        amountCents:
+          type === "invoice.paid"
+            ? (n(obj.amount_paid) ?? n(obj.amount_due) ?? 0)
+            : (n(obj.amount_due) ?? n(obj.amount_remaining) ?? 0),
         applicationFeeCents: n(obj.application_fee_amount) ?? 0,
         currency: s(obj.currency) ?? "usd",
         periodStart: n(period?.start) ?? n(obj.period_start) ?? null,
