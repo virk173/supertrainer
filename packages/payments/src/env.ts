@@ -65,3 +65,28 @@ export function platformPriceForSeatBand(
 export function founderGraceEnabled(): boolean {
   return process.env.NEXT_PUBLIC_FOUNDER_GRACE === "1";
 }
+
+/** The Stripe PRODUCT TAX CODE stamped on every tier Product created by the tier
+ *  sync. Drives STRIPE TAX categorisation (checkout sets automatic_tax), so it
+ *  decides how GST/HST/VAT is calculated on every client payment.
+ *
+ *  NOTE: this is NOT about Managed Payments eligibility — supertrainer can never
+ *  qualify for that (Connect platform + Express accounts + human 1-1 coaching are
+ *  all excluded), so checkout opts out of it explicitly instead.
+ *
+ *  Default `txcd_50021003` — "Fee for Personal Training/Fitness Classes". Stripe
+ *  files physical exercise under the 50021xxx fitness family (the generic
+ *  `txcd_20060044` "Training" code explicitly EXCLUDES physical exercise), so
+ *  that family is the right home for coaching even though our delivery is remote
+ *  and the code's wording says in-person — Stripe publishes no "remote personal
+ *  training" code.
+ *
+ *  Tax codes are GLOBAL, not per-country: Stripe maps this one code onto each
+ *  jurisdiction's rules (Canadian GST/HST included) using the customer's
+ *  location. Override per deployment if an accountant advises a different code —
+ *  e.g. txcd_20060045 (Training Services - Live Virtual) for a calls-only
+ *  offering, or txcd_20030000 (General - Services). Browse them all with
+ *  `stripe tax_codes list`. */
+export function productTaxCode(): string {
+  return process.env.STRIPE_PRODUCT_TAX_CODE?.trim() || "txcd_50021003";
+}

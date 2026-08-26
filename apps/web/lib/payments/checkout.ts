@@ -77,6 +77,17 @@ export async function createCheckoutSession(
         metadata: { org_id: input.orgId, client_id: input.clientId, tier_id: input.tierId },
       },
       automatic_tax: { enabled: true },
+      // Managed Payments (Stripe's merchant-of-record product) is ON by default
+      // on some accounts and REJECTS this session if left enabled. supertrainer
+      // can never qualify for it on two independent counts: it is a CONNECT
+      // PLATFORM using Express accounts ("Managed Payments supports direct
+      // integrations only… doesn't support Connect platforms, Express accounts"),
+      // and it sells human 1-1 coaching ("If your service involves human
+      // intervention (such as live 1-1 coaching), it doesn't qualify"). So we opt
+      // out explicitly rather than chase an eligible tax code. Tax still works —
+      // automatic_tax above uses Stripe Tax with the product's own tax_code.
+      // Not yet in stripe@19's types (typed from v22) — cast until we upgrade.
+      ...({ managed_payments: { enabled: false } } as object),
       client_reference_id: input.clientId,
       // The webhook (8.3) reads these off checkout.session.completed to create
       // the subscription row and flip the client active.

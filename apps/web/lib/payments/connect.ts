@@ -2,7 +2,7 @@ import "server-only";
 
 import { recordAudit } from "@supertrainer/db/queries";
 import type { Json } from "@supertrainer/db/types";
-import { isStripeConfigured } from "@supertrainer/payments";
+import { isStripeConfigured, productTaxCode } from "@supertrainer/payments";
 import { getStripeClient } from "@supertrainer/payments/client";
 
 import { createClient, createServiceClient } from "@/lib/supabase/server";
@@ -317,12 +317,36 @@ export async function runTierSync(
   const productForTier = new Map<string, string>();
   for (const t of tiers) if (t.stripeProductId) productForTier.set(t.id, t.stripeProductId);
 
+  // Repair pass: a Product created before the tax_code requirement blocks
+  // Checkout under Managed Payments ("the product tax code is missing"). Stamp
+  // the configured code on every existing managed Product — idempotent, and this
+  // runs only on the manual sync, so the extra call is cheap. Failures are logged
+  // and don't abort the sync (the create path below is the primary guarantee).
+  for (const t of tiers) {
+    if (!t.isActive || !t.stripeProductId) continue;
+    try {
+      await stripe.products.update(
+        t.stripeProductId,
+        { tax_code: productTaxCode() },
+        { stripeAccount },
+      );
+    } catch (err) {
+      console.error("[payments] tax_code repair failed for tier", t.id, err);
+    }
+  }
+
   const applied: SyncOp[] = [];
   for (const op of plan.ops) {
     switch (op.kind) {
       case "create_product": {
         const product = await stripe.products.create(
-          { name: op.name, metadata: { org_id: orgId, tier_id: op.tierId } },
+          {
+            name: op.name,
+            // REQUIRED when Managed Payments is on: Checkout rejects a line item
+            // whose product carries no tax_code. Configurable per deployment.
+            tax_code: productTaxCode(),
+            metadata: { org_id: orgId, tier_id: op.tierId },
+          },
           { stripeAccount, idempotencyKey: `product:${op.tierId}` },
         );
         productForTier.set(op.tierId, product.id);

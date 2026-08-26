@@ -8,4 +8,5 @@ export {
   assertTestModeKey,
   platformPriceForSeatBand,
   founderGraceEnabled,
+  productTaxCode,
 } from "./env";
