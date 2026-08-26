@@ -3,6 +3,16 @@ import { expect, test } from "@playwright/test";
 import { expectAxeAAClean, expectNoHorizontalOverflow, settlePaint } from "./axe";
 import { consentClient, seedClient, serviceClient, uniqueEmail } from "./helpers";
 
+// These specs assert the UNCONFIGURED (gated) payment surfaces — the state CI
+// runs in, where STRIPE_SECRET_KEY is absent. With real Stripe keys in a local
+// .env.local the pages render their live state instead, so skip rather than
+// fail (mirrors how the webhook-route spec skips without its secret).
+test.skip(
+  Boolean(process.env.STRIPE_SECRET_KEY),
+  "local STRIPE_SECRET_KEY present — gated-state specs apply to the unconfigured path",
+);
+
+
 // Phase 8.2 — client membership + checkout surfaces. Stripe keys are unset in
 // CI, so both render their gated states (deterministic). a11y floor enforced.
 
