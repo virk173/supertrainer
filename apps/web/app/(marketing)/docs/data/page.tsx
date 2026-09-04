@@ -21,8 +21,8 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 export default function DataDocsPage() {
   return (
-    <main className="mx-auto w-full max-w-2xl px-6 py-16">
-      <h1 className="text-xl font-semibold tracking-tight">Your data is yours</h1>
+    <main className="mx-auto w-full max-w-2xl px-6 py-16 sm:py-24">
+      <h1 className="font-display text-3xl font-semibold tracking-tight sm:text-5xl">Your data is yours</h1>
       <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
         Everything you and your clients put into supertrainer can be exported in full, at any time,
         in a format that outlives us. Nothing here is a feature we can withdraw — it&rsquo;s how the
@@ -79,8 +79,8 @@ export default function DataDocsPage() {
       </Section>
 
       <p className="border-t pt-8 text-sm text-muted-foreground">
-        <Link href="/" className="underline underline-offset-4">
-          Back to supertrainer
+        <Link href="/security" className="underline underline-offset-4">
+          How the data is stored and what the AI may do
         </Link>
       </p>
     </main>

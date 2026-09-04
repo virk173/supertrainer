@@ -579,6 +579,53 @@ export type Database = {
           },
         ]
       }
+      custom_domains: {
+        Row: {
+          created_at: string
+          domain: string
+          error: string | null
+          id: string
+          last_checked_at: string | null
+          org_id: string
+          status: Database["public"]["Enums"]["domain_status"]
+          updated_at: string
+          verification: Json
+          verified_at: string | null
+        }
+        Insert: {
+          created_at?: string
+          domain: string
+          error?: string | null
+          id?: string
+          last_checked_at?: string | null
+          org_id: string
+          status?: Database["public"]["Enums"]["domain_status"]
+          updated_at?: string
+          verification?: Json
+          verified_at?: string | null
+        }
+        Update: {
+          created_at?: string
+          domain?: string
+          error?: string | null
+          id?: string
+          last_checked_at?: string | null
+          org_id?: string
+          status?: Database["public"]["Enums"]["domain_status"]
+          updated_at?: string
+          verification?: Json
+          verified_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "custom_domains_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: true
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       deletion_requests: {
         Row: {
           client_id: string | null
@@ -3344,6 +3391,7 @@ export type Database = {
       client_status: "lead" | "onboarding" | "active" | "paused" | "churned"
       deletion_scope: "org" | "client"
       deletion_status: "pending" | "canceled" | "completed"
+      domain_status: "pending" | "verifying" | "active" | "error"
       draft_edit_entity: "plan" | "split" | "reply"
       draft_edit_kind:
         | "swap"
@@ -3589,6 +3637,7 @@ export const Constants = {
       client_status: ["lead", "onboarding", "active", "paused", "churned"],
       deletion_scope: ["org", "client"],
       deletion_status: ["pending", "canceled", "completed"],
+      domain_status: ["pending", "verifying", "active", "error"],
       draft_edit_entity: ["plan", "split", "reply"],
       draft_edit_kind: [
         "swap",

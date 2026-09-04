@@ -133,6 +133,11 @@ export const DATA_REGISTRY: readonly TableSpec[] = [
     table: "referral_codes", scope: "org", orgColumn: "org_id", clientColumn: null,
     exported: true, deleted: true, deleteOrder: 46,
   },
+  {
+    table: "custom_domains", scope: "org", orgColumn: "org_id", clientColumn: null,
+    exported: true, deleted: true, deleteOrder: 46,
+    note: "a coach's own domain — theirs to know about and theirs to lose on deletion",
+  },
 
   // ── the org row itself, last ──────────────────────────────────────────────
   {

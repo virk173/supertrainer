@@ -55,6 +55,10 @@ const eslintConfig = [
       "lib/push/digest.ts",
       "app/api/**/*.{ts,tsx}",
       "app/manifest.webmanifest/**/*.{ts,tsx}",
+      // Social cards are rendered by Satori, which takes literal colors — there
+      // is no CSS variable layer inside an ImageResponse.
+      "app/**/opengraph-image.tsx",
+      "app/**/twitter-image.tsx",
       "app/**/pdf/route.{ts,tsx}",
       "components/brand-form.tsx",
       "app/onboarding/brand/**/*.{ts,tsx}",
