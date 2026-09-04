@@ -17,6 +17,13 @@ export interface LiveIncident {
 const TTL_MS = 30_000;
 let cache: { at: number; rows: LiveIncident[] } | null = null;
 
+/** Drop the cache the moment an operator publishes or ends an incident. A
+ *  status banner that lags the incident by half a minute is worse than useless
+ *  during the half-minute that matters most. */
+export function invalidateIncidentCache(): void {
+  cache = null;
+}
+
 async function liveRows(): Promise<LiveIncident[]> {
   if (cache && Date.now() - cache.at < TTL_MS) return cache.rows;
   try {

@@ -39,6 +39,23 @@ export function rowsToCsv(rows: Row[]): string {
   return [head, ...body].join("\r\n");
 }
 
+// The table name is dynamic, so the typed client would have to union every
+// table's row shape at this one call site — which the compiler gives up on once
+// the schema is large enough. The registry already guarantees the name is a real
+// table and the column exists; this cast keeps that guarantee where it belongs
+// (the registry + its live-schema test) instead of in an unbounded generic.
+interface LooseQuery {
+  select(cols: string): {
+    range(from: number, to: number): LooseFilter;
+  };
+}
+interface LooseFilter extends PromiseLike<{ data: Row[] | null; error: { message: string } | null }> {
+  eq(column: string, value: string): LooseFilter;
+}
+interface LooseClient {
+  from(table: string): LooseQuery;
+}
+
 /** Read every row of one table for an org (optionally one client), paged. */
 async function readAll(
   service: Service,
@@ -46,9 +63,10 @@ async function readAll(
   orgId: string,
   clientId: string | null,
 ): Promise<Row[]> {
+  const db = service as unknown as LooseClient;
   const out: Row[] = [];
   for (let from = 0; ; from += PAGE) {
-    let q = service.from(spec.table).select("*").range(from, from + PAGE - 1);
+    let q = db.from(spec.table).select("*").range(from, from + PAGE - 1);
     if (spec.orgColumn) q = q.eq(spec.orgColumn, orgId);
     if (clientId && spec.clientColumn) q = q.eq(spec.clientColumn, clientId);
     const { data, error } = await q;

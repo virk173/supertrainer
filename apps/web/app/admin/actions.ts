@@ -18,6 +18,7 @@ import {
   openElevation,
 } from "@/lib/admin/guard";
 import { invalidateFlagCache } from "@/lib/admin/flags";
+import { invalidateIncidentCache } from "@/lib/admin/incidents";
 import {
   authenticationOptions,
   registrationOptions,
@@ -266,6 +267,7 @@ export async function saveIncident(input: {
     : await service.from("platform_incidents").insert(row).select("id").single();
   if (error || !data) return { ok: false, message: "Couldn’t save that." };
 
+  invalidateIncidentCache();
   await platformAudit(who.profileId, "incident.saved", "platform_incident", data.id, {
     published: input.published,
     maintenance: input.maintenanceMode,
@@ -282,6 +284,7 @@ export async function endIncident(id: string): Promise<AdminResult> {
     .from("platform_incidents")
     .update({ published: false, maintenance_mode: false, ends_at: new Date().toISOString() })
     .eq("id", id);
+  invalidateIncidentCache();
   await platformAudit(who.profileId, "incident.ended", "platform_incident", id);
   revalidatePath("/admin/incidents");
   return { ok: true };

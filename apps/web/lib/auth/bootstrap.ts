@@ -1,5 +1,8 @@
+import { cookies } from "next/headers";
+
 import type { SupabaseServerClient } from "@supertrainer/db/server";
 
+import { attributeTrainerSignup, REFERRAL_COOKIE } from "@/lib/growth/referrals";
 import { createServiceClient } from "@/lib/supabase/server";
 
 function slugify(input: string): string {
@@ -86,6 +89,21 @@ export async function bootstrapOrgIfNeeded(
       org_id: org.id,
       type: "trainer.signed_up",
     });
+
+    // Phase 9.4 — if they arrived through a referral link, record the
+    // attribution NOW, while the cookie is still there. Credit is decided much
+    // later (referral-core), when they are actually a customer.
+    try {
+      const jar = await cookies();
+      const code = jar.get(REFERRAL_COOKIE)?.value;
+      if (code) {
+        await attributeTrainerSignup(org.id, code);
+        jar.delete(REFERRAL_COOKIE);
+      }
+    } catch (err) {
+      // A referral must never be able to break a signup.
+      console.error("[referrals] attribution failed:", err);
+    }
   }
 
   // Mint a fresh JWT: either the profile was just created, or the user signed

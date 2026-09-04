@@ -6,8 +6,10 @@ import { Button } from "@supertrainer/ui/components/button";
 import { cn, focusRing } from "@supertrainer/ui/lib/utils";
 
 import { signOut } from "@/app/(auth)/actions";
+import { BringAFriend } from "@/components/portal/bring-a-friend";
 import { YourData } from "@/components/portal/your-data";
 import { DELETION_GRACE_DAYS } from "@/lib/data/deletion";
+import { clientCode } from "@/lib/growth/referrals";
 import { getSessionClaims } from "@/lib/onboarding/state";
 import { createServiceClient } from "@/lib/supabase/server";
 
@@ -43,6 +45,10 @@ export default async function PortalMePage() {
       .maybeSingle(),
   ]);
 
+  // Phase 9.4 — only if this client's coach turned it on.
+  const friendCode = await clientCode(orgId, client.id);
+  const origin = (process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
+
   return (
     <div className="space-y-6" data-testid="portal-me">
       <div className="space-y-1">
@@ -74,6 +80,10 @@ export default async function PortalMePage() {
           </span>
         </span>
       </Link>
+
+      {friendCode ? (
+        <BringAFriend link={`${origin}/r/${friendCode}`} coachName={org?.name ?? "your coach"} />
+      ) : null}
 
       <YourData
         graceDays={DELETION_GRACE_DAYS}

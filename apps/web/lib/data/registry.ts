@@ -120,6 +120,20 @@ export const DATA_REGISTRY: readonly TableSpec[] = [
     note: "append-only; purge ANONYMISES (drops payload/actor) and keeps a tombstone — deleting it would erase the record that the deletion happened",
   },
 
+  // ── growth (Phase 9.4) ────────────────────────────────────────────────────
+  // A trainer's referrals are their own record — who they brought in and what
+  // they earned — so both tables travel with them. The ledger goes before the
+  // codes it points at.
+  {
+    table: "referrals", scope: "org", orgColumn: "referrer_org_id", clientColumn: null,
+    exported: true, deleted: true, deleteOrder: 45,
+    note: "scoped by referrer_org_id; a referral pointing AT this org is FK-nulled, not deleted",
+  },
+  {
+    table: "referral_codes", scope: "org", orgColumn: "org_id", clientColumn: null,
+    exported: true, deleted: true, deleteOrder: 46,
+  },
+
   // ── the org row itself, last ──────────────────────────────────────────────
   {
     table: "orgs", scope: "self", orgColumn: "id", clientColumn: null,

@@ -1,11 +1,12 @@
 "use server";
 
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 
 import { scoreLeadIntent } from "@supertrainer/ai";
 import type { Json } from "@supertrainer/db/types";
 
 import { forOrg } from "@/lib/admin/attribution";
+import { attributeLead, REFERRAL_COOKIE } from "@/lib/growth/referrals";
 import { trackServer } from "@/lib/analytics/server";
 import { getOrgThemeBySlug } from "@/lib/brand/theme";
 import { clientIp } from "@/lib/http/client-ip";
@@ -128,6 +129,16 @@ export async function submitLead(
     .single();
   if (error || !lead) {
     return { ok: false, message: error?.message ?? "Something went wrong — please try again." };
+  }
+
+  // Phase 9.4 — a friend who arrived through a client's link is attributed to
+  // that client's coach. Best-effort: attribution must never cost a lead.
+  try {
+    const jar = await cookies();
+    const ref = jar.get(REFERRAL_COOKIE)?.value;
+    if (ref) await attributeLead(lead.id, ref);
+  } catch (err) {
+    console.error("[referrals] lead attribution failed:", err);
   }
 
   await trackServer({

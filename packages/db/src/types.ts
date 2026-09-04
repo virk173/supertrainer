@@ -1878,6 +1878,7 @@ export type Database = {
           ai_budget_micros: number | null
           ai_throttled_at: string | null
           brand: Json
+          client_referrals_enabled: boolean
           created_at: string
           data_export_monthly: boolean
           id: string
@@ -1890,6 +1891,7 @@ export type Database = {
           ai_budget_micros?: number | null
           ai_throttled_at?: string | null
           brand?: Json
+          client_referrals_enabled?: boolean
           created_at?: string
           data_export_monthly?: boolean
           id?: string
@@ -1902,6 +1904,7 @@ export type Database = {
           ai_budget_micros?: number | null
           ai_throttled_at?: string | null
           brand?: Json
+          client_referrals_enabled?: boolean
           created_at?: string
           data_export_monthly?: boolean
           id?: string
@@ -2297,6 +2300,7 @@ export type Database = {
       platform_subscriptions: {
         Row: {
           created_at: string
+          credit_months_remaining: number
           currency: string
           current_period_end: string | null
           founder_pricing: boolean
@@ -2307,10 +2311,12 @@ export type Database = {
           stripe_customer_id: string | null
           stripe_subscription_id: string | null
           trial_end: string | null
+          trial_extra_days: number
           updated_at: string
         }
         Insert: {
           created_at?: string
+          credit_months_remaining?: number
           currency?: string
           current_period_end?: string | null
           founder_pricing?: boolean
@@ -2321,10 +2327,12 @@ export type Database = {
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
           trial_end?: string | null
+          trial_extra_days?: number
           updated_at?: string
         }
         Update: {
           created_at?: string
+          credit_months_remaining?: number
           currency?: string
           current_period_end?: string | null
           founder_pricing?: boolean
@@ -2335,6 +2343,7 @@ export type Database = {
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
           trial_end?: string | null
+          trial_extra_days?: number
           updated_at?: string
         }
         Relationships: [
@@ -2481,6 +2490,131 @@ export type Database = {
           {
             foreignKeyName: "push_subscriptions_org_id_fkey"
             columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      referral_codes: {
+        Row: {
+          client_id: string | null
+          code: string
+          created_at: string
+          kind: Database["public"]["Enums"]["referral_kind"]
+          org_id: string
+          updated_at: string
+        }
+        Insert: {
+          client_id?: string | null
+          code: string
+          created_at?: string
+          kind: Database["public"]["Enums"]["referral_kind"]
+          org_id: string
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string | null
+          code?: string
+          created_at?: string
+          kind?: Database["public"]["Enums"]["referral_kind"]
+          org_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "referral_codes_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "referral_codes_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      referrals: {
+        Row: {
+          activated_at: string | null
+          code: string
+          created_at: string
+          credited_at: string | null
+          id: string
+          kind: Database["public"]["Enums"]["referral_kind"]
+          reason: string | null
+          referred_credit_months: number
+          referred_lead_id: string | null
+          referred_org_id: string | null
+          referrer_credit_months: number
+          referrer_org_id: string
+          signed_up_at: string | null
+          status: Database["public"]["Enums"]["referral_status"]
+          updated_at: string
+        }
+        Insert: {
+          activated_at?: string | null
+          code: string
+          created_at?: string
+          credited_at?: string | null
+          id?: string
+          kind: Database["public"]["Enums"]["referral_kind"]
+          reason?: string | null
+          referred_credit_months?: number
+          referred_lead_id?: string | null
+          referred_org_id?: string | null
+          referrer_credit_months?: number
+          referrer_org_id: string
+          signed_up_at?: string | null
+          status?: Database["public"]["Enums"]["referral_status"]
+          updated_at?: string
+        }
+        Update: {
+          activated_at?: string | null
+          code?: string
+          created_at?: string
+          credited_at?: string | null
+          id?: string
+          kind?: Database["public"]["Enums"]["referral_kind"]
+          reason?: string | null
+          referred_credit_months?: number
+          referred_lead_id?: string | null
+          referred_org_id?: string | null
+          referrer_credit_months?: number
+          referrer_org_id?: string
+          signed_up_at?: string | null
+          status?: Database["public"]["Enums"]["referral_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "referrals_code_fkey"
+            columns: ["code"]
+            isOneToOne: false
+            referencedRelation: "referral_codes"
+            referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "referrals_referred_lead_id_fkey"
+            columns: ["referred_lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "referrals_referred_org_id_fkey"
+            columns: ["referred_org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "referrals_referrer_org_id_fkey"
+            columns: ["referrer_org_id"]
             isOneToOne: false
             referencedRelation: "orgs"
             referencedColumns: ["id"]
@@ -3206,7 +3340,7 @@ export type Database = {
     }
     Enums: {
       checkin_status: "trained" | "rest" | "missed"
-      client_source: "teaser" | "invite" | "import"
+      client_source: "teaser" | "invite" | "import" | "referral"
       client_status: "lead" | "onboarding" | "active" | "paused" | "churned"
       deletion_scope: "org" | "client"
       deletion_status: "pending" | "canceled" | "completed"
@@ -3293,6 +3427,13 @@ export type Database = {
         | "incomplete"
         | "paused"
       progress_pose: "front" | "side" | "back"
+      referral_kind: "trainer" | "client"
+      referral_status:
+        | "pending"
+        | "signed_up"
+        | "activated"
+        | "credited"
+        | "rejected"
       reminder_kind: "meal" | "weigh_in" | "checkin" | "custom"
       seat_band: "20" | "50" | "100" | "unlimited"
       split_status: "draft" | "approved" | "superseded" | "archived"
@@ -3444,7 +3585,7 @@ export const Constants = {
   public: {
     Enums: {
       checkin_status: ["trained", "rest", "missed"],
-      client_source: ["teaser", "invite", "import"],
+      client_source: ["teaser", "invite", "import", "referral"],
       client_status: ["lead", "onboarding", "active", "paused", "churned"],
       deletion_scope: ["org", "client"],
       deletion_status: ["pending", "canceled", "completed"],
@@ -3532,6 +3673,14 @@ export const Constants = {
         "paused",
       ],
       progress_pose: ["front", "side", "back"],
+      referral_kind: ["trainer", "client"],
+      referral_status: [
+        "pending",
+        "signed_up",
+        "activated",
+        "credited",
+        "rejected",
+      ],
       reminder_kind: ["meal", "weigh_in", "checkin", "custom"],
       seat_band: ["20", "50", "100", "unlimited"],
       split_status: ["draft", "approved", "superseded", "archived"],
