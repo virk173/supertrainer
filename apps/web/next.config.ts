@@ -3,6 +3,10 @@ import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
 
 const nextConfig: NextConfig = {
+  // Phase 9.6 — the secret scan builds into its own directory so it can run
+  // beside a live dev server without clobbering .next (they share the folder,
+  // and a half-overwritten .next takes the dev server down mid-session).
+  ...(process.env.NEXT_DIST_DIR ? { distDir: process.env.NEXT_DIST_DIR } : {}),
   // Workspace packages ship raw TypeScript — Next transpiles them.
   transpilePackages: ["@supertrainer/ai", "@supertrainer/db", "@supertrainer/payments", "@supertrainer/scoring", "@supertrainer/ui"],
   // Node-only extraction libs (style ingestion) — keep them out of the bundle.

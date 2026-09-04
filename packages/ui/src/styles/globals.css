@@ -145,6 +145,10 @@
   --color-input: var(--input);
   --color-ring: var(--ring);
   --font-sans: var(--font-geist-sans);
+  /* Phase 9.5 — the marketing register's display face. Scoped to the public
+     site by the (marketing) layout, which is the only place --font-display is
+     defined; in-app text never resolves it. */
+  --font-display: var(--font-marketing-display), var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   /* One radius: sm/md/lg/xl all collapse to 8px so `rounded-*` utilities can
    * never reintroduce radius soup across 8 build sessions. `rounded-full`

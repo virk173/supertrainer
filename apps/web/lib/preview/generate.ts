@@ -8,6 +8,7 @@ import {
 } from "@supertrainer/ai";
 import type { Json } from "@supertrainer/db/types";
 
+import { forOrg } from "@/lib/admin/attribution";
 import { trackServer } from "@/lib/analytics/server";
 import { createServiceClient } from "@/lib/supabase/server";
 import {
@@ -189,18 +190,20 @@ export async function getOrCreatePreview(
 
   let draft;
   try {
-    draft = await generatePreviewDraft({
-      candidates,
-      styleText,
-      lead: {
-        goal: String(answers.goal ?? "general_health"),
-        diet: pref,
-        experience: String(answers.experience ?? "beginner"),
-        trainingDaysPerWeek: Number(answers.trainingDaysPerWeek ?? 3),
-        sex: String(answers.sex ?? "prefer_not"),
-        age: Number(answers.age ?? 30),
-      },
-    });
+    draft = await forOrg(lead.org_id, () =>
+      generatePreviewDraft({
+        candidates,
+        styleText,
+        lead: {
+          goal: String(answers.goal ?? "general_health"),
+          diet: pref,
+          experience: String(answers.experience ?? "beginner"),
+          trainingDaysPerWeek: Number(answers.trainingDaysPerWeek ?? 3),
+          sex: String(answers.sex ?? "prefer_not"),
+          age: Number(answers.age ?? 30),
+        },
+      }),
+    );
   } catch (err) {
     console.error("[preview] generation failed:", err);
     await releaseClaim();

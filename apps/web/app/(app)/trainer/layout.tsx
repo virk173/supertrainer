@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 
+import { StatusBanner } from "@/components/status-banner";
 import { TrainerShell } from "@/components/trainer-shell";
 import { getOnboardingState, getSessionClaims } from "@/lib/onboarding/state";
 import { isOnboardingComplete } from "@/lib/onboarding/steps";
@@ -60,6 +61,7 @@ export default async function TrainerLayout({
       userName={userName}
       userEmail={user?.email ?? ""}
     >
+      <StatusBanner surface="dashboard" />
       {children}
     </TrainerShell>
   );

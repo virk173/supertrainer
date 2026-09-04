@@ -56,6 +56,24 @@ export async function middleware(request: NextRequest) {
     return withCookies(NextResponse.rewrite(url));
   }
 
+  // A coach's OWN domain (Phase 9.5). Same rule as a branded subdomain: only the
+  // root is rewritten, so /portal, /auth and the rest of the funnel keep working
+  // on that host. The host→org lookup needs the database, so it happens in the
+  // page rather than here — middleware must not add a query to every request.
+  const platformDomain = process.env.NEXT_PUBLIC_PLATFORM_DOMAIN?.toLowerCase();
+  const hostname = (request.headers.get("host") ?? "").split(":")[0].toLowerCase();
+  const isPlatformHost =
+    !platformDomain ||
+    hostname === platformDomain ||
+    hostname.endsWith(`.${platformDomain}`) ||
+    hostname === "localhost" ||
+    hostname.endsWith(".vercel.app");
+  if (!isPlatformHost && path === "/") {
+    const url = request.nextUrl.clone();
+    url.pathname = `/d/${encodeURIComponent(hostname)}`;
+    return withCookies(NextResponse.rewrite(url));
+  }
+
   // Segment-aware matches so "/trainer-x" is not gated as "/trainer".
   if (isPathActive(path, "/trainer")) {
     if (!isAuthed) return redirectTo("/login");

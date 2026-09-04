@@ -13,6 +13,7 @@ import {
   type VisionMediaType,
 } from "@supertrainer/ai";
 
+import { forOrg } from "@/lib/admin/attribution";
 import { getCurrentClientContext, logMeal, type LogMealInput } from "@/lib/ledger/log";
 import { resolveMealItems, type ResolvedItem } from "@/lib/ledger/resolve";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -29,7 +30,7 @@ export interface ResolveResult {
 export async function parseAndResolveText(rawInput: string): Promise<ResolveResult> {
   const ctx = await getCurrentClientContext();
   if (!ctx) throw new Error("No client for the current session");
-  const parsed = await parseMealText(rawInput);
+  const parsed = await forOrg(ctx.orgId, () => parseMealText(rawInput));
   const service = createServiceClient();
   const items = await resolveMealItems(service, parsed.items, {
     locale: ctx.locale ?? undefined,
@@ -73,7 +74,7 @@ export async function proposeAndResolvePhoto(
     .upload(path, bytes, { contentType: mediaType, upsert: false });
   if (upErr) throw upErr;
 
-  const parsed = await proposeMealFromPhoto(base64Data, mediaType);
+  const parsed = await forOrg(ctx.orgId, () => proposeMealFromPhoto(base64Data, mediaType));
   const items = await resolveMealItems(service, parsed.items, {
     locale: ctx.locale ?? undefined,
     orgId: ctx.orgId,

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronRight, CreditCard, Layers, Palette } from "lucide-react";
+import { ChevronRight, CreditCard, Gift, Globe, Layers, Palette, ShieldCheck } from "lucide-react";
 
 import { cn, focusRing } from "@supertrainer/ui/lib/utils";
 
@@ -23,6 +23,24 @@ const SECTIONS = [
     icon: Layers,
     title: "Tiers",
     summary: "Name, price, and shape your coaching packages.",
+  },
+  {
+    href: "/trainer/settings/data",
+    icon: ShieldCheck,
+    title: "Data & privacy",
+    summary: "Export everything you have here, or ask us to erase it.",
+  },
+  {
+    href: "/trainer/settings/referrals",
+    icon: Gift,
+    title: "Referrals",
+    summary: "Bring another coach across — you both get something.",
+  },
+  {
+    href: "/trainer/settings/domain",
+    icon: Globe,
+    title: "Your domain",
+    summary: "Send clients to an address that’s yours, not ours.",
   },
 ] as const;
 

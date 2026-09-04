@@ -13,6 +13,7 @@ import {
 } from "@supertrainer/ai";
 import type { Json } from "@supertrainer/db/types";
 
+import { forOrg } from "@/lib/admin/attribution";
 import { trackServer } from "@/lib/analytics/server";
 import { serializeIntakeForBrief, summarizeHealthFlags } from "@/lib/interview/brief";
 import { dayNumber } from "@/lib/interview/pacing";
@@ -244,14 +245,16 @@ export async function ensureInterview(
     const leased = await leaseOpenerSlot(service, clientId, state.last_prompt_at);
     if (leased) {
       try {
-        const turn = await interviewTurn({
-          section,
-          styleText: await styleFor(service, orgId),
-          history: [],
-          answersSoFar: answers[section] ?? {},
-          clientMessage: "",
-          clientName,
-        });
+        const turn = await forOrg(orgId, async () =>
+          interviewTurn({
+            section,
+            styleText: await styleFor(service, orgId),
+            history: [],
+            answersSoFar: answers[section] ?? {},
+            clientMessage: "",
+            clientName,
+          }),
+        );
         await say(service, orgId, clientId, "assistant", turn.reply);
         await service
           .from("interview_state")
@@ -378,14 +381,16 @@ export async function runTurn(
     body: m.body,
   }));
 
-  const turn = await interviewTurn({
-    section,
-    styleText: await styleFor(service, orgId),
-    history: history.slice(-12),
-    answersSoFar: answers[section] ?? {},
-    clientMessage: text,
-    clientName,
-  });
+  const turn = await forOrg(orgId, async () =>
+    interviewTurn({
+      section,
+      styleText: await styleFor(service, orgId),
+      history: history.slice(-12),
+      answersSoFar: answers[section] ?? {},
+      clientMessage: text,
+      clientName,
+    }),
+  );
 
   // Merge what we learned; code (not the model) decides completion.
   const merged: AnswersBySection = {
@@ -510,11 +515,13 @@ async function completeIntake(
       try {
         const healthFlags = summarizeHealthFlags(client?.health_flags);
         const intakeName = (intake as Record<string, unknown>).name;
-        const draft = await generateClientBrief({
-          clientName: typeof intakeName === "string" ? intakeName : undefined,
-          intakeText: serializeIntakeForBrief(intake),
-          healthFlags,
-        });
+        const draft = await forOrg(orgId, () =>
+          generateClientBrief({
+            clientName: typeof intakeName === "string" ? intakeName : undefined,
+            intakeText: serializeIntakeForBrief(intake),
+            healthFlags,
+          }),
+        );
         await service
           .from("clients")
           .update({

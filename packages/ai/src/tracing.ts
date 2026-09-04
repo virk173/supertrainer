@@ -30,6 +30,52 @@ export function currentAiTask(): AiTask | undefined {
   return taskStore.getStore();
 }
 
+// ── Org context + usage sink (Phase 9.3) ─────────────────────────────────────
+// Langfuse is optional; the margin meter is not. Every traced call emits a usage
+// record to whatever sink the app registered, tagged with the org whose work it
+// was. The org is ambient (AsyncLocalStorage) for the same reason the task is:
+// it isn't visible at the Anthropic call boundary.
+
+const orgStore = new AsyncLocalStorage<string>();
+
+/** Run `fn` so any Claude call it makes is billed to `orgId`. */
+export function withAiOrg<T>(orgId: string, fn: () => T): T {
+  return orgStore.run(orgId, fn);
+}
+
+/** The org the currently executing traced call belongs to, if any. */
+export function currentAiOrg(): string | undefined {
+  return orgStore.getStore();
+}
+
+export interface AiUsageRecord {
+  orgId?: string;
+  task?: AiTask;
+  model: string;
+  inputTokens: number;
+  outputTokens: number;
+}
+
+export type AiUsageSink = (record: AiUsageRecord) => void;
+
+let usageSink: AiUsageSink | null = null;
+
+/** Register the process-wide usage sink (the app writes it to ai_usage). */
+export function setAiUsageSink(sink: AiUsageSink | null): void {
+  usageSink = sink;
+}
+
+/** Emit one usage record. Never throws into the caller: metering a call must
+ *  not be able to fail the call. */
+export function recordAiUsage(record: AiUsageRecord): void {
+  if (!usageSink) return;
+  try {
+    usageSink({ ...record, orgId: record.orgId ?? currentAiOrg() });
+  } catch {
+    // metering is best-effort by design
+  }
+}
+
 // ── Per-plan trace grouping (Phase 4.2) ──────────────────────────────────────
 // Groups every generation a multi-agent run makes under one Langfuse trace
 // (one trace per plan; each agent call is a generation/span under it, with cost

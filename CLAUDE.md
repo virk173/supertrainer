@@ -46,7 +46,29 @@ packages/ui       Design tokens (src/styles/globals.css) + shared shadcn compone
 packages/ai       Claude client (claude.ts), modelRouter(task), zodOutput(schema, params).
                   Task types: parse | classify | draft | plan | ingest.
 docs/plan         The build plan — phase prompts reference these paths.
+docs/runbooks     One page per thing that can go wrong (restore, webhook outage, push down, AI down).
+load              k6 load suite + seeder + realtime listener (staging only; see load/README.md).
+scripts           Repo tooling. scan-client-bundle.mjs is a CI job: builds into .next-scan and
+                  fails if a server-only secret's VALUE reaches the browser bundle.
 ```
+
+## Phase 9 additions (launch)
+
+- **Data registry** (`apps/web/lib/data/registry.ts`) — EVERY public table must be classified
+  here (scope, exported, delete order). A live-schema diff test fails CI on an unclassified
+  table; that guard is what stops personal data silently surviving a purge. Adding a table?
+  Classify it in the same PR.
+- **Platform console** (`/admin`) — platform-operator only: listed in `platform_admins` AND a
+  live WebAuthn elevation. Its ten tables have RLS on and NO grant to any API role. Never add
+  one.
+- **AI margin meter** — every Claude call is priced in code (`@supertrainer/ai/pricing`, integer
+  micros) and billed to the org whose work it was. New AI entry points should be wrapped in
+  `forOrg(orgId, …)` (`lib/admin/attribution.ts`) or they land unattributed.
+- **Feature flags** — `flag(orgId, key)` from `lib/admin/flags.ts`. Deterministic per-org ramp;
+  unknown flags are OFF (never fail open). Every rollout from here on goes through one.
+- **Marketing prices** live only in `lib/marketing/pricing.ts` (placeholders pending a decision);
+  competitor figures in `lib/marketing/competitors.ts` carry a source URL + checked date, and
+  anything unverifiable is omitted rather than estimated.
 
 ## Command cheatsheet
 

@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { PortalShell } from "@/components/portal-shell";
+import { StatusBanner } from "@/components/status-banner";
 import { getOrgTheme } from "@/lib/brand/theme";
 import { needsConsent } from "@/lib/consent/versions";
 import { getSessionClaims } from "@/lib/onboarding/state";
@@ -53,6 +54,7 @@ export default async function PortalLayout({
       chatBadge={chatBadge}
       pushDegraded={pushDegraded}
     >
+      <StatusBanner surface="portal" />
       {children}
     </PortalShell>
   );

@@ -80,13 +80,22 @@ export async function convertLead(
     selected_tier_id: selectedTierId,
   };
 
+  // Phase 9.4 — a referred friend is not a cold teaser lead, and calling them
+  // one would erase the attribution the referring client earned. The roster
+  // shows the difference.
+  const { data: referral } = await service
+    .from("referrals")
+    .select("id")
+    .eq("referred_lead_id", lead.id)
+    .maybeSingle();
+
   const { data: client, error: clientError } = await service
     .from("clients")
     .insert({
       org_id: theme.orgId,
       profile_id: userId,
       status: "onboarding",
-      source: "teaser",
+      source: referral ? "referral" : "teaser",
       intake: intake as Json,
       // `allergies` key matches the Phase 1 import/demo convention so a single
       // reader (P3/P4) can retrieve allergens across every client population.

@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+import { throttledOrgIds } from "@/lib/admin/budget";
 import { enqueueRenewals } from "@/lib/plans/renewals";
 import { enqueueSplitProgressions } from "@/lib/splits/renewals";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -20,7 +21,12 @@ export async function GET(request: NextRequest) {
   }
   const service = createServiceClient();
   const now = new Date();
-  const diet = await enqueueRenewals(service, now);
-  const split = await enqueueSplitProgressions(service, now);
-  return NextResponse.json({ diet, split });
+  // Phase 9.3 — an org over its AI budget stands down SCHEDULED generation only.
+  // Nothing a person is waiting on is affected: trainer-initiated plans, chat
+  // replies, and meal parsing all still run. The renewal simply waits for the
+  // next period rather than quietly costing us more than the org pays.
+  const throttled = await throttledOrgIds();
+  const diet = await enqueueRenewals(service, now, undefined, throttled);
+  const split = await enqueueSplitProgressions(service, now, undefined, throttled);
+  return NextResponse.json({ diet, split, throttledOrgs: throttled.size });
 }

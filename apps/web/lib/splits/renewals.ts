@@ -14,7 +14,9 @@ export async function enqueueSplitProgressions(
   service: ServiceClient,
   asOf: Date,
   cycleDays = DEFAULT_CYCLE_DAYS,
-): Promise<{ due: number; queued: number }> {
+  /** orgs standing down scheduled AI this period (Phase 9.3 budget throttle) */
+  skipOrgIds: ReadonlySet<string> = new Set(),
+): Promise<{ due: number; queued: number; skipped?: number }> {
   const cutoff = new Date(asOf.getTime() - cycleDays * 86400000).toISOString();
 
   const { data: active } = await service
@@ -44,10 +46,15 @@ export async function enqueueSplitProgressions(
 
   let queued = 0;
   let dueCount = 0;
+  let skipped = 0;
   for (const row of rows) {
     if (!row.split_id || !due.has(row.split_id)) continue;
     dueCount += 1;
     if (busy.has(row.client_id)) continue;
+    if (skipOrgIds.has(row.org_id)) {
+      skipped += 1;
+      continue;
+    }
     const { error } = await service.from("plan_requests").insert({
       org_id: row.org_id,
       client_id: row.client_id,
@@ -60,5 +67,5 @@ export async function enqueueSplitProgressions(
       busy.add(row.client_id);
     }
   }
-  return { due: dueCount, queued };
+  return { due: dueCount, queued, skipped };
 }

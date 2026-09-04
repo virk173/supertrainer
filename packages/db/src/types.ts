@@ -34,6 +34,189 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_challenges: {
+        Row: {
+          challenge: string
+          consumed_at: string | null
+          created_at: string
+          expires_at: string
+          id: string
+          kind: string
+          profile_id: string
+        }
+        Insert: {
+          challenge: string
+          consumed_at?: string | null
+          created_at?: string
+          expires_at: string
+          id?: string
+          kind: string
+          profile_id: string
+        }
+        Update: {
+          challenge?: string
+          consumed_at?: string | null
+          created_at?: string
+          expires_at?: string
+          id?: string
+          kind?: string
+          profile_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "admin_challenges_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      admin_credentials: {
+        Row: {
+          backed_up: boolean
+          counter: number
+          created_at: string
+          credential_id: string
+          device_type: string | null
+          id: string
+          last_used_at: string | null
+          nickname: string | null
+          profile_id: string
+          public_key: string
+          transports: string[]
+          updated_at: string
+        }
+        Insert: {
+          backed_up?: boolean
+          counter?: number
+          created_at?: string
+          credential_id: string
+          device_type?: string | null
+          id?: string
+          last_used_at?: string | null
+          nickname?: string | null
+          profile_id: string
+          public_key: string
+          transports?: string[]
+          updated_at?: string
+        }
+        Update: {
+          backed_up?: boolean
+          counter?: number
+          created_at?: string
+          credential_id?: string
+          device_type?: string | null
+          id?: string
+          last_used_at?: string | null
+          nickname?: string | null
+          profile_id?: string
+          public_key?: string
+          transports?: string[]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "admin_credentials_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      admin_sessions: {
+        Row: {
+          created_at: string
+          credential_id: string | null
+          elevated_until: string
+          id: string
+          ip: string | null
+          profile_id: string
+          revoked_at: string | null
+          user_agent: string | null
+        }
+        Insert: {
+          created_at?: string
+          credential_id?: string | null
+          elevated_until: string
+          id?: string
+          ip?: string | null
+          profile_id: string
+          revoked_at?: string | null
+          user_agent?: string | null
+        }
+        Update: {
+          created_at?: string
+          credential_id?: string | null
+          elevated_until?: string
+          id?: string
+          ip?: string | null
+          profile_id?: string
+          revoked_at?: string | null
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "admin_sessions_credential_id_fkey"
+            columns: ["credential_id"]
+            isOneToOne: false
+            referencedRelation: "admin_credentials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "admin_sessions_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_usage: {
+        Row: {
+          cost_micros: number
+          created_at: string
+          id: string
+          input_tokens: number
+          model: string
+          occurred_at: string
+          org_id: string | null
+          output_tokens: number
+          task: string | null
+        }
+        Insert: {
+          cost_micros?: number
+          created_at?: string
+          id?: string
+          input_tokens?: number
+          model: string
+          occurred_at?: string
+          org_id?: string | null
+          output_tokens?: number
+          task?: string | null
+        }
+        Update: {
+          cost_micros?: number
+          created_at?: string
+          id?: string
+          input_tokens?: number
+          model?: string
+          occurred_at?: string
+          org_id?: string | null
+          output_tokens?: number
+          task?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_usage_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audit_log: {
         Row: {
           action: string
@@ -396,6 +579,130 @@ export type Database = {
           },
         ]
       }
+      custom_domains: {
+        Row: {
+          created_at: string
+          domain: string
+          error: string | null
+          id: string
+          last_checked_at: string | null
+          org_id: string
+          status: Database["public"]["Enums"]["domain_status"]
+          updated_at: string
+          verification: Json
+          verified_at: string | null
+        }
+        Insert: {
+          created_at?: string
+          domain: string
+          error?: string | null
+          id?: string
+          last_checked_at?: string | null
+          org_id: string
+          status?: Database["public"]["Enums"]["domain_status"]
+          updated_at?: string
+          verification?: Json
+          verified_at?: string | null
+        }
+        Update: {
+          created_at?: string
+          domain?: string
+          error?: string | null
+          id?: string
+          last_checked_at?: string | null
+          org_id?: string
+          status?: Database["public"]["Enums"]["domain_status"]
+          updated_at?: string
+          verification?: Json
+          verified_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "custom_domains_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: true
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      deletion_requests: {
+        Row: {
+          client_id: string | null
+          completed_at: string | null
+          created_at: string
+          final_export_job_id: string | null
+          grace_until: string
+          id: string
+          org_id: string
+          reason: string | null
+          requested_at: string
+          requested_by: string | null
+          scope: Database["public"]["Enums"]["deletion_scope"]
+          status: Database["public"]["Enums"]["deletion_status"]
+          updated_at: string
+        }
+        Insert: {
+          client_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          final_export_job_id?: string | null
+          grace_until: string
+          id?: string
+          org_id: string
+          reason?: string | null
+          requested_at?: string
+          requested_by?: string | null
+          scope: Database["public"]["Enums"]["deletion_scope"]
+          status?: Database["public"]["Enums"]["deletion_status"]
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          final_export_job_id?: string | null
+          grace_until?: string
+          id?: string
+          org_id?: string
+          reason?: string | null
+          requested_at?: string
+          requested_by?: string | null
+          scope?: Database["public"]["Enums"]["deletion_scope"]
+          status?: Database["public"]["Enums"]["deletion_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deletion_requests_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deletion_requests_final_export_job_id_fkey"
+            columns: ["final_export_job_id"]
+            isOneToOne: false
+            referencedRelation: "export_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deletion_requests_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deletion_requests_requested_by_fkey"
+            columns: ["requested_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       draft_edits: {
         Row: {
           after: Json | null
@@ -748,6 +1055,151 @@ export type Database = {
           },
         ]
       }
+      export_jobs: {
+        Row: {
+          client_id: string | null
+          completed_at: string | null
+          created_at: string
+          error: string | null
+          expires_at: string | null
+          id: string
+          org_id: string
+          requested_at: string
+          requested_by: string | null
+          scope: Database["public"]["Enums"]["export_scope"]
+          size_bytes: number | null
+          started_at: string | null
+          status: Database["public"]["Enums"]["export_status"]
+          storage_path: string | null
+          updated_at: string
+        }
+        Insert: {
+          client_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          error?: string | null
+          expires_at?: string | null
+          id?: string
+          org_id: string
+          requested_at?: string
+          requested_by?: string | null
+          scope: Database["public"]["Enums"]["export_scope"]
+          size_bytes?: number | null
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["export_status"]
+          storage_path?: string | null
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          error?: string | null
+          expires_at?: string | null
+          id?: string
+          org_id?: string
+          requested_at?: string
+          requested_by?: string | null
+          scope?: Database["public"]["Enums"]["export_scope"]
+          size_bytes?: number | null
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["export_status"]
+          storage_path?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "export_jobs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "export_jobs_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "export_jobs_requested_by_fkey"
+            columns: ["requested_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      feature_flag_overrides: {
+        Row: {
+          created_at: string
+          enabled: boolean
+          flag_key: string
+          note: string | null
+          org_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          enabled: boolean
+          flag_key: string
+          note?: string | null
+          org_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          enabled?: boolean
+          flag_key?: string
+          note?: string | null
+          org_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "feature_flag_overrides_flag_key_fkey"
+            columns: ["flag_key"]
+            isOneToOne: false
+            referencedRelation: "feature_flags"
+            referencedColumns: ["key"]
+          },
+          {
+            foreignKeyName: "feature_flag_overrides_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      feature_flags: {
+        Row: {
+          created_at: string
+          description: string
+          enabled_default: boolean
+          key: string
+          rollout_percent: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string
+          enabled_default?: boolean
+          key: string
+          rollout_percent?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          enabled_default?: boolean
+          key?: string
+          rollout_percent?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       food_aliases: {
         Row: {
           alias: string
@@ -889,6 +1341,51 @@ export type Database = {
           },
           {
             foreignKeyName: "gym_checkins_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      impersonation_sessions: {
+        Row: {
+          admin_profile_id: string
+          created_at: string
+          ended_at: string | null
+          id: string
+          org_id: string
+          reason: string
+          started_at: string
+        }
+        Insert: {
+          admin_profile_id: string
+          created_at?: string
+          ended_at?: string | null
+          id?: string
+          org_id: string
+          reason: string
+          started_at?: string
+        }
+        Update: {
+          admin_profile_id?: string
+          created_at?: string
+          ended_at?: string | null
+          id?: string
+          org_id?: string
+          reason?: string
+          started_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "impersonation_sessions_admin_profile_id_fkey"
+            columns: ["admin_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "impersonation_sessions_org_id_fkey"
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "orgs"
@@ -1425,8 +1922,12 @@ export type Database = {
       }
       orgs: {
         Row: {
+          ai_budget_micros: number | null
+          ai_throttled_at: string | null
           brand: Json
+          client_referrals_enabled: boolean
           created_at: string
+          data_export_monthly: boolean
           id: string
           name: string
           settings: Json
@@ -1434,8 +1935,12 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          ai_budget_micros?: number | null
+          ai_throttled_at?: string | null
           brand?: Json
+          client_referrals_enabled?: boolean
           created_at?: string
+          data_export_monthly?: boolean
           id?: string
           name: string
           settings?: Json
@@ -1443,8 +1948,12 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          ai_budget_micros?: number | null
+          ai_throttled_at?: string | null
           brand?: Json
+          client_referrals_enabled?: boolean
           created_at?: string
+          data_export_monthly?: boolean
           id?: string
           name?: string
           settings?: Json
@@ -1715,41 +2224,173 @@ export type Database = {
           },
         ]
       }
+      platform_admins: {
+        Row: {
+          created_at: string
+          note: string | null
+          profile_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          note?: string | null
+          profile_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          note?: string | null
+          profile_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "platform_admins_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      platform_audit: {
+        Row: {
+          action: string
+          actor_profile_id: string | null
+          created_at: string
+          entity_id: string | null
+          entity_type: string | null
+          id: number
+          payload: Json
+        }
+        Insert: {
+          action: string
+          actor_profile_id?: string | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: never
+          payload?: Json
+        }
+        Update: {
+          action?: string
+          actor_profile_id?: string | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: never
+          payload?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "platform_audit_actor_profile_id_fkey"
+            columns: ["actor_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      platform_incidents: {
+        Row: {
+          body: string
+          created_at: string
+          created_by: string | null
+          ends_at: string | null
+          id: string
+          maintenance_mode: boolean
+          published: boolean
+          severity: Database["public"]["Enums"]["incident_severity"]
+          starts_at: string
+          surface: Database["public"]["Enums"]["incident_surface"]
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          body?: string
+          created_at?: string
+          created_by?: string | null
+          ends_at?: string | null
+          id?: string
+          maintenance_mode?: boolean
+          published?: boolean
+          severity?: Database["public"]["Enums"]["incident_severity"]
+          starts_at?: string
+          surface?: Database["public"]["Enums"]["incident_surface"]
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          created_by?: string | null
+          ends_at?: string | null
+          id?: string
+          maintenance_mode?: boolean
+          published?: boolean
+          severity?: Database["public"]["Enums"]["incident_severity"]
+          starts_at?: string
+          surface?: Database["public"]["Enums"]["incident_surface"]
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "platform_incidents_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       platform_subscriptions: {
         Row: {
           created_at: string
+          credit_months_remaining: number
+          currency: string
           current_period_end: string | null
           founder_pricing: boolean
           org_id: string
+          price_cents: number | null
           seat_band: Database["public"]["Enums"]["seat_band"]
           status: Database["public"]["Enums"]["platform_sub_status"]
           stripe_customer_id: string | null
           stripe_subscription_id: string | null
           trial_end: string | null
+          trial_extra_days: number
           updated_at: string
         }
         Insert: {
           created_at?: string
+          credit_months_remaining?: number
+          currency?: string
           current_period_end?: string | null
           founder_pricing?: boolean
           org_id: string
+          price_cents?: number | null
           seat_band?: Database["public"]["Enums"]["seat_band"]
           status?: Database["public"]["Enums"]["platform_sub_status"]
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
           trial_end?: string | null
+          trial_extra_days?: number
           updated_at?: string
         }
         Update: {
           created_at?: string
+          credit_months_remaining?: number
+          currency?: string
           current_period_end?: string | null
           founder_pricing?: boolean
           org_id?: string
+          price_cents?: number | null
           seat_band?: Database["public"]["Enums"]["seat_band"]
           status?: Database["public"]["Enums"]["platform_sub_status"]
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
           trial_end?: string | null
+          trial_extra_days?: number
           updated_at?: string
         }
         Relationships: [
@@ -1896,6 +2537,131 @@ export type Database = {
           {
             foreignKeyName: "push_subscriptions_org_id_fkey"
             columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      referral_codes: {
+        Row: {
+          client_id: string | null
+          code: string
+          created_at: string
+          kind: Database["public"]["Enums"]["referral_kind"]
+          org_id: string
+          updated_at: string
+        }
+        Insert: {
+          client_id?: string | null
+          code: string
+          created_at?: string
+          kind: Database["public"]["Enums"]["referral_kind"]
+          org_id: string
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string | null
+          code?: string
+          created_at?: string
+          kind?: Database["public"]["Enums"]["referral_kind"]
+          org_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "referral_codes_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "referral_codes_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      referrals: {
+        Row: {
+          activated_at: string | null
+          code: string
+          created_at: string
+          credited_at: string | null
+          id: string
+          kind: Database["public"]["Enums"]["referral_kind"]
+          reason: string | null
+          referred_credit_months: number
+          referred_lead_id: string | null
+          referred_org_id: string | null
+          referrer_credit_months: number
+          referrer_org_id: string
+          signed_up_at: string | null
+          status: Database["public"]["Enums"]["referral_status"]
+          updated_at: string
+        }
+        Insert: {
+          activated_at?: string | null
+          code: string
+          created_at?: string
+          credited_at?: string | null
+          id?: string
+          kind: Database["public"]["Enums"]["referral_kind"]
+          reason?: string | null
+          referred_credit_months?: number
+          referred_lead_id?: string | null
+          referred_org_id?: string | null
+          referrer_credit_months?: number
+          referrer_org_id: string
+          signed_up_at?: string | null
+          status?: Database["public"]["Enums"]["referral_status"]
+          updated_at?: string
+        }
+        Update: {
+          activated_at?: string | null
+          code?: string
+          created_at?: string
+          credited_at?: string | null
+          id?: string
+          kind?: Database["public"]["Enums"]["referral_kind"]
+          reason?: string | null
+          referred_credit_months?: number
+          referred_lead_id?: string | null
+          referred_org_id?: string | null
+          referrer_credit_months?: number
+          referrer_org_id?: string
+          signed_up_at?: string | null
+          status?: Database["public"]["Enums"]["referral_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "referrals_code_fkey"
+            columns: ["code"]
+            isOneToOne: false
+            referencedRelation: "referral_codes"
+            referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "referrals_referred_lead_id_fkey"
+            columns: ["referred_lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "referrals_referred_org_id_fkey"
+            columns: ["referred_org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "referrals_referrer_org_id_fkey"
+            columns: ["referrer_org_id"]
             isOneToOne: false
             referencedRelation: "orgs"
             referencedColumns: ["id"]
@@ -2562,6 +3328,7 @@ export type Database = {
         Args: never
         Returns: Database["public"]["Enums"]["org_role"]
       }
+      list_public_tables: { Args: never; Returns: string[] }
       search_exercises: {
         Args: {
           p_equipment?: string[]
@@ -2620,8 +3387,11 @@ export type Database = {
     }
     Enums: {
       checkin_status: "trained" | "rest" | "missed"
-      client_source: "teaser" | "invite" | "import"
+      client_source: "teaser" | "invite" | "import" | "referral"
       client_status: "lead" | "onboarding" | "active" | "paused" | "churned"
+      deletion_scope: "org" | "client"
+      deletion_status: "pending" | "canceled" | "completed"
+      domain_status: "pending" | "verifying" | "active" | "error"
       draft_edit_entity: "plan" | "split" | "reply"
       draft_edit_kind:
         | "swap"
@@ -2640,7 +3410,11 @@ export type Database = {
       exercise_source: "feb" | "org_custom"
       exercise_video_kind: "upload" | "youtube"
       experience_level: "beginner" | "intermediate" | "advanced"
+      export_scope: "org" | "client"
+      export_status: "queued" | "running" | "ready" | "failed" | "expired"
       food_source: "usda" | "off" | "ifct" | "org_custom" | "seed"
+      incident_severity: "info" | "warning" | "critical"
+      incident_surface: "portal" | "dashboard" | "both"
       interview_section:
         | "logistics"
         | "goals"
@@ -2701,6 +3475,13 @@ export type Database = {
         | "incomplete"
         | "paused"
       progress_pose: "front" | "side" | "back"
+      referral_kind: "trainer" | "client"
+      referral_status:
+        | "pending"
+        | "signed_up"
+        | "activated"
+        | "credited"
+        | "rejected"
       reminder_kind: "meal" | "weigh_in" | "checkin" | "custom"
       seat_band: "20" | "50" | "100" | "unlimited"
       split_status: "draft" | "approved" | "superseded" | "archived"
@@ -2852,8 +3633,11 @@ export const Constants = {
   public: {
     Enums: {
       checkin_status: ["trained", "rest", "missed"],
-      client_source: ["teaser", "invite", "import"],
+      client_source: ["teaser", "invite", "import", "referral"],
       client_status: ["lead", "onboarding", "active", "paused", "churned"],
+      deletion_scope: ["org", "client"],
+      deletion_status: ["pending", "canceled", "completed"],
+      domain_status: ["pending", "verifying", "active", "error"],
       draft_edit_entity: ["plan", "split", "reply"],
       draft_edit_kind: [
         "swap",
@@ -2868,7 +3652,11 @@ export const Constants = {
       exercise_source: ["feb", "org_custom"],
       exercise_video_kind: ["upload", "youtube"],
       experience_level: ["beginner", "intermediate", "advanced"],
+      export_scope: ["org", "client"],
+      export_status: ["queued", "running", "ready", "failed", "expired"],
       food_source: ["usda", "off", "ifct", "org_custom", "seed"],
+      incident_severity: ["info", "warning", "critical"],
+      incident_surface: ["portal", "dashboard", "both"],
       interview_section: [
         "logistics",
         "goals",
@@ -2934,6 +3722,14 @@ export const Constants = {
         "paused",
       ],
       progress_pose: ["front", "side", "back"],
+      referral_kind: ["trainer", "client"],
+      referral_status: [
+        "pending",
+        "signed_up",
+        "activated",
+        "credited",
+        "rejected",
+      ],
       reminder_kind: ["meal", "weigh_in", "checkin", "custom"],
       seat_band: ["20", "50", "100", "unlimited"],
       split_status: ["draft", "approved", "superseded", "archived"],
