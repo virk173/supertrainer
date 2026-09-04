@@ -396,6 +396,83 @@ export type Database = {
           },
         ]
       }
+      deletion_requests: {
+        Row: {
+          client_id: string | null
+          completed_at: string | null
+          created_at: string
+          final_export_job_id: string | null
+          grace_until: string
+          id: string
+          org_id: string
+          reason: string | null
+          requested_at: string
+          requested_by: string | null
+          scope: Database["public"]["Enums"]["deletion_scope"]
+          status: Database["public"]["Enums"]["deletion_status"]
+          updated_at: string
+        }
+        Insert: {
+          client_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          final_export_job_id?: string | null
+          grace_until: string
+          id?: string
+          org_id: string
+          reason?: string | null
+          requested_at?: string
+          requested_by?: string | null
+          scope: Database["public"]["Enums"]["deletion_scope"]
+          status?: Database["public"]["Enums"]["deletion_status"]
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          final_export_job_id?: string | null
+          grace_until?: string
+          id?: string
+          org_id?: string
+          reason?: string | null
+          requested_at?: string
+          requested_by?: string | null
+          scope?: Database["public"]["Enums"]["deletion_scope"]
+          status?: Database["public"]["Enums"]["deletion_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deletion_requests_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deletion_requests_final_export_job_id_fkey"
+            columns: ["final_export_job_id"]
+            isOneToOne: false
+            referencedRelation: "export_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deletion_requests_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deletion_requests_requested_by_fkey"
+            columns: ["requested_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       draft_edits: {
         Row: {
           after: Json | null
@@ -744,6 +821,82 @@ export type Database = {
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      export_jobs: {
+        Row: {
+          client_id: string | null
+          completed_at: string | null
+          created_at: string
+          error: string | null
+          expires_at: string | null
+          id: string
+          org_id: string
+          requested_at: string
+          requested_by: string | null
+          scope: Database["public"]["Enums"]["export_scope"]
+          size_bytes: number | null
+          started_at: string | null
+          status: Database["public"]["Enums"]["export_status"]
+          storage_path: string | null
+          updated_at: string
+        }
+        Insert: {
+          client_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          error?: string | null
+          expires_at?: string | null
+          id?: string
+          org_id: string
+          requested_at?: string
+          requested_by?: string | null
+          scope: Database["public"]["Enums"]["export_scope"]
+          size_bytes?: number | null
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["export_status"]
+          storage_path?: string | null
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          error?: string | null
+          expires_at?: string | null
+          id?: string
+          org_id?: string
+          requested_at?: string
+          requested_by?: string | null
+          scope?: Database["public"]["Enums"]["export_scope"]
+          size_bytes?: number | null
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["export_status"]
+          storage_path?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "export_jobs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "export_jobs_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "export_jobs_requested_by_fkey"
+            columns: ["requested_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -1427,6 +1580,7 @@ export type Database = {
         Row: {
           brand: Json
           created_at: string
+          data_export_monthly: boolean
           id: string
           name: string
           settings: Json
@@ -1436,6 +1590,7 @@ export type Database = {
         Insert: {
           brand?: Json
           created_at?: string
+          data_export_monthly?: boolean
           id?: string
           name: string
           settings?: Json
@@ -1445,6 +1600,7 @@ export type Database = {
         Update: {
           brand?: Json
           created_at?: string
+          data_export_monthly?: boolean
           id?: string
           name?: string
           settings?: Json
@@ -2562,6 +2718,7 @@ export type Database = {
         Args: never
         Returns: Database["public"]["Enums"]["org_role"]
       }
+      list_public_tables: { Args: never; Returns: string[] }
       search_exercises: {
         Args: {
           p_equipment?: string[]
@@ -2622,6 +2779,8 @@ export type Database = {
       checkin_status: "trained" | "rest" | "missed"
       client_source: "teaser" | "invite" | "import"
       client_status: "lead" | "onboarding" | "active" | "paused" | "churned"
+      deletion_scope: "org" | "client"
+      deletion_status: "pending" | "canceled" | "completed"
       draft_edit_entity: "plan" | "split" | "reply"
       draft_edit_kind:
         | "swap"
@@ -2640,6 +2799,8 @@ export type Database = {
       exercise_source: "feb" | "org_custom"
       exercise_video_kind: "upload" | "youtube"
       experience_level: "beginner" | "intermediate" | "advanced"
+      export_scope: "org" | "client"
+      export_status: "queued" | "running" | "ready" | "failed" | "expired"
       food_source: "usda" | "off" | "ifct" | "org_custom" | "seed"
       interview_section:
         | "logistics"
@@ -2854,6 +3015,8 @@ export const Constants = {
       checkin_status: ["trained", "rest", "missed"],
       client_source: ["teaser", "invite", "import"],
       client_status: ["lead", "onboarding", "active", "paused", "churned"],
+      deletion_scope: ["org", "client"],
+      deletion_status: ["pending", "canceled", "completed"],
       draft_edit_entity: ["plan", "split", "reply"],
       draft_edit_kind: [
         "swap",
@@ -2868,6 +3031,8 @@ export const Constants = {
       exercise_source: ["feb", "org_custom"],
       exercise_video_kind: ["upload", "youtube"],
       experience_level: ["beginner", "intermediate", "advanced"],
+      export_scope: ["org", "client"],
+      export_status: ["queued", "running", "ready", "failed", "expired"],
       food_source: ["usda", "off", "ifct", "org_custom", "seed"],
       interview_section: [
         "logistics",
