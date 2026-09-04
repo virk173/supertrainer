@@ -26,11 +26,23 @@ export {
 export {
   flushTracing,
   withAiTask,
+  withAiOrg,
   withPlanTrace,
   currentAiTask,
+  currentAiOrg,
   recordGeneration,
+  recordAiUsage,
+  setAiUsageSink,
   type GenerationRecord,
+  type AiUsageRecord,
+  type AiUsageSink,
 } from "./tracing";
+export {
+  costMicros,
+  formatMicros,
+  priceFor,
+  type ModelPrice,
+} from "./pricing";
 export {
   dietStyleExtractor,
   trainingStyleExtractor,

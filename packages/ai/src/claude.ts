@@ -1,6 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 
-import { currentAiTask, recordGeneration } from "./tracing";
+import { currentAiTask, recordAiUsage, recordGeneration } from "./tracing";
 
 // Phase 0.5 wraps this factory with Langfuse tracing — keep all client
 // construction here so tracing covers every call site. The wrapper is a Proxy
@@ -30,6 +30,13 @@ function traceCall(original: AnyAsyncFn, thisArg: unknown): AnyAsyncFn {
     try {
       const result = await original.apply(thisArg, args);
       const { inputTokens, outputTokens } = readUsage(result);
+      // The margin meter runs whether or not Langfuse is configured.
+      recordAiUsage({
+        task,
+        model,
+        inputTokens: inputTokens ?? 0,
+        outputTokens: outputTokens ?? 0,
+      });
       recordGeneration({
         task,
         model,

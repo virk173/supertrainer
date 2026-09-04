@@ -24,6 +24,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { compileSplitPool } from "@/lib/splits/pool";
 import { applyProgression, compileProgressionContext } from "@/lib/splits/progression";
+import { forOrg } from "@/lib/admin/attribution";
 
 type ServiceClient = SupabaseClient<Database>;
 
@@ -118,22 +119,24 @@ export async function runSplitPipeline(
     return fail(`insufficient safe exercises for this client's equipment/injuries (${pool.length})`);
   }
 
-  const result = await withPlanTrace(
-    {
-      name: "training-split",
-      metadata: { planRequestId: req.id, clientId: client.id, trigger: req.trigger },
-    },
-    () =>
-      generateSplit(
-        {
-          availability: { daysPerWeek: intake.daysPerWeek },
-          experience: intake.experience,
-          goal: intake.goal,
-          styleProfile,
-          pool,
-        },
-        deps,
-      ),
+  const result = await forOrg(req.org_id, () =>
+    withPlanTrace(
+      {
+        name: "training-split",
+        metadata: { planRequestId: req.id, clientId: client.id, trigger: req.trigger },
+      },
+      () =>
+        generateSplit(
+          {
+            availability: { daysPerWeek: intake.daysPerWeek },
+            experience: intake.experience,
+            goal: intake.goal,
+            styleProfile,
+            pool,
+          },
+          deps,
+        ),
+    ),
   );
   await flushTracing();
 

@@ -137,6 +137,60 @@ export const DATA_REGISTRY: readonly TableSpec[] = [
     exported: false, deleted: false, deleteOrder: 0,
     note: "global food-search reference data",
   },
+  {
+    table: "platform_admins", scope: "platform", orgColumn: null, clientColumn: null,
+    exported: false, deleted: false, deleteOrder: 0,
+    note: "who operates the platform — not org data",
+  },
+  {
+    table: "admin_credentials", scope: "platform", orgColumn: null, clientColumn: null,
+    exported: false, deleted: false, deleteOrder: 0,
+    note: "platform-operator hardware keys — credential material, never exported",
+  },
+  {
+    table: "admin_challenges", scope: "platform", orgColumn: null, clientColumn: null,
+    exported: false, deleted: false, deleteOrder: 0,
+    note: "one-shot WebAuthn challenges — credential material, never exported",
+  },
+  {
+    table: "admin_sessions", scope: "platform", orgColumn: null, clientColumn: null,
+    exported: false, deleted: false, deleteOrder: 0,
+    note: "platform-operator elevations — credential material, never exported",
+  },
+  {
+    table: "feature_flags", scope: "platform", orgColumn: null, clientColumn: null,
+    exported: false, deleted: false, deleteOrder: 0,
+    note: "platform rollout configuration",
+  },
+  {
+    table: "platform_incidents", scope: "platform", orgColumn: null, clientColumn: null,
+    exported: false, deleted: false, deleteOrder: 0,
+    note: "platform status banners",
+  },
+  {
+    table: "platform_audit", scope: "platform", orgColumn: null, clientColumn: null,
+    exported: false, deleted: false, deleteOrder: 0,
+    note: "console audit trail — platform-wide acts that belong to no org",
+  },
+
+  // ── platform telemetry that happens to carry an org_id ────────────────────
+  // Not the trainer's content, so not in their archive — but it is ABOUT them,
+  // so it dies with them.
+  {
+    table: "ai_usage", scope: "org", orgColumn: "org_id", clientColumn: null,
+    exported: false, deleted: true, deleteOrder: 70,
+    note: "platform margin meter — our telemetry about an org, purged with it",
+  },
+  {
+    table: "feature_flag_overrides", scope: "org", orgColumn: "org_id", clientColumn: null,
+    exported: false, deleted: true, deleteOrder: 70,
+    note: "platform rollout state for one org",
+  },
+  {
+    table: "impersonation_sessions", scope: "org", orgColumn: "org_id", clientColumn: null,
+    exported: true, deleted: true, deleteOrder: 70,
+    note: "every read-only support view of this org — exported BECAUSE a trainer is entitled to know who looked",
+  },
 ];
 
 /** Every table name the registry knows about. */

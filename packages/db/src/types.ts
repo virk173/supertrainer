@@ -34,6 +34,189 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_challenges: {
+        Row: {
+          challenge: string
+          consumed_at: string | null
+          created_at: string
+          expires_at: string
+          id: string
+          kind: string
+          profile_id: string
+        }
+        Insert: {
+          challenge: string
+          consumed_at?: string | null
+          created_at?: string
+          expires_at: string
+          id?: string
+          kind: string
+          profile_id: string
+        }
+        Update: {
+          challenge?: string
+          consumed_at?: string | null
+          created_at?: string
+          expires_at?: string
+          id?: string
+          kind?: string
+          profile_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "admin_challenges_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      admin_credentials: {
+        Row: {
+          backed_up: boolean
+          counter: number
+          created_at: string
+          credential_id: string
+          device_type: string | null
+          id: string
+          last_used_at: string | null
+          nickname: string | null
+          profile_id: string
+          public_key: string
+          transports: string[]
+          updated_at: string
+        }
+        Insert: {
+          backed_up?: boolean
+          counter?: number
+          created_at?: string
+          credential_id: string
+          device_type?: string | null
+          id?: string
+          last_used_at?: string | null
+          nickname?: string | null
+          profile_id: string
+          public_key: string
+          transports?: string[]
+          updated_at?: string
+        }
+        Update: {
+          backed_up?: boolean
+          counter?: number
+          created_at?: string
+          credential_id?: string
+          device_type?: string | null
+          id?: string
+          last_used_at?: string | null
+          nickname?: string | null
+          profile_id?: string
+          public_key?: string
+          transports?: string[]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "admin_credentials_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      admin_sessions: {
+        Row: {
+          created_at: string
+          credential_id: string | null
+          elevated_until: string
+          id: string
+          ip: string | null
+          profile_id: string
+          revoked_at: string | null
+          user_agent: string | null
+        }
+        Insert: {
+          created_at?: string
+          credential_id?: string | null
+          elevated_until: string
+          id?: string
+          ip?: string | null
+          profile_id: string
+          revoked_at?: string | null
+          user_agent?: string | null
+        }
+        Update: {
+          created_at?: string
+          credential_id?: string | null
+          elevated_until?: string
+          id?: string
+          ip?: string | null
+          profile_id?: string
+          revoked_at?: string | null
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "admin_sessions_credential_id_fkey"
+            columns: ["credential_id"]
+            isOneToOne: false
+            referencedRelation: "admin_credentials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "admin_sessions_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_usage: {
+        Row: {
+          cost_micros: number
+          created_at: string
+          id: string
+          input_tokens: number
+          model: string
+          occurred_at: string
+          org_id: string | null
+          output_tokens: number
+          task: string | null
+        }
+        Insert: {
+          cost_micros?: number
+          created_at?: string
+          id?: string
+          input_tokens?: number
+          model: string
+          occurred_at?: string
+          org_id?: string | null
+          output_tokens?: number
+          task?: string | null
+        }
+        Update: {
+          cost_micros?: number
+          created_at?: string
+          id?: string
+          input_tokens?: number
+          model?: string
+          occurred_at?: string
+          org_id?: string | null
+          output_tokens?: number
+          task?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_usage_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audit_log: {
         Row: {
           action: string
@@ -901,6 +1084,75 @@ export type Database = {
           },
         ]
       }
+      feature_flag_overrides: {
+        Row: {
+          created_at: string
+          enabled: boolean
+          flag_key: string
+          note: string | null
+          org_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          enabled: boolean
+          flag_key: string
+          note?: string | null
+          org_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          enabled?: boolean
+          flag_key?: string
+          note?: string | null
+          org_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "feature_flag_overrides_flag_key_fkey"
+            columns: ["flag_key"]
+            isOneToOne: false
+            referencedRelation: "feature_flags"
+            referencedColumns: ["key"]
+          },
+          {
+            foreignKeyName: "feature_flag_overrides_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      feature_flags: {
+        Row: {
+          created_at: string
+          description: string
+          enabled_default: boolean
+          key: string
+          rollout_percent: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string
+          enabled_default?: boolean
+          key: string
+          rollout_percent?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          enabled_default?: boolean
+          key?: string
+          rollout_percent?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       food_aliases: {
         Row: {
           alias: string
@@ -1042,6 +1294,51 @@ export type Database = {
           },
           {
             foreignKeyName: "gym_checkins_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      impersonation_sessions: {
+        Row: {
+          admin_profile_id: string
+          created_at: string
+          ended_at: string | null
+          id: string
+          org_id: string
+          reason: string
+          started_at: string
+        }
+        Insert: {
+          admin_profile_id: string
+          created_at?: string
+          ended_at?: string | null
+          id?: string
+          org_id: string
+          reason: string
+          started_at?: string
+        }
+        Update: {
+          admin_profile_id?: string
+          created_at?: string
+          ended_at?: string | null
+          id?: string
+          org_id?: string
+          reason?: string
+          started_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "impersonation_sessions_admin_profile_id_fkey"
+            columns: ["admin_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "impersonation_sessions_org_id_fkey"
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "orgs"
@@ -1578,6 +1875,8 @@ export type Database = {
       }
       orgs: {
         Row: {
+          ai_budget_micros: number | null
+          ai_throttled_at: string | null
           brand: Json
           created_at: string
           data_export_monthly: boolean
@@ -1588,6 +1887,8 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          ai_budget_micros?: number | null
+          ai_throttled_at?: string | null
           brand?: Json
           created_at?: string
           data_export_monthly?: boolean
@@ -1598,6 +1899,8 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          ai_budget_micros?: number | null
+          ai_throttled_at?: string | null
           brand?: Json
           created_at?: string
           data_export_monthly?: boolean
@@ -1871,12 +2174,134 @@ export type Database = {
           },
         ]
       }
+      platform_admins: {
+        Row: {
+          created_at: string
+          note: string | null
+          profile_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          note?: string | null
+          profile_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          note?: string | null
+          profile_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "platform_admins_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      platform_audit: {
+        Row: {
+          action: string
+          actor_profile_id: string | null
+          created_at: string
+          entity_id: string | null
+          entity_type: string | null
+          id: number
+          payload: Json
+        }
+        Insert: {
+          action: string
+          actor_profile_id?: string | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: never
+          payload?: Json
+        }
+        Update: {
+          action?: string
+          actor_profile_id?: string | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: never
+          payload?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "platform_audit_actor_profile_id_fkey"
+            columns: ["actor_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      platform_incidents: {
+        Row: {
+          body: string
+          created_at: string
+          created_by: string | null
+          ends_at: string | null
+          id: string
+          maintenance_mode: boolean
+          published: boolean
+          severity: Database["public"]["Enums"]["incident_severity"]
+          starts_at: string
+          surface: Database["public"]["Enums"]["incident_surface"]
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          body?: string
+          created_at?: string
+          created_by?: string | null
+          ends_at?: string | null
+          id?: string
+          maintenance_mode?: boolean
+          published?: boolean
+          severity?: Database["public"]["Enums"]["incident_severity"]
+          starts_at?: string
+          surface?: Database["public"]["Enums"]["incident_surface"]
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          created_by?: string | null
+          ends_at?: string | null
+          id?: string
+          maintenance_mode?: boolean
+          published?: boolean
+          severity?: Database["public"]["Enums"]["incident_severity"]
+          starts_at?: string
+          surface?: Database["public"]["Enums"]["incident_surface"]
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "platform_incidents_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       platform_subscriptions: {
         Row: {
           created_at: string
+          currency: string
           current_period_end: string | null
           founder_pricing: boolean
           org_id: string
+          price_cents: number | null
           seat_band: Database["public"]["Enums"]["seat_band"]
           status: Database["public"]["Enums"]["platform_sub_status"]
           stripe_customer_id: string | null
@@ -1886,9 +2311,11 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          currency?: string
           current_period_end?: string | null
           founder_pricing?: boolean
           org_id: string
+          price_cents?: number | null
           seat_band?: Database["public"]["Enums"]["seat_band"]
           status?: Database["public"]["Enums"]["platform_sub_status"]
           stripe_customer_id?: string | null
@@ -1898,9 +2325,11 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          currency?: string
           current_period_end?: string | null
           founder_pricing?: boolean
           org_id?: string
+          price_cents?: number | null
           seat_band?: Database["public"]["Enums"]["seat_band"]
           status?: Database["public"]["Enums"]["platform_sub_status"]
           stripe_customer_id?: string | null
@@ -2802,6 +3231,8 @@ export type Database = {
       export_scope: "org" | "client"
       export_status: "queued" | "running" | "ready" | "failed" | "expired"
       food_source: "usda" | "off" | "ifct" | "org_custom" | "seed"
+      incident_severity: "info" | "warning" | "critical"
+      incident_surface: "portal" | "dashboard" | "both"
       interview_section:
         | "logistics"
         | "goals"
@@ -3034,6 +3465,8 @@ export const Constants = {
       export_scope: ["org", "client"],
       export_status: ["queued", "running", "ready", "failed", "expired"],
       food_source: ["usda", "off", "ifct", "org_custom", "seed"],
+      incident_severity: ["info", "warning", "critical"],
+      incident_surface: ["portal", "dashboard", "both"],
       interview_section: [
         "logistics",
         "goals",

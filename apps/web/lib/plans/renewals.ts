@@ -14,7 +14,9 @@ export async function enqueueRenewals(
   service: ServiceClient,
   asOf: Date,
   cycleDays = DEFAULT_CYCLE_DAYS,
-): Promise<{ due: number; queued: number }> {
+  /** orgs standing down scheduled AI this period (Phase 9.3 budget throttle) */
+  skipOrgIds: ReadonlySet<string> = new Set(),
+): Promise<{ due: number; queued: number; skipped?: number }> {
   const cutoff = new Date(asOf.getTime() - cycleDays * 86400000).toISOString().slice(0, 10);
   const { data: due } = await service
     .from("plans_active")
@@ -35,8 +37,13 @@ export async function enqueueRenewals(
   const busy = new Set((inflight ?? []).map((r) => r.client_id));
 
   let queued = 0;
+  let skipped = 0;
   for (const row of rows) {
     if (busy.has(row.client_id)) continue;
+    if (skipOrgIds.has(row.org_id)) {
+      skipped += 1;
+      continue;
+    }
     const { error } = await service.from("plan_requests").insert({
       org_id: row.org_id,
       client_id: row.client_id,
@@ -49,5 +56,5 @@ export async function enqueueRenewals(
       busy.add(row.client_id); // guard against duplicate plans_active rows for one client
     }
   }
-  return { due: rows.length, queued };
+  return { due: rows.length, queued, skipped };
 }

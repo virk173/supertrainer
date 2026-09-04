@@ -5,6 +5,7 @@ import { headers } from "next/headers";
 import { scoreLeadIntent } from "@supertrainer/ai";
 import type { Json } from "@supertrainer/db/types";
 
+import { forOrg } from "@/lib/admin/attribution";
 import { trackServer } from "@/lib/analytics/server";
 import { getOrgThemeBySlug } from "@/lib/brand/theme";
 import { clientIp } from "@/lib/http/client-ip";
@@ -141,14 +142,16 @@ export async function submitLead(
   // rate limits above (one classify per successfully-created lead).
   try {
     const a = parsed.data;
-    const intent = await scoreLeadIntent({
-      goal: a.goal,
-      experience: a.experience,
-      activity: a.activity,
-      trainingDaysPerWeek: a.trainingDaysPerWeek,
-      diet: a.diet,
-      allergenCount: allergens.length,
-    });
+    const intent = await forOrg(theme.orgId, () =>
+      scoreLeadIntent({
+        goal: a.goal,
+        experience: a.experience,
+        activity: a.activity,
+        trainingDaysPerWeek: a.trainingDaysPerWeek,
+        diet: a.diet,
+        allergenCount: allergens.length,
+      }),
+    );
     await service
       .from("leads")
       // Truncate here (not via a schema max that would reject a good band): the

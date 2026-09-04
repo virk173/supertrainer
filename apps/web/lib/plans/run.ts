@@ -29,6 +29,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { compileAdjustmentContext } from "@/lib/plans/adjust-context";
 import type { DietPreference } from "@/lib/preview/diet-filter";
 import { buildSafePool, poolExcludedTags, POOL_FOOD_COLUMNS, type PoolFoodRow } from "@/lib/plans/pool";
+import { forOrg } from "@/lib/admin/attribution";
 
 type ServiceClient = SupabaseClient<Database>;
 
@@ -161,13 +162,16 @@ export async function runDietPipeline(
   if (pool.length === 0) return fail("no safe foods for this client's constraints");
   const excludedAllergenTags = poolExcludedTags(allergens);
 
-  const result = await withPlanTrace(
-    { name: "diet-plan", metadata: { planRequestId: req.id, clientId: client.id, trigger: req.trigger } },
-    () =>
-      generateDietPlan(
-        { targets, constraints, styleProfile, pool, excludedAllergenTags },
-        deps,
-      ),
+  // Billed to the org whose plan this is (Phase 9.3 margin meter).
+  const result = await forOrg(req.org_id, () =>
+    withPlanTrace(
+      { name: "diet-plan", metadata: { planRequestId: req.id, clientId: client.id, trigger: req.trigger } },
+      () =>
+        generateDietPlan(
+          { targets, constraints, styleProfile, pool, excludedAllergenTags },
+          deps,
+        ),
+    ),
   );
   await flushTracing();
 

@@ -6,6 +6,7 @@ import { extractStyleProfile } from "@supertrainer/ai";
 import type { Json } from "@supertrainer/db/types";
 
 import { completeStep } from "@/app/onboarding/actions";
+import { forOrg } from "@/lib/admin/attribution";
 import { styleCoverage } from "@/lib/style/coverage";
 import { extractTextFromFile } from "@/lib/style/extract-text";
 import {
@@ -144,14 +145,16 @@ export async function ingestUploads(
   // of schema fields that came back with real content — not a file count.
   let drafts: StyleDraft[];
   try {
-    drafts = await Promise.all(
-      STYLE_DOMAIN_ORDER.map(async (domain): Promise<StyleDraft> => {
-        const profile = (await extractStyleProfile(domain, combined)) as Record<
-          string,
-          unknown
-        >;
-        return { domain, profile, confidence: styleCoverage(profile).score };
-      }),
+    drafts = await forOrg(orgId, () =>
+      Promise.all(
+        STYLE_DOMAIN_ORDER.map(async (domain): Promise<StyleDraft> => {
+          const profile = (await extractStyleProfile(domain, combined)) as Record<
+            string,
+            unknown
+          >;
+          return { domain, profile, confidence: styleCoverage(profile).score };
+        }),
+      ),
     );
   } catch (err) {
     console.error("[style] extraction failed:", err);

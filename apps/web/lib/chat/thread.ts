@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import type { Json } from "@supertrainer/db/types";
 
+import { forOrg } from "@/lib/admin/attribution";
 import { trackServer } from "@/lib/analytics/server";
 import { dispatchClientMessage } from "@/lib/comms/dispatch";
 import {
@@ -151,12 +152,14 @@ export async function sendClientMessage(input: {
   // immediate), so this runs after; any failure here never loses the message.
   const inserted = row as MessageRow;
   try {
-    await dispatchClientMessage(service, {
-      orgId: ctx.orgId,
-      clientId: ctx.clientId,
-      messageId: inserted.id,
-      text: parsed.data.text,
-    });
+    await forOrg(ctx.orgId, () =>
+      dispatchClientMessage(service, {
+        orgId: ctx.orgId,
+        clientId: ctx.clientId,
+        messageId: inserted.id,
+        text: parsed.data.text,
+      }),
+    );
   } catch (err) {
     console.error("[chat] message dispatch failed:", err);
   }
