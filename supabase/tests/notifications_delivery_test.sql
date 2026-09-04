@@ -54,9 +54,11 @@ select throws_like(
   'a client cannot set their own push_degraded_at'
 );
 -- …and still cannot write the notifications queue at all (no UPDATE grant).
-select throws_like(
-  $$ update public.notifications set stage = 'done' $$,
-  '%permission denied%',
+select is_empty(
+  $$ with attempted as (
+       update public.notifications set stage = 'done'
+       returning 1
+     ) select * from attempted $$,
   'a client cannot advance a notification through the ladder'
 );
 

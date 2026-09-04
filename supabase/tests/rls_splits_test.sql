@@ -75,10 +75,11 @@ select is_empty(
   $$ select 1 from public.splits where id = '77777777-7777-7777-7777-777777777703' $$,
   'client A cannot read another client''s approved split'
 );
-select throws_like(
+select throws_ok(
   $$ insert into public.splits (org_id, client_id, source)
      values ('11111111-1111-1111-1111-111111111111', 'dddddddd-dddd-dddd-dddd-dddddddddd01', 'manual') $$,
-  '%permission denied%',
+  '42501',
+  null,
   'a client cannot write splits directly (service-role only)'
 );
 

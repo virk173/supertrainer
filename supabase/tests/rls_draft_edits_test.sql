@@ -58,10 +58,11 @@ select isnt_empty(
   $$ select 1 from public.draft_edits where entity_id = '99999999-9999-9999-9999-999999999901' $$,
   'staff A reads their org edit-capture log'
 );
-select throws_like(
+select throws_ok(
   $$ insert into public.draft_edits (org_id, entity_type, entity_id, path, edit_kind)
      values ('11111111-1111-1111-1111-111111111111', 'plan', '99999999-9999-9999-9999-999999999901', 'x', 'resize') $$,
-  '%permission denied%',
+  '42501',
+  null,
   'staff cannot write edits directly (service-role only)'
 );
 

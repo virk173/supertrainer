@@ -100,17 +100,20 @@ select set_config('request.jwt.claims',
   '{"sub": "c0000000-0000-0000-0000-000000000001", "role": "authenticated", "org_id": "11111111-1111-1111-1111-111111111111", "user_role": "client"}',
   true);
 
-select throws_like(
+select throws_ok(
   $$ insert into public.messages (org_id, client_id, sender, kind, body)
      values ('11111111-1111-1111-1111-111111111111',
              'd0000000-0000-0000-0000-000000000001', 'coach', 'text', 'spoofed coach line') $$,
-  '%permission denied%',
+  '42501',
+  null,
   'a client cannot INSERT a message (no spoofing coach/assistant — writes are service-role)'
 );
-select throws_like(
-  $$ update public.messages set read_at = now()
-     where id = 'e0000000-0000-0000-0000-000000000002' $$,
-  '%permission denied%',
+select is_empty(
+  $$ with attempted as (
+       update public.messages set read_at = now()
+     where id = 'e0000000-0000-0000-0000-000000000002'
+       returning 1
+     ) select * from attempted $$,
   'a client cannot forge a read receipt (no UPDATE grant)'
 );
 

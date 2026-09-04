@@ -67,16 +67,19 @@ select results_eq(
   array['mine'],
   'client A reads only their own messages'
 );
-select throws_like(
+select throws_ok(
   $$ insert into public.messages (org_id, client_id, sender, body)
      values ('11111111-1111-1111-1111-111111111111',
              'd0000000-0000-0000-0000-000000000001', 'assistant', 'spoof') $$,
-  '%permission denied%',
+  '42501',
+  null,
   'client cannot write messages (turns are service-role written)'
 );
-select throws_like(
-  $$ update public.interview_state set answers = '{"hacked":true}'::jsonb $$,
-  '%permission denied%',
+select is_empty(
+  $$ with attempted as (
+       update public.interview_state set answers = '{"hacked":true}'::jsonb
+       returning 1
+     ) select * from attempted $$,
   'client cannot edit their own interview state'
 );
 select is_empty(

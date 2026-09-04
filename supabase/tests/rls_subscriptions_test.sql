@@ -91,10 +91,11 @@ select is_empty(
   $$ select 1 from public.payment_records where id = '66666666-6666-6666-6666-666666666602' $$,
   'client A1 cannot read another client''s payment record'
 );
-select throws_like(
+select throws_ok(
   $$ insert into public.subscriptions (org_id, client_id, status)
      values ('11111111-1111-1111-1111-111111111111', 'dddddddd-dddd-dddd-dddd-dddddddddd01', 'active') $$,
-  '%permission denied%',
+  '42501',
+  null,
   'a client cannot write subscriptions directly (service-role only)'
 );
 

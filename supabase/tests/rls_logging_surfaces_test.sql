@@ -58,10 +58,11 @@ select isnt_empty(
   $$ select 1 from public.workout_logs where client_id = 'dddddddd-dddd-dddd-dddd-dddddddddd01' $$,
   'client A reads their own working sets'
 );
-select throws_like(
+select throws_ok(
   $$ insert into public.weigh_ins (org_id, client_id, tz_date, weight_kg)
      values ('11111111-1111-1111-1111-111111111111', 'dddddddd-dddd-dddd-dddd-dddddddddd01', current_date, 70) $$,
-  '%permission denied%',
+  '42501',
+  null,
   'a client cannot INSERT weigh-ins directly (service-role only)'
 );
 

@@ -54,10 +54,11 @@ select results_eq(
 );
 
 -- No INSERT grant for authenticated → permission denied even for own org.
-select throws_like(
+select throws_ok(
   $$ insert into public.leads (org_id, email, allergens)
      values ('11111111-1111-1111-1111-111111111111', 'x@test.local', '{}') $$,
-  '%permission denied%',
+  '42501',
+  null,
   'owner A cannot insert leads directly (writes go through the service role)'
 );
 
@@ -80,10 +81,11 @@ select is_empty(
   'client cannot read leads'
 );
 
-select throws_like(
+select throws_ok(
   $$ insert into public.leads (org_id, email, allergens)
      values ('11111111-1111-1111-1111-111111111111', 'y@test.local', '{}') $$,
-  '%permission denied%',
+  '42501',
+  null,
   'client cannot insert leads'
 );
 

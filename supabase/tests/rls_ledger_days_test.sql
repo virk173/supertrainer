@@ -44,10 +44,11 @@ select isnt_empty(
   $$ select 1 from public.ledger_days where client_id = 'dddddddd-dddd-dddd-dddd-dddddddddd01' $$,
   'client A reads their own ledger days'
 );
-select throws_like(
+select throws_ok(
   $$ insert into public.ledger_days (org_id, client_id, tz_date)
      values ('11111111-1111-1111-1111-111111111111', 'dddddddd-dddd-dddd-dddd-dddddddddd01', current_date) $$,
-  '%permission denied%',
+  '42501',
+  null,
   'a client cannot write ledger days (close job is service-role)'
 );
 

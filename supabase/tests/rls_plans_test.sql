@@ -75,10 +75,11 @@ select is_empty(
   $$ select 1 from public.plans where id = '99999999-9999-9999-9999-999999999903' $$,
   'client A cannot read another client''s approved plan'
 );
-select throws_like(
+select throws_ok(
   $$ insert into public.plans (org_id, client_id, source)
      values ('11111111-1111-1111-1111-111111111111', 'dddddddd-dddd-dddd-dddd-dddddddddd01', 'manual') $$,
-  '%permission denied%',
+  '42501',
+  null,
   'a client cannot write plans directly (service-role only)'
 );
 
