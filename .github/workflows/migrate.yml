@@ -10,6 +10,16 @@ name: Migrate (production DB)
 # reviewers on the `production` environment.
 on:
   workflow_dispatch:
+    inputs:
+      include_all:
+        description: >-
+          Apply migrations that sort BEFORE the last one already on prod.
+          Off by default: out-of-order application is how a migration that
+          depends on a later one silently half-applies. Turn it on only after
+          reading the offending file and confirming it is independent of
+          everything applied since.
+        type: boolean
+        default: false
 
 concurrency:
   group: migrate-main
@@ -34,7 +44,7 @@ jobs:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
       - name: Push migrations
-        run: supabase db push
+        run: supabase db push ${{ inputs.include_all && '--include-all' || '' }}
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
