@@ -29,6 +29,8 @@ const eslintConfig = [
   ...compat.extends("next/core-web-vitals", "next/typescript"),
   {
     ignores: [
+      // The secret-scan build output (see scripts/scan-client-bundle.mjs).
+      ".next-scan/**",
       "node_modules/**",
       ".next/**",
       "out/**",

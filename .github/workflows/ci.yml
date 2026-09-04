@@ -65,6 +65,11 @@ jobs:
           # STRIPE_SECRET_KEY stays unset, so every other payment surface renders
           # its gated state (mirror of the ANTHROPIC_API_KEY live-AI gating).
           echo "STRIPE_WEBHOOK_SECRET=whsec_test_supertrainer_ci" >> apps/web/.env.local
+          # A TEST-ONLY cron secret (not a real credential): the data-rights,
+          # budget-sweep and referral-settlement e2e tests drive their workers
+          # over HTTP, and without this they SKIP — silently losing the tests
+          # that prove an export is complete and a purge leaves nothing behind.
+          echo "CRON_SECRET=ci_cron_secret_supertrainer" >> apps/web/.env.local
 
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
@@ -80,3 +85,50 @@ jobs:
       - name: Playwright smoke tests
         run: npm run test
         working-directory: apps/web
+
+  bundle:
+    name: Client-bundle secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      # Builds into its own directory and reads every byte a browser would
+      # download, looking for the VALUES of server-only secrets as well as their
+      # shapes. Catches the one-word mistake that ships a service-role key.
+      - name: Build (scan output)
+        run: NEXT_DIST_DIR=.next-scan npm run build
+        working-directory: apps/web
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-anon-key-placeholder
+          SUPABASE_SERVICE_ROLE_KEY: ci-service-role-placeholder-value
+      - name: Scan client bundle
+        run: node scripts/scan-client-bundle.mjs --build-dir .next-scan
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ci-service-role-placeholder-value
+
+  security:
+    name: Security review (Claude)
+    runs-on: ubuntu-latest
+    # Only when the API key is configured — a missing key must not gate merges
+    # with a red check nobody can fix from a fork.
+    if: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Claude security review
+        uses: anthropics/claude-code-security-review@main
+        continue-on-error: true
+        with:
+          claude-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
+          comment-pr: true
+          exclude-directories: "load,docs,supabase/tests"

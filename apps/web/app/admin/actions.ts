@@ -128,6 +128,20 @@ export async function finishRegisterKey(
 ): Promise<AdminResult> {
   const who = await requireAdmin();
   if (!who) return { ok: false, message: "Not available." };
+
+  // The elevation rule is re-checked HERE as well as in beginRegisterKey.
+  // Without a matching challenge this call already fails, so the check is
+  // defence in depth — but "the other function checked" is exactly the
+  // assumption that turns a refactor into a second way in.
+  const service = createServiceClient();
+  const { count } = await service
+    .from("admin_credentials")
+    .select("id", { count: "exact", head: true })
+    .eq("profile_id", who.profileId);
+  if ((count ?? 0) > 0 && !(await requireElevated())) {
+    return { ok: false, message: "Unlock the console before adding another key." };
+  }
+
   const ok = await verifyRegistration(who.profileId, response, nickname.slice(0, 60) || "Security key");
   if (!ok) return { ok: false, message: "That key couldn’t be registered." };
   await platformAudit(who.profileId, "console.key_registered", "admin_credential", null, { nickname });
