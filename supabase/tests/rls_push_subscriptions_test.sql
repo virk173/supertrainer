@@ -52,11 +52,12 @@ select lives_ok(
   'client A registers their own device subscription'
 );
 
-select throws_like(
+select throws_ok(
   $$ insert into public.push_subscriptions (org_id, client_id, endpoint, platform)
      values ('11111111-1111-1111-1111-111111111111',
              'd0000000-0000-0000-0000-000000000002', 'https://push.example/spoof', 'ios') $$,
-  '%row-level security%',
+  '42501',
+  null,
   'client A cannot register a subscription for another client'
 );
 
@@ -67,9 +68,10 @@ select results_eq(
   'client A sees only their own subscriptions'
 );
 
-select throws_like(
+select throws_ok(
   $$ delete from public.push_subscriptions $$,
-  '%permission denied%',
+  '42501',
+  null,
   'no DELETE grant — subscriptions are soft-revoked'
 );
 

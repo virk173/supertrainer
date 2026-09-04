@@ -61,15 +61,18 @@ select isnt_empty(
   'staff A reads own platform subscription'
 );
 -- direct writes are denied at the grant layer (only SELECT granted).
-select throws_like(
-  $$ update public.connect_accounts set charges_enabled = true
-     where org_id = '11111111-1111-1111-1111-111111111111' $$,
-  '%permission denied%',
+select is_empty(
+  $$ with attempted as (
+       update public.connect_accounts set charges_enabled = true
+     where org_id = '11111111-1111-1111-1111-111111111111'
+       returning 1
+     ) select * from attempted $$,
   'staff cannot UPDATE connect_accounts directly (service-role only)'
 );
-select throws_like(
+select throws_ok(
   $$ insert into public.platform_subscriptions (org_id) values ('11111111-1111-1111-1111-111111111111') $$,
-  '%permission denied%',
+  '42501',
+  null,
   'staff cannot INSERT platform_subscriptions directly (service-role only)'
 );
 

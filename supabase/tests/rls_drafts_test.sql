@@ -47,11 +47,12 @@ select lives_ok(
      where id = 'f0000000-0000-0000-0000-000000000001' $$,
   'staff can action (update) a draft'
 );
-select throws_like(
+select throws_ok(
   $$ insert into public.drafts (org_id, client_id, category, draft_text)
      values ('11111111-1111-1111-1111-111111111111',
              'd0000000-0000-0000-0000-000000000001', 'conversational', 'spoof') $$,
-  '%permission denied%',
+  '42501',
+  null,
   'staff cannot INSERT drafts (service-role only)'
 );
 

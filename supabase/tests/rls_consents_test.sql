@@ -55,11 +55,12 @@ select results_eq(
   array['Client A'],
   'client A reads their own consent'
 );
-select throws_like(
+select throws_ok(
   $$ insert into public.consents (org_id, client_id, doc_version, doc_sha256, signed_name)
      values ('11111111-1111-1111-1111-111111111111',
              'd0000000-0000-0000-0000-000000000001', 'v1', 'x', 'Hacker') $$,
-  '%permission denied%',
+  '42501',
+  null,
   'client cannot insert consents (append-only, service-role writes)'
 );
 

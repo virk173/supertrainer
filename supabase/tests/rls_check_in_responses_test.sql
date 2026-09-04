@@ -52,11 +52,12 @@ select is(
   1,
   'a client reads their own check-in responses'
 );
-select throws_like(
+select throws_ok(
   $$ insert into public.check_in_responses (org_id, client_id, card_id, card_kind, answer)
      values ('11111111-1111-1111-1111-111111111111',
              'd0000000-0000-0000-0000-000000000001', 'sleep-1', 'sleep', '{"value":1}') $$,
-  '%permission denied%',
+  '42501',
+  null,
   'a client cannot write check-in responses (service-role only)'
 );
 

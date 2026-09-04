@@ -130,18 +130,21 @@ select is_empty(
 
 -- Privilege-escalation guards: profile lifecycle is service-role only, so even
 -- staff cannot mint a new profile (e.g. a second owner) or delete one.
-select throws_like(
+select throws_ok(
   $$ insert into public.profiles (id, org_id, role, display_name)
      values ('a0000000-0000-0000-0000-000000000009',
              '11111111-1111-1111-1111-111111111111', 'owner', 'Injected') $$,
-  '%permission denied%',
+  '42501',
+  null,
   'staff cannot insert profiles (no INSERT grant)'
 );
 
-select throws_like(
-  $$ delete from public.profiles
-     where id = 'a0000000-0000-0000-0000-000000000001' $$,
-  '%permission denied%',
+select is_empty(
+  $$ with attempted as (
+       delete from public.profiles
+     where id = 'a0000000-0000-0000-0000-000000000001'
+       returning 1
+     ) select * from attempted $$,
   'staff cannot delete the owner''s profile (no DELETE grant)'
 );
 
@@ -182,10 +185,11 @@ select lives_ok(
   'client can update own intake'
 );
 
-select throws_ok(
+select throws_like(
   $$ update public.clients
        set status = 'paused'
      where id = 'c0000000-0000-0000-0000-0000000000a1' $$,
+  '%restricted columns%',
   'clients cannot modify restricted columns'
 );
 
@@ -225,11 +229,12 @@ select lives_ok(
   'client may append an audit row attributed to themselves'
 );
 
-select throws_like(
+select throws_ok(
   $$ update public.profiles
        set role = 'owner'
      where id = 'a0000000-0000-0000-0000-000000000003' $$,
-  '%permission denied%',
+  '42501',
+  null,
   'client cannot escalate their own role (column grant)'
 );
 

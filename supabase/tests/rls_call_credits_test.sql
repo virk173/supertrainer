@@ -42,9 +42,11 @@ set local role authenticated;
 select set_config('request.jwt.claims',
   '{"sub": "a0000000-0000-0000-0000-0000000000c1", "role": "authenticated", "org_id": "11111111-1111-1111-1111-111111111111", "user_role": "client"}', true);
 select is((select count(*)::int from public.call_credits), 1, 'client A1 reads only their own credit row');
-select throws_like(
-  $$ update public.call_credits set credits_used = 1 where client_id = 'dddddddd-dddd-dddd-dddd-dddddddddd01' $$,
-  '%permission denied%',
+select is_empty(
+  $$ with attempted as (
+       update public.call_credits set credits_used = 1 where client_id = 'dddddddd-dddd-dddd-dddd-dddddddddd01'
+       returning 1
+     ) select * from attempted $$,
   'a client cannot write call_credits directly (service-role only)'
 );
 

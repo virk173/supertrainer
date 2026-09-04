@@ -67,10 +67,11 @@ select ok(
      from public.exercises),
   'owner A reads global exercises + only their own org-custom'
 );
-select throws_like(
+select throws_ok(
   $$ insert into public.exercises (org_id, source, name, name_normalized)
      values ('11111111-1111-1111-1111-111111111111', 'org_custom', 'x', 'x') $$,
-  '%permission denied%',
+  '42501',
+  null,
   'no authenticated INSERT on exercises (service-role only in P5.1)'
 );
 -- P5.3 opens a trainer WRITE path on exercise_videos for the org's own overrides.

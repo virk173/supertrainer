@@ -56,11 +56,12 @@ select isnt_empty(
   $$ select 1 from public.plans_active where client_id = 'dddddddd-dddd-dddd-dddd-dddddddddd01' $$,
   'client A reads their own active plan (targets)'
 );
-select throws_like(
+select throws_ok(
   $$ insert into public.meal_logs (org_id, client_id, tz_date, meal_slot, method)
      values ('11111111-1111-1111-1111-111111111111', 'dddddddd-dddd-dddd-dddd-dddddddddd01',
              current_date, 'dinner', 'text') $$,
-  '%permission denied%',
+  '42501',
+  null,
   'a client cannot INSERT meal logs directly (writes are service-role only)'
 );
 
@@ -89,10 +90,11 @@ select is_empty(
   $$ select 1 from public.plans_active where client_id = 'dddddddd-dddd-dddd-dddd-dddddddddd01' $$,
   'org B staff cannot read org A''s active plan'
 );
-select throws_like(
+select throws_ok(
   $$ insert into public.plans_active (client_id, org_id) values
      ('dddddddd-dddd-dddd-dddd-dddddddddd01', '22222222-2222-2222-2222-222222222222') $$,
-  '%permission denied%',
+  '42501',
+  null,
   'no API role can write plans_active (P4.3 writes it service-role)'
 );
 

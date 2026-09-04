@@ -46,10 +46,11 @@ select isnt_empty(
   $$ select 1 from public.reminder_rules where client_id = 'dddddddd-dddd-dddd-dddd-dddddddddd01' $$,
   'client A reads their own reminder rules'
 );
-select throws_like(
+select throws_ok(
   $$ insert into public.reminder_rules (org_id, client_id, kind)
      values ('11111111-1111-1111-1111-111111111111', 'dddddddd-dddd-dddd-dddd-dddddddddd01', 'checkin') $$,
-  '%permission denied%',
+  '42501',
+  null,
   'a client cannot write reminder rules directly (service-role only)'
 );
 
