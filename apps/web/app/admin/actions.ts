@@ -22,6 +22,7 @@ import { invalidateIncidentCache } from "@/lib/admin/incidents";
 import {
   authenticationOptions,
   registrationOptions,
+  rpID,
   verifyAssertion,
   verifyRegistration,
 } from "@/lib/admin/webauthn";
@@ -111,10 +112,13 @@ export async function beginRegisterKey(label: string): Promise<AdminResult> {
   // Registering the FIRST key needs no elevation (there is nothing to elevate
   // with yet); every key after that does.
   const service = createServiceClient();
+  // "First key" means first key FOR THIS HOSTNAME. On a new domain there is
+  // nothing to elevate with, exactly as on a fresh deployment.
   const { count } = await service
     .from("admin_credentials")
     .select("id", { count: "exact", head: true })
-    .eq("profile_id", who.profileId);
+    .eq("profile_id", who.profileId)
+    .eq("rp_id", rpID());
   if ((count ?? 0) > 0 && !(await requireElevated())) {
     return { ok: false, message: "Unlock the console before adding another key." };
   }
@@ -137,7 +141,8 @@ export async function finishRegisterKey(
   const { count } = await service
     .from("admin_credentials")
     .select("id", { count: "exact", head: true })
-    .eq("profile_id", who.profileId);
+    .eq("profile_id", who.profileId)
+    .eq("rp_id", rpID());
   if ((count ?? 0) > 0 && !(await requireElevated())) {
     return { ok: false, message: "Unlock the console before adding another key." };
   }

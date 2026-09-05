@@ -76,10 +76,14 @@ async function takeChallenge(
 
 export async function registrationOptions(profileId: string, label: string) {
   const service = createServiceClient();
+  // Scoped to this RP: a credential registered for another hostname is not a
+  // duplicate here, and excluding it would stop the operator registering the
+  // key they actually need on this one.
   const { data: existing } = await service
     .from("admin_credentials")
     .select("credential_id, transports")
-    .eq("profile_id", profileId);
+    .eq("profile_id", profileId)
+    .eq("rp_id", rpID());
 
   const options = await generateRegistrationOptions({
     rpName: "supertrainer platform",
@@ -118,6 +122,9 @@ export async function verifyRegistration(
   const service = createServiceClient();
   const { error } = await service.from("admin_credentials").insert({
     profile_id: profileId,
+    // Recorded, not derived later: this is the hostname the browser bound the
+    // credential to, and it is the only hostname it will ever work on.
+    rp_id: rpID(),
     credential_id: info.credential.id,
     public_key: bytesToHex(info.credential.publicKey),
     counter: info.credential.counter,
@@ -134,7 +141,8 @@ export async function authenticationOptions(profileId: string) {
   const { data: creds } = await service
     .from("admin_credentials")
     .select("credential_id, transports")
-    .eq("profile_id", profileId);
+    .eq("profile_id", profileId)
+    .eq("rp_id", rpID());
 
   const options = await generateAuthenticationOptions({
     rpID: rpID(),
@@ -161,11 +169,14 @@ export async function verifyAssertion(
   const service = createServiceClient();
   const { data: cred } = await service
     .from("admin_credentials")
-    .select("id, profile_id, credential_id, public_key, counter, transports")
+    .select("id, profile_id, credential_id, public_key, counter, transports, rp_id")
     .eq("credential_id", response.id)
     .maybeSingle();
-  // The credential must belong to the caller — never trust the id alone.
+  // The credential must belong to the caller AND to this hostname — never trust
+  // the id alone, and never verify an assertion against a credential registered
+  // for a different relying party.
   if (!cred || cred.profile_id !== profileId) return { ok: false, reason: "unknown credential" };
+  if (cred.rp_id !== rpID()) return { ok: false, reason: "credential belongs to another domain" };
 
   const verification = await verifyAuthenticationResponse({
     response,

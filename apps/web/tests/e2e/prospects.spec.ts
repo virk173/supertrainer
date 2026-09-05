@@ -98,8 +98,19 @@ test("prospects: convert manually issues an invite and marks the lead converted"
   const row = page.getByTestId("prospect-row").filter({ hasText: "Convert Me" });
   await row.getByTestId("convert-prospect").click();
 
-  // Success surfaces a copyable /join invite link.
-  await expect(row.getByTestId("copy-join-link")).toBeVisible({ timeout: 15_000 });
+  // Success surfaces a copyable /join invite link. Wait on EITHER outcome:
+  // conversion provisions an auth user, a client and an invite, so on a loaded
+  // CI runner it is genuinely slow — and when it does fail, the error the UI
+  // already renders is the thing worth reading. Asserting only the happy path
+  // turned every failure into "element not found", which is why this test has
+  // been flaky-by-mystery three times now.
+  const joinLink = row.getByTestId("copy-join-link");
+  const convertError = row.getByTestId("convert-error");
+  await expect(joinLink.or(convertError)).toBeVisible({ timeout: 45_000 });
+  if (await convertError.isVisible()) {
+    throw new Error(`convert failed: ${await convertError.textContent()}`);
+  }
+  await expect(joinLink).toBeVisible();
 
   const service = serviceClient();
 

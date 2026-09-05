@@ -232,3 +232,52 @@ test("register a key, unlock, and operate: budget, flags, replay, incident banne
   await expect(page.getByTestId("admin-unlock")).toBeVisible();
   await expect(page.getByTestId("admin-overview")).toHaveCount(0);
 });
+
+test("a key registered on another domain does not lock the operator out", async ({ page }) => {
+  // The lockout this guards against: a credential is bound to the hostname it
+  // was created on. If /admin counted credentials without regard to hostname,
+  // moving NEXT_PUBLIC_APP_URL to a new domain would offer "unlock" with a key
+  // the browser cannot produce, while refusing to register a replacement
+  // because one already exists — recoverable only by hand-deleting a row in
+  // production.
+  const service = serviceClient();
+  const { userId, tokenHash } = await seedTrainer(uniqueEmail("admin-otherdomain"));
+  await makePlatformAdmin(userId);
+
+  // A key that belongs to a DIFFERENT relying party (as if registered before a
+  // domain move). It is real as far as the database is concerned.
+  await service.from("admin_credentials").insert({
+    profile_id: userId,
+    rp_id: "an-old-domain.example",
+    credential_id: `stale-${randomUUID()}`,
+    public_key: "\\x01",
+    counter: 0,
+    nickname: "Key from the old domain",
+  });
+
+  await attachVirtualKey(page);
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto(`/auth/confirm?token_hash=${tokenHash}&type=email&next=/admin`);
+
+  // The door must offer REGISTRATION, not an unlock that cannot succeed.
+  await expect(page.getByTestId("admin-unlock")).toBeVisible();
+  await expect(page.getByTestId("admin-register-button")).toBeVisible();
+  await expect(page.getByTestId("admin-unlock-button")).toHaveCount(0);
+
+  // …and registering here actually works, without an elevation the operator
+  // has no way to obtain on this hostname.
+  await page.getByRole("textbox", { name: "Name this key" }).fill("Key for this domain");
+  await page.getByTestId("admin-register-button").click();
+  await expect(page.getByTestId("admin-unlock-button")).toBeVisible();
+
+  await page.getByTestId("admin-unlock-button").click();
+  await expect(page.getByTestId("admin-overview")).toBeVisible();
+
+  // Both credentials coexist, each bound to its own hostname.
+  const { data: creds } = await service
+    .from("admin_credentials")
+    .select("rp_id")
+    .eq("profile_id", userId);
+  const domains = (creds ?? []).map((c) => c.rp_id).sort();
+  expect(domains).toEqual(["an-old-domain.example", "localhost"]);
+});
