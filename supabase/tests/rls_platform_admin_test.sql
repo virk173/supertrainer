@@ -21,9 +21,9 @@ insert into public.profiles (id, org_id, role) values
 -- Seed one row in each table as the service role would.
 insert into public.platform_admins (profile_id, note)
   values ('a0000000-0000-0000-0000-000000000001', 'seed');
-insert into public.admin_credentials (id, profile_id, credential_id, public_key)
+insert into public.admin_credentials (id, profile_id, credential_id, public_key, rp_id)
   values ('cccccccc-cccc-cccc-cccc-cccccccccc01',
-          'a0000000-0000-0000-0000-000000000001', 'cred-1', '\x01'::bytea);
+          'a0000000-0000-0000-0000-000000000001', 'cred-1', '\x01'::bytea, 'test.local');
 insert into public.admin_challenges (profile_id, challenge, kind, expires_at)
   values ('a0000000-0000-0000-0000-000000000001', 'chal-1', 'authenticate', now() + interval '5 minutes');
 insert into public.admin_sessions (profile_id, elevated_until)

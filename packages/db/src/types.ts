@@ -84,6 +84,7 @@ export type Database = {
           nickname: string | null
           profile_id: string
           public_key: string
+          rp_id: string
           transports: string[]
           updated_at: string
         }
@@ -98,6 +99,7 @@ export type Database = {
           nickname?: string | null
           profile_id: string
           public_key: string
+          rp_id: string
           transports?: string[]
           updated_at?: string
         }
@@ -112,6 +114,7 @@ export type Database = {
           nickname?: string | null
           profile_id?: string
           public_key?: string
+          rp_id?: string
           transports?: string[]
           updated_at?: string
         }

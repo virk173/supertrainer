@@ -2,6 +2,7 @@ import "server-only";
 
 import { cookies, headers } from "next/headers";
 
+import { rpID } from "@/lib/admin/webauthn";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getSessionClaims } from "@/lib/onboarding/state";
 
@@ -92,10 +93,14 @@ export async function adminIdentity(): Promise<AdminIdentity | null> {
     );
   }
 
+  // Scoped to the CURRENT hostname. A key registered for another domain cannot
+  // produce an assertion here, so offering "unlock" with it would be a dead end
+  // — and, since registration is gated on already having one, a lockout.
   const { count } = await service
     .from("admin_credentials")
     .select("id", { count: "exact", head: true })
-    .eq("profile_id", userId);
+    .eq("profile_id", userId)
+    .eq("rp_id", rpID());
 
   return { profileId: userId, elevated, orgId, hasCredential: (count ?? 0) > 0 };
 }
