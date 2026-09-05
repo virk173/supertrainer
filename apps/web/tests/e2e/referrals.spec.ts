@@ -316,6 +316,23 @@ test("the trainer surface mints a link, and the client card obeys the trainer's 
   await page.getByTestId("client-referrals-toggle").check();
   await expect(page.getByText("On", { exact: true })).toBeVisible();
 
+  // That label is OPTIMISTIC — it reflects local state, not the write. Wait for
+  // the server to actually have it before reloading the client's page, or this
+  // races on a slow runner.
+  await expect
+    .poll(
+      async () => {
+        const { data } = await service
+          .from("orgs")
+          .select("client_referrals_enabled")
+          .eq("id", orgId)
+          .single();
+        return data?.client_referrals_enabled ?? false;
+      },
+      { timeout: 15_000 },
+    )
+    .toBe(true);
+
   await clientPage.reload();
   await expect(clientPage.getByTestId("bring-a-friend")).toBeVisible();
   await settlePaint(clientPage);
